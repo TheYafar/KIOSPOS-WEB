@@ -70,23 +70,26 @@ CREATE INDEX IF NOT EXISTS idx_cajas_negocio_id ON cajas(negocio_id);
 -- ==============================================================================
 -- 4. RLS para las tablas de datos (mismo patrón que productos en V1)
 -- ==============================================================================
+-- NULLIF(..., '') por el mismo motivo que en V1: tras un SET LOCAL previo en la
+-- conexión del pool, el GUC vuelve a '' (no a NULL), y '' debe contar como "sin
+-- negocio" (cero filas), no reventar el cast a bigint.
 ALTER TABLE locales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE locales FORCE ROW LEVEL SECURITY;
 CREATE POLICY locales_aislamiento_por_negocio ON locales
-    USING (negocio_id = current_setting('app.current_negocio_id', true)::bigint)
-    WITH CHECK (negocio_id = current_setting('app.current_negocio_id', true)::bigint);
+    USING (negocio_id = NULLIF(current_setting('app.current_negocio_id', true), '')::bigint)
+    WITH CHECK (negocio_id = NULLIF(current_setting('app.current_negocio_id', true), '')::bigint);
 
 ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE usuarios FORCE ROW LEVEL SECURITY;
 CREATE POLICY usuarios_aislamiento_por_negocio ON usuarios
-    USING (negocio_id = current_setting('app.current_negocio_id', true)::bigint)
-    WITH CHECK (negocio_id = current_setting('app.current_negocio_id', true)::bigint);
+    USING (negocio_id = NULLIF(current_setting('app.current_negocio_id', true), '')::bigint)
+    WITH CHECK (negocio_id = NULLIF(current_setting('app.current_negocio_id', true), '')::bigint);
 
 ALTER TABLE cajas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cajas FORCE ROW LEVEL SECURITY;
 CREATE POLICY cajas_aislamiento_por_negocio ON cajas
-    USING (negocio_id = current_setting('app.current_negocio_id', true)::bigint)
-    WITH CHECK (negocio_id = current_setting('app.current_negocio_id', true)::bigint);
+    USING (negocio_id = NULLIF(current_setting('app.current_negocio_id', true), '')::bigint)
+    WITH CHECK (negocio_id = NULLIF(current_setting('app.current_negocio_id', true), '')::bigint);
 
 -- ==============================================================================
 -- 5. cuentas_login (DIRECTORIO, SIN RLS)

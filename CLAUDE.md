@@ -164,10 +164,11 @@ El producto y la UI en **español (Venezuela)**. Montos en Bs y $, a la **tasa B
 - **Paso 2 — Multi-tenant:** hecho. `negocio_id` + Row Level Security real en Postgres (doble barrera:
   `NegocioContext` en la app + `SET LOCAL app.current_negocio_id` + policy RLS con `FORCE ROW LEVEL
   SECURITY`, fail-closed si no hay contexto). Prueba de aislamiento con Testcontainers en
-  `backend/src/test/java/.../NegocioRlsIsolationTest.java`.
-  **Nota:** la prueba aún no se ha ejecutado de verdad (compila); falta instalar Docker Desktop en el PC de
-  dev para correr Testcontainers.
-- **Paso 3 — Auth:** hecho (compila; pruebas sin ejecutar aún, igual que Paso 2, por falta de Docker).
+  `backend/src/test/java/.../NegocioRlsIsolationTest.java`. **Pruebas en verde** contra Postgres 16 real.
+  Detalle aprendido: las policies usan `NULLIF(current_setting('app.current_negocio_id', true), '')::bigint`
+  porque tras un `SET LOCAL` previo en la conexión del pool el GUC vuelve a `''` (no NULL); sin el NULLIF, el
+  fail-closed no cerraba y el cast a bigint reventaba.
+- **Paso 3 — Auth:** hecho. **Pruebas en verde.**
   - Spring Security sin estado + **JWT firmado por el servidor** (HS256, `JwtService`/`JwtAuthFilter`). El
     filtro fija el `negocio_id` en `NegocioContext` desde el token, que es lo que activa RLS por petición.
   - **Contraseñas y PIN con BCrypt** (el escritorio los tenía en texto plano — NO se portó eso).
@@ -185,8 +186,7 @@ El producto y la UI en **español (Venezuela)**. Montos en Bs y $, a la **tasa B
   - **Pendiente/consciente:** falta refresh tokens, 2FA del super admin, bloqueo por intentos fallidos y el
     endpoint real de alta de negocio (va en el Paso 4). El JWT lleva el `rol` grabado: al cambiar el rol de un
     usuario, su token viejo sigue valiendo hasta expirar (TTL 12h por defecto) — aceptable por ahora.
-- **Paso 4 — Permiso/licencia + suscripción + super admin:** hecho (compila; pruebas sin ejecutar aún por
-  falta de Docker).
+- **Paso 4 — Permiso/licencia + suscripción + super admin:** hecho. **Pruebas en verde.**
   - **Suscripción:** `negocios` gana `plan` + `pago_hasta`; `estado` se reusa como override manual
     (SUSPENDIDA/ACTIVA). `SuscripcionService` calcula la situación contra el reloj del servidor y la escalera
     de corte: al día → ACTIVA cobra; 1..15 días vencido → AVISO aún cobra; >15 → SUSPENDIDA efectiva, solo

@@ -47,11 +47,13 @@ CREATE INDEX IF NOT EXISTS idx_productos_negocio_id ON productos(negocio_id);
 --    nunca es superusuario ni propietario, así que ya le aplicaría sin FORCE;
 --    FORCE además impide que un futuro "ALTER ROLE kioskpos_app ... OWNER"
 --    accidental abra una puerta de escape.
---    Sin current_setting fijado, la comparación da NULL -> cero filas (fail-closed).
+--    Sin negocio fijado -> cero filas (fail-closed). Se usa NULLIF(..., '') porque,
+--    tras un SET LOCAL previo en la misma conexión del pool, el GUC no vuelve a NULL
+--    sino a cadena vacía '', y ''::bigint daría error en vez de cerrar el acceso.
 -- ==============================================================================
 ALTER TABLE productos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE productos FORCE ROW LEVEL SECURITY;
 
 CREATE POLICY productos_aislamiento_por_negocio ON productos
-    USING (negocio_id = current_setting('app.current_negocio_id', true)::bigint)
-    WITH CHECK (negocio_id = current_setting('app.current_negocio_id', true)::bigint);
+    USING (negocio_id = NULLIF(current_setting('app.current_negocio_id', true), '')::bigint)
+    WITH CHECK (negocio_id = NULLIF(current_setting('app.current_negocio_id', true), '')::bigint);

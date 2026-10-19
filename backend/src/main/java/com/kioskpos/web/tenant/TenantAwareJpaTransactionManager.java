@@ -16,9 +16,12 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * {@code negocio_id} contra ese GUC.
  *
  * <p>Si {@link NegocioContext} no tiene nada fijado, deliberadamente NO se llama a
- * {@code set_config}: el GUC queda sin definir en esta transacción y
- * {@code current_setting(..., true)} devuelve NULL, con lo que las policies de RLS
- * no matchean ninguna fila (fail-closed), en vez de abrir el acceso a todo.
+ * {@code set_config}: el GUC queda sin valor en esta transacción. Ojo: tras un
+ * {@code SET LOCAL} previo en la misma conexión del pool, {@code current_setting(...,
+ * true)} no devuelve NULL sino cadena vacía {@code ''}; por eso las policies usan
+ * {@code NULLIF(current_setting(...), '')::bigint}, de modo que "sin negocio" (NULL o
+ * '') no matchea ninguna fila (fail-closed) en vez de abrir el acceso o reventar el
+ * cast a bigint.
  */
 public class TenantAwareJpaTransactionManager extends JpaTransactionManager {
 
