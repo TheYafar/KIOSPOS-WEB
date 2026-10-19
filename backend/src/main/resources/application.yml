@@ -31,6 +31,13 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: false
 
+kioskpos:
+  jwt:
+    # En dev hay un secreto por defecto; en producción SIEMPRE via variable de entorno
+    # KIOSKPOS_JWT_SECRET (>= 32 bytes). Firmar los tokens: el servidor es la autoridad.
+    secret: ${KIOSKPOS_JWT_SECRET:dev-secret-cambiar-en-produccion-min-32-bytes!!}
+    ttl-minutes: ${KIOSKPOS_JWT_TTL_MINUTES:720}
+
 management:
   endpoints:
     web:

@@ -2,6 +2,7 @@ package com.kioskpos.web.tenant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.kioskpos.web.PostgresRlsTestBase;
 import com.kioskpos.web.negocio.Negocio;
 import com.kioskpos.web.negocio.NegocioRepository;
 import com.kioskpos.web.producto.Producto;
@@ -13,46 +14,13 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.test.context.DynamicPropertyRegistry;
-import org.springframework.test.context.DynamicPropertySource;
-import org.testcontainers.containers.PostgreSQLContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
 
 /**
- * Prueba de la regla dura del CLAUDE.md: "una bodega no puede leer los datos de
- * otra". Usa un Postgres 16 real vía Testcontainers (no H2: Row Level Security es
- * una característica real de Postgres, no se puede simular).
- *
- * <p>El datasource de la app en este test se conecta como {@code kioskpos_app}
- * (creado por db/init/01-create-app-role.sql, sin privilegios de superusuario ni
- * de propietario), exactamente como en dev/producción — si esta prueba conectara
- * como superusuario, Row Level Security se saltaría silenciosamente y la prueba
- * daría una falsa sensación de seguridad.
+ * Regla dura del CLAUDE.md: "una bodega no puede leer los datos de otra". Prueba la
+ * barrera de base de datos (Row Level Security) directamente sobre productos.
  */
-@Testcontainers
 @SpringBootTest
-class NegocioRlsIsolationTest {
-
-    @Container
-    static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>("postgres:16")
-            .withDatabaseName("kioskpos")
-            .withUsername("kioskpos_admin")
-            .withPassword("kioskpos_admin_dev")
-            .withInitScript("db/init/01-create-app-role.sql");
-
-    @DynamicPropertySource
-    static void overridePostgresProperties(DynamicPropertyRegistry registry) {
-        // Datasource de runtime: el rol limitado, igual que en dev/producción.
-        registry.add("spring.datasource.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.datasource.username", () -> "kioskpos_app");
-        registry.add("spring.datasource.password", () -> "kioskpos_app_dev");
-
-        // Datasource de Flyway: el rol administrativo, dueño de las tablas.
-        registry.add("spring.flyway.url", POSTGRES::getJdbcUrl);
-        registry.add("spring.flyway.user", POSTGRES::getUsername);
-        registry.add("spring.flyway.password", POSTGRES::getPassword);
-    }
+class NegocioRlsIsolationTest extends PostgresRlsTestBase {
 
     @Autowired
     private NegocioRepository negocioRepository;

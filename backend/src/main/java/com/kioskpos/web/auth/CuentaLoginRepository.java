@@ -1,0 +1,13 @@
+package com.kioskpos.web.auth;
+
+import java.util.Optional;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+/**
+ * Tabla de directorio sin RLS: solo se consulta por email exacto (resolución
+ * pre-sesión). No exponer un findAll() ni consultas amplias desde la app.
+ */
+public interface CuentaLoginRepository extends JpaRepository<CuentaLogin, Long> {
+    Optional<CuentaLogin> findByEmail(String email);
+    boolean existsByEmail(String email);
+}

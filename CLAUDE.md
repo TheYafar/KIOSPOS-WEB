@@ -167,4 +167,22 @@ El producto y la UI en **español (Venezuela)**. Montos en Bs y $, a la **tasa B
   `backend/src/test/java/.../NegocioRlsIsolationTest.java`.
   **Nota:** la prueba aún no se ha ejecutado de verdad (compila); falta instalar Docker Desktop en el PC de
   dev para correr Testcontainers.
-- **Paso 3 — Auth:** pendiente (siguiente).
+- **Paso 3 — Auth:** hecho (compila; pruebas sin ejecutar aún, igual que Paso 2, por falta de Docker).
+  - Spring Security sin estado + **JWT firmado por el servidor** (HS256, `JwtService`/`JwtAuthFilter`). El
+    filtro fija el `negocio_id` en `NegocioContext` desde el token, que es lo que activa RLS por petición.
+  - **Contraseñas y PIN con BCrypt** (el escritorio los tenía en texto plano — NO se portó eso).
+  - Dos caminos de entrada: **dueño/encargado** (correo+contraseña, `POST /api/auth/login-dueno`) y
+    **cajero** (PIN sobre caja registrada, `POST /api/auth/login-cajero`).
+  - Tablas de datos (`usuarios`, `cajas`, `locales`) bajo RLS; tablas de **directorio** sin RLS
+    (`cuentas_login`, `caja_tokens`) para resolver el negocio ANTES de que exista sesión (el único acceso
+    pre-contexto, por clave exacta).
+  - Registro/autorización de caja: `POST /api/cajas` (solo dueño/encargado) devuelve el token de la caja UNA
+    vez; `GET /api/caja/cajeros` (con header `X-Caja-Token`) para la pantalla de bloqueo.
+  - Alta de negocio+dueño: `NegocioRegistroService` (lo usará el panel de super admin del Paso 4; por ahora
+    seed/pruebas).
+  - Pruebas en `src/test/java/.../auth/AuthFlowIsolationTest.java` (login dueño, PIN cajero, cruce de negocio
+    bloqueado, listado aislado).
+  - **Pendiente/consciente:** falta refresh tokens, 2FA del super admin, bloqueo por intentos fallidos y el
+    endpoint real de alta de negocio (va en el Paso 4). El JWT lleva el `rol` grabado: al cambiar el rol de un
+    usuario, su token viejo sigue valiendo hasta expirar (TTL 12h por defecto) — aceptable por ahora.
+- **Paso 4 — Permiso/licencia + panel de super admin:** pendiente (siguiente).
