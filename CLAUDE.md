@@ -185,4 +185,28 @@ El producto y la UI en **español (Venezuela)**. Montos en Bs y $, a la **tasa B
   - **Pendiente/consciente:** falta refresh tokens, 2FA del super admin, bloqueo por intentos fallidos y el
     endpoint real de alta de negocio (va en el Paso 4). El JWT lleva el `rol` grabado: al cambiar el rol de un
     usuario, su token viejo sigue valiendo hasta expirar (TTL 12h por defecto) — aceptable por ahora.
-- **Paso 4 — Permiso/licencia + panel de super admin:** pendiente (siguiente).
+- **Paso 4 — Permiso/licencia + suscripción + super admin:** hecho (compila; pruebas sin ejecutar aún por
+  falta de Docker).
+  - **Suscripción:** `negocios` gana `plan` + `pago_hasta`; `estado` se reusa como override manual
+    (SUSPENDIDA/ACTIVA). `SuscripcionService` calcula la situación contra el reloj del servidor y la escalera
+    de corte: al día → ACTIVA cobra; 1..15 días vencido → AVISO aún cobra; >15 → SUSPENDIDA efectiva, solo
+    consulta. `dias-gracia` configurable (`kioskpos.suscripcion.dias-gracia`, default 15).
+  - **Permiso (kill switch):** `PermisoService` + `POST /api/permiso/renovar`. La caja (JWT con cajaId) pide
+    un permiso corto firmado (JWT `tipo=permiso`, TTL `kioskpos.permiso.lease-minutes`, default 10) que solo
+    se emite si el negocio puede cobrar. `exigirPermisoVigente(...)` lo usará la API de ventas (Paso 5).
+  - **Pagos manuales:** tabla `pagos` (sin RLS, facturación transversal). El dueño reporta
+    (`POST /api/mi-negocio/pagos`, queda PENDIENTE) y el super admin aprueba (empuja `pago_hasta`).
+  - **Super admin (global):** tabla `super_admins` (sin RLS). Login `POST /api/admin/login` → JWT sin negocio
+    (rol SUPER_ADMIN; el filtro no fija NegocioContext). Panel: `GET /api/admin/negocios` (con situación
+    calculada, # cajas, última vez en línea, último pago), `POST /api/admin/negocios` (alta negocio+dueño),
+    `GET .../cajas`, `POST .../suspender`, `POST .../reactivar`, `GET /api/admin/pagos-pendientes`,
+    `POST /api/admin/pagos/{id}/aprobar`. Para leer datos bajo RLS de un negocio (sus cajas), el admin fija el
+    contexto de ese negocio explícitamente.
+  - **Primer super admin:** `SuperAdminSeeder` lo crea al arrancar SOLO si se dan
+    `KIOSKPOS_BOOTSTRAP_SUPERADMIN_EMAIL`/`_PASSWORD` por entorno y no existe ninguno (sin default → sin
+    backdoor, CLAUDE.md §9).
+  - Pruebas en `src/test/java/.../suscripcion/SuscripcionPermisoTest.java` (escalera de corte, permiso solo
+    al día, aprobar pago reactiva).
+  - **Pendiente/consciente:** 2FA del super admin, pago automático (P3), y la lista de negocios cuenta cajas
+    con un switch de contexto por negocio (N+1; bien para pocos negocios, revisar si crece).
+- **Paso 5 — Ventas API + pantalla de cobro + ticket:** pendiente (siguiente).

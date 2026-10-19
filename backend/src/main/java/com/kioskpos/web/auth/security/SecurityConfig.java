@@ -25,13 +25,17 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        // Públicos: el propio login y los endpoints que se autentican con el
-                        // token de la caja (hacen su propia verificación, no por JWT).
+                        // Públicos: el login de dueño/cajero, el login de super admin,
+                        // los endpoints que se autentican con el token de la caja, y salud.
                         .requestMatchers("/api/auth/**", "/api/caja/**").permitAll()
+                        .requestMatchers("/api/admin/login").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
-                        // Crear cajas y usuarios: solo dueño o encargado.
+                        // Panel de super admin.
+                        .requestMatchers("/api/admin/**").hasRole("SUPER_ADMIN")
+                        // Crear cajas/usuarios y reportar pagos: solo dueño o encargado.
                         .requestMatchers(HttpMethod.POST, "/api/cajas").hasAnyRole("DUENO", "ENCARGADO")
                         .requestMatchers(HttpMethod.POST, "/api/usuarios").hasAnyRole("DUENO", "ENCARGADO")
+                        .requestMatchers(HttpMethod.POST, "/api/mi-negocio/pagos").hasAnyRole("DUENO", "ENCARGADO")
                         .anyRequest().authenticated())
                 .addFilterBefore(new JwtAuthFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
         return http.build();
