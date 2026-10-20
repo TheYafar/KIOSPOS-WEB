@@ -51,7 +51,6 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
       <nav className="tabbar">
         {tabs.map((t) => (
           <button key={t.id} className="tab" aria-current={tab === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>
-            <span className="dot" />
             {t.n}
           </button>
         ))}
