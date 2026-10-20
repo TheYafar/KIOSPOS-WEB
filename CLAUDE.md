@@ -230,4 +230,15 @@ El producto y la UI en **español (Venezuela)**. Montos en Bs y $, a la **tasa B
     `POST /api/inventario/importar` (CSV en el cuerpo). Leer: cualquier usuario; escribir: dueño/encargado.
   - **Pendiente/consciente:** sin códigos alternos, empaques/desempaque ni categorías como entidad (P2);
     pantalla React con el frontend.
-- **Paso 7 — Cuadre (apertura + cierre simple):** pendiente (siguiente).
+- **Paso 7 — Cuadre (apertura + cierre simple):** hecho (backend). **Pruebas en verde (18/18).**
+  - `turnos` (RLS): sesión de caja con fondo inicial; índice único parcial → un solo turno ABIERTO por caja.
+    `ventas` gana `turno_id` (la venta se ata al turno abierto de su caja al cobrar).
+  - `CuadreService` (lógica sacada del controller, como pide CLAUDE.md §5): `abrir(fondo)`, `resumen` (vivo) y
+    `cerrarSimple(contado)`. Esperado en gaveta = fondo + efectivo cobrado − vuelto. El vuelto sale de la caja
+    (§9) y la base NO se suma dos veces (lo contado ES la gaveta completa). Diferencia = contado − esperado
+    (sobrante/faltante).
+  - Endpoints `POST /api/cuadre/abrir`, `GET /api/cuadre/turnos/{id}`, `POST /api/cuadre/turnos/{id}/cerrar`.
+  - **Pendiente/consciente:** sin gastos/avances/devoluciones en el cuadre (P2), sin ticket Z todavía, sin
+    cierre "ciego" ni desglose multicaja. Solo efectivo USD/Bs y vuelto (punto/pago móvil/biopago son digitales
+    y no afectan la gaveta de efectivo).
+- **Paso 8 — Offline (PWA + cola idempotente):** pendiente (siguiente).

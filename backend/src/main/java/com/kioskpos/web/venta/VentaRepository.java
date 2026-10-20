@@ -13,6 +13,8 @@ public interface VentaRepository extends JpaRepository<Venta, Long> {
 
     List<Venta> findByCajaIdOrderByFechaHoraDesc(Long cajaId);
 
+    List<Venta> findByTurnoId(Long turnoId);
+
     List<Venta> findByFechaHoraBetweenOrderByFechaHoraDesc(Instant desde, Instant hasta);
 
     /** Mayor número de factura de una caja (correlativo por caja). 0 si no tiene ventas. */

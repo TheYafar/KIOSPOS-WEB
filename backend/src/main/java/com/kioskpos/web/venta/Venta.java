@@ -36,6 +36,10 @@ public class Venta {
     @Column(name = "usuario_id", nullable = false)
     private Long usuarioId;
 
+    /** Turno (sesión de caja) al que pertenece la venta; null si se cobró sin turno abierto. */
+    @Column(name = "turno_id")
+    private Long turnoId;
+
     /** UUID del cliente para deduplicar reenvíos de la cola offline (idempotencia). */
     @Column(name = "codigo_unico", length = 64)
     private String codigoUnico;

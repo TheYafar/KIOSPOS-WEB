@@ -1,6 +1,8 @@
 package com.kioskpos.web.venta;
 
 import com.kioskpos.web.auth.security.KioskPrincipal;
+import com.kioskpos.web.cuadre.Turno;
+import com.kioskpos.web.cuadre.TurnoRepository;
 import com.kioskpos.web.permiso.PermisoService;
 import com.kioskpos.web.producto.Producto;
 import com.kioskpos.web.producto.ProductoRepository;
@@ -26,13 +28,16 @@ public class VentaService {
     private final VentaRepository ventaRepository;
     private final ProductoRepository productoRepository;
     private final PermisoService permisoService;
+    private final TurnoRepository turnoRepository;
 
     public VentaService(VentaRepository ventaRepository,
                         ProductoRepository productoRepository,
-                        PermisoService permisoService) {
+                        PermisoService permisoService,
+                        TurnoRepository turnoRepository) {
         this.ventaRepository = ventaRepository;
         this.productoRepository = productoRepository;
         this.permisoService = permisoService;
+        this.turnoRepository = turnoRepository;
     }
 
     public record ItemInput(Long productoId, BigDecimal cantidad, BigDecimal precioUsd, String nombre) {
@@ -69,6 +74,9 @@ public class VentaService {
         venta.setNegocioId(principal.negocioId());
         venta.setCajaId(principal.cajaId());
         venta.setUsuarioId(principal.usuarioId());
+        // Se ata al turno abierto de la caja (si hay), para que el cuadre la sume.
+        turnoRepository.findFirstByCajaIdAndEstado(principal.cajaId(), Turno.Estado.ABIERTO.name())
+                .ifPresent(t -> venta.setTurnoId(t.getId()));
         venta.setCodigoUnico(input.codigoUnico());
         venta.setTasaBcv(tasa);
 
