@@ -41,8 +41,23 @@ public class Producto {
     @Column(name = "precio_usd", nullable = false, precision = 12, scale = 2)
     private BigDecimal precioUsd;
 
+    @Column(name = "costo_usd", nullable = false, precision = 12, scale = 2)
+    private BigDecimal costoUsd = BigDecimal.ZERO;
+
+    @Column(nullable = false, length = 50)
+    private String categoria = "General";
+
     @Column(name = "stock_actual", nullable = false, precision = 12, scale = 3)
     private BigDecimal stockActual = BigDecimal.ZERO;
+
+    @Column(name = "stock_minimo", nullable = false, precision = 12, scale = 3)
+    private BigDecimal stockMinimo = BigDecimal.ZERO;
+
+    @Column(name = "es_pesable", nullable = false)
+    private boolean esPesable = false;
+
+    @Column(name = "unidad_medida", nullable = false, length = 10)
+    private String unidadMedida = "UND";
 
     @Column(nullable = false)
     private boolean activo = true;

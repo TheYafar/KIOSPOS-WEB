@@ -1,12 +1,23 @@
 package com.kioskpos.web.producto;
 
 import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface ProductoRepository extends JpaRepository<Producto, Long> {
+
+    Optional<Producto> findByCodigoBarras(String codigoBarras);
+
+    List<Producto> findByActivoTrueOrderByNombreAsc();
+
+    @Query("SELECT p FROM Producto p WHERE p.activo = true AND "
+            + "(LOWER(p.nombre) LIKE LOWER(CONCAT('%', :q, '%')) OR p.codigoBarras LIKE CONCAT('%', :q, '%')) "
+            + "ORDER BY p.nombre ASC")
+    List<Producto> buscar(@Param("q") String q);
 
     /**
      * Descuenta stock de forma ATÓMICA y condicional (WHERE stock_actual >= cantidad),

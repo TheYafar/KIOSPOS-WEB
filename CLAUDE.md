@@ -220,4 +220,14 @@ El producto y la UI en **español (Venezuela)**. Montos en Bs y $, a la **tasa B
   - **Ticket 40 columnas, texto plano** (`TicketService`, `GET /api/ventas/{id}/ticket`) para el Conector.
   - **Pendiente/consciente:** sin turno/cuadre todavía (Paso 7, la venta aún no se ata a un turno), sin
     descuento ni redondeo Bs, sin fiado/avances/recargas (P2). La pantalla de cobro React va con el frontend.
-- **Paso 6 — Inventario API + import CSV:** pendiente (siguiente).
+- **Paso 6 — Inventario API + import CSV:** hecho (backend). **Pruebas en verde (16/16).**
+  - `productos` ampliado (costo, categoría, stock mínimo, pesable, unidad). `movimientos_inventario` (RLS) con
+    bitácora de cada cambio de stock.
+  - `InventarioService`: CRUD, `ajustarStock` (ENTRADA/SALIDA/FIJAR con movimiento), `importarCsv` (upsert por
+    código de barras), `eliminar` "para siempre" (desenlaza las líneas de venta —que guardan nombre y monto—
+    y borra; los movimientos caen por cascada).
+  - Endpoints `/api/inventario/productos` (GET con `?q=`, POST, PUT, DELETE), `.../{id}/ajuste`,
+    `POST /api/inventario/importar` (CSV en el cuerpo). Leer: cualquier usuario; escribir: dueño/encargado.
+  - **Pendiente/consciente:** sin códigos alternos, empaques/desempaque ni categorías como entidad (P2);
+    pantalla React con el frontend.
+- **Paso 7 — Cuadre (apertura + cierre simple):** pendiente (siguiente).
