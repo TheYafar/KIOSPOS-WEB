@@ -265,4 +265,26 @@ El producto y la UI en **español (Venezuela)**. Montos en Bs y $, a la **tasa B
     y se lo pasa al Conector).
   - **Pendiente/consciente:** empaquetar como servicio de Windows con auto-arranque + icono de bandeja;
     calibración de impresora desde la PWA.
-- **Paso 10 — Reportes del día + panel del dueño básico:** pendiente (siguiente).
+- **Paso 10 — Reportes del día + panel del dueño básico:** hecho (backend). **Pruebas en verde (20/20).**
+  - `ReporteService.resumenDelDia(fecha)` (bajo RLS, suma todo el negocio y todas sus cajas): total vendido
+    ($ y Bs), cantidad de ventas, costo, **ganancia** (total − costo) y **desglose por método de pago**.
+    Rango del día en zona America/Caracas.
+  - Costo/ganancia usan el costo ACTUAL del producto (join por producto_id); las líneas sin producto (cobro
+    rápido / producto borrado) no suman costo. Para ganancia histórica exacta habría que guardar el costo en
+    la línea de venta (mejora futura).
+  - Endpoint `GET /api/reportes/dia?fecha=YYYY-MM-DD` (autenticado; el dueño lo verá en su panel).
+  - **Pendiente/consciente:** productos más vendidos y gráficos, y el panel del dueño como pantalla React (va
+    con el frontend completo).
+
+---
+
+## 12. P1 (MVP) — estado general
+
+El **backend de P1 está completo y probado** (20/20 contra Postgres real): multi-tenant con RLS, auth
+(dueño/cajero/super admin), licencia/suscripción + kill switch, ventas, inventario, cuadre y reportes. Hay
+además la base del **frontend** (PWA con cola offline) y el **Conector** de impresión. 
+
+**Lo que falta para cerrar P1 de cara al cliente:** el **frontend React completo** siguiendo
+`design/mockup.html` (login PIN, caja/cobro, inventario, cuadre, super admin, panel del dueño), empaquetar el
+Conector como servicio de Windows, y el **despliegue** en Vultr (ver §8). Fiado/recargas/avances son P2 pero
+Cocoa los usa a diario (ver nota en §6).
