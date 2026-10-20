@@ -5,6 +5,7 @@ import { Caja } from "./Caja";
 import { Cuadre } from "./Cuadre";
 import { Inventario } from "./Inventario";
 import { Reportes } from "./Reportes";
+import { Usuarios } from "./Usuarios";
 
 interface Tab { id: string; n: string; icon: string; }
 
@@ -48,9 +49,9 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
           {tab === "cuadre" && esCaja && <Cuadre />}
           {tab === "reportes" && <Reportes />}
           {tab === "inventario" && <Inventario />}
-          {tab === "mas" && (
-            <div className="stub"><b>Más</b><p>Ajustes, usuarios y más saldrán aquí.</p><button className="btn ghost" onClick={onSalir}>Cerrar sesión</button></div>
-          )}
+          {tab === "mas" && (esCaja
+            ? <div className="stub"><b>Más</b><p>El manejo de usuarios y cajas lo hace el dueño desde su panel.</p><button className="btn ghost" onClick={onSalir}>Cerrar sesión</button></div>
+            : <Usuarios onSalir={onSalir} />)}
         </div>
       </div>
 

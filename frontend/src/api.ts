@@ -194,4 +194,40 @@ export async function cerrarTurno(id: number, declaradoUsd: number, declaradoBs:
   return parse(resp);
 }
 
+// ---------- Usuarios (dueño/encargado) ----------
+
+export interface Usuario { id: number; nombreCompleto: string; rol: Rol; activo: boolean; esSoporte: boolean; }
+export async function listarUsuarios(): Promise<Usuario[]> { return parse(await fetch("/api/usuarios", { headers: auth() })); }
+export async function crearUsuario(body: { rol: Rol; nombreCompleto: string; email?: string; password?: string; pin?: string }): Promise<Usuario> {
+  return parse(await fetch("/api/usuarios", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+
+export interface CajaInfo { id: number; nombre: string; localId: number; autorizada: boolean; activa: boolean; }
+export interface CajaCreada extends CajaInfo { cajaToken: string; }
+export async function listarCajas(): Promise<CajaInfo[]> { return parse(await fetch("/api/cajas", { headers: auth() })); }
+export async function crearCaja(nombre: string): Promise<CajaCreada> {
+  return parse(await fetch("/api/cajas", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ nombre }) }));
+}
+
+// ---------- Super admin ----------
+
+export async function adminLogin(email: string, password: string): Promise<string> {
+  const r = await parse(await fetch("/api/admin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) }));
+  const s: Sesion = { token: r.token, rol: "SUPER_ADMIN", usuarioId: 0, negocioId: 0, cajaId: null, nombre: "Administración" };
+  setSesion(s);
+  return r.token;
+}
+
+export interface Situacion { negocioId: number; nombre: string; plan: string; estadoEfectivo: string; puedeCobrar: boolean; pagoHasta: string | null; diasVencido: number; mesesPendientes: number; deuda: number; mensaje: string; }
+export interface NegocioVista { situacion: Situacion; cajas: number; ultimaVezEnLinea: string | null; ultimoPago: { monto: string; referencia: string | null; fecha: string } | null; }
+export async function adminNegocios(): Promise<NegocioVista[]> { return parse(await fetch("/api/admin/negocios", { headers: auth() })); }
+export async function adminCrearNegocio(body: { nombreNegocio: string; nombreDueno: string; email: string; password: string }): Promise<{ negocioId: number; duenoId: number }> {
+  return parse(await fetch("/api/admin/negocios", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+export async function adminSuspender(id: number): Promise<void> { await parse(await fetch(`/api/admin/negocios/${id}/suspender`, { method: "POST", headers: auth() })); }
+export async function adminReactivar(id: number): Promise<void> { await parse(await fetch(`/api/admin/negocios/${id}/reactivar`, { method: "POST", headers: auth() })); }
+export interface PagoPendiente { id: number; negocioId: number; monto: number; moneda: string; metodo: string; referencia: string | null; meses: number; estado: string; }
+export async function adminPagosPendientes(): Promise<PagoPendiente[]> { return parse(await fetch("/api/admin/pagos-pendientes", { headers: auth() })); }
+export async function adminAprobarPago(pagoId: number): Promise<void> { await parse(await fetch(`/api/admin/pagos/${pagoId}/aprobar`, { method: "POST", headers: auth() })); }
+
 export { getTasa, setTasa };

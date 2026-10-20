@@ -284,7 +284,16 @@ El **backend de P1 está completo y probado** (20/20 contra Postgres real): mult
 (dueño/cajero/super admin), licencia/suscripción + kill switch, ventas, inventario, cuadre y reportes. Hay
 además la base del **frontend** (PWA con cola offline) y el **Conector** de impresión. 
 
-**Lo que falta para cerrar P1 de cara al cliente:** el **frontend React completo** siguiendo
-`design/mockup.html` (login PIN, caja/cobro, inventario, cuadre, super admin, panel del dueño), empaquetar el
-Conector como servicio de Windows, y el **despliegue** en Vultr (ver §8). Fiado/recargas/avances son P2 pero
-Cocoa los usa a diario (ver nota en §6).
+**Frontend (React PWA, en `frontend/`) — P1 completo:** Login (PIN cajero / correo dueño / admin), Caja +
+cobro con 6 métodos incl. **mixto**, Cuadre (apertura/cierre), Inventario (CRUD + ajuste + CSV), Reportes del
+dueño, panel de **Super admin** (negocios, aprobar pago, suspender/reactivar, alta de negocio) y Usuarios/Cajas.
+**Responsive**: riel lateral en escritorio/tablet, pestañas en móvil. Todo probado contra el backend real.
+
+**Despliegue (listo):** Dockerfiles de backend y frontend + `docker-compose.prod.yml` + `.env.example` +
+`DESPLIEGUE.md` (incluye pasos para Vultr). Un `docker compose -f docker-compose.prod.yml up -d --build`
+levanta Postgres + backend + PWA.
+
+**Lo que falta (P2, necesita backend nuevo primero):** fiado/libreta de clientes, recargas y avances,
+devoluciones, facturas de compra, crédito a empleados, multicaja/supervisión, habladores de precio. Cocoa usa
+fiado/recargas/avances a diario (ver nota §6), así que es lo próximo tras probar el P1 desplegado. También:
+empaquetar el Conector como servicio de Windows, y HTTPS en el despliegue (la PWA lo requiere para instalarse).

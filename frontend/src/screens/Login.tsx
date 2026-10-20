@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useState } from "react";
-import { listarCajeros, loginCajero, loginDueno, type Cajero } from "../api";
-import { getCajaToken, getTasa, setCajaToken, setTasa, type Sesion } from "../session";
+import { adminLogin, listarCajeros, loginCajero, loginDueno, type Cajero } from "../api";
+import { getCajaToken, getSesion, getTasa, setCajaToken, setTasa, type Sesion } from "../session";
 
-type Vista = "config" | "pin" | "dueno";
+type Vista = "config" | "pin" | "dueno" | "admin";
 
 const AV_COLORES = [
   "var(--c-bebidas)", "var(--c-limpieza)", "var(--c-chucherias)",
@@ -97,6 +97,16 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
     }
   };
 
+  const entrarAdmin = async () => {
+    try {
+      await adminLogin(email.trim(), pass);
+      const s = getSesion();
+      if (s) onLogin(s);
+    } catch (e) {
+      setErr((e as Error).message);
+    }
+  };
+
   const fecha = reloj.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" });
   const hora = reloj.toLocaleTimeString("es-VE", { hour: "numeric", minute: "2-digit" });
 
@@ -146,7 +156,25 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
             </label>
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn" onClick={entrarDueno} disabled={!email || !pass}>Entrar</button>
+            <button className="link" onClick={() => { setErr(""); setEmail(""); setPass(""); setVista("admin"); }}>Soy el administrador</button>
             <button className="link" onClick={() => { setErr(""); setVista(getCajaToken() ? "pin" : "config"); }}>Volver</button>
+          </div>
+        </div>
+      </div></div>
+    );
+  }
+
+  if (vista === "admin") {
+    return (
+      <div className="app"><div className="lock">{panel}
+        <div className="lock-r">
+          <div className="lock-q">Panel de administración</div>
+          <div className="owner">
+            <label>Correo<input className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
+            <label>Contraseña<input className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)} /></label>
+            {err && <p className="pinmsg err">{err}</p>}
+            <button className="btn" onClick={entrarAdmin} disabled={!email || !pass}>Entrar</button>
+            <button className="link" onClick={() => { setErr(""); setVista("dueno"); }}>Volver</button>
           </div>
         </div>
       </div></div>

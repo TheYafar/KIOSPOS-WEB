@@ -3,6 +3,7 @@ import { renovarPermiso, sincronizar } from "./api";
 import { cerrarSesion, getSesion, type Sesion } from "./session";
 import { Login } from "./screens/Login";
 import { Shell } from "./screens/Shell";
+import { SuperAdmin } from "./screens/SuperAdmin";
 
 export function App() {
   const [sesion, setSesion] = useState<Sesion | null>(getSesion());
@@ -36,6 +37,9 @@ export function App() {
 
   if (!sesion) {
     return <Login onLogin={setSesion} />;
+  }
+  if (sesion.rol === "SUPER_ADMIN") {
+    return <SuperAdmin onSalir={salir} />;
   }
   return <Shell sesion={sesion} onSalir={salir} />;
 }

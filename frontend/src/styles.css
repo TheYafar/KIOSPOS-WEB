@@ -301,6 +301,7 @@ svg { display:block; }
 .pill.late { background:var(--bad-soft); color:var(--bad); }
 .b { height:38px; padding:0 14px; border-radius:11px; border:0; background:var(--surface-2); font-size:13.5px; font-weight:500; }
 .b.pri { background:var(--ink); color:var(--on-ink); }
+.b.bad { color:var(--bad); }
 
 /* ---------- INVENTARIO ---------- */
 .scroll { flex:1; min-height:0; overflow-y:auto; padding:0 16px 90px; display:flex; flex-direction:column; gap:10px; }

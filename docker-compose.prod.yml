@@ -1,0 +1,47 @@
+# Producción: Postgres + backend (Spring Boot) + frontend (nginx que sirve la PWA
+# y hace de proxy a /api). Variables en un archivo .env (ver .env.example).
+services:
+  postgres:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_ADMIN_USER:-kioskpos_admin}
+      POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?define DB_ADMIN_PASSWORD en .env}
+      POSTGRES_DB: ${DB_NAME:-kioskpos}
+    volumes:
+      - kioskpos_pgdata:/var/lib/postgresql/data
+      - ./backend/src/main/resources/db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_ADMIN_USER:-kioskpos_admin} -d ${DB_NAME:-kioskpos}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-kioskpos}
+      DB_ADMIN_USER: ${DB_ADMIN_USER:-kioskpos_admin}
+      DB_ADMIN_PASSWORD: ${DB_ADMIN_PASSWORD}
+      DB_APP_USER: ${DB_APP_USER:-kioskpos_app}
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:-kioskpos_app_dev}
+      KIOSKPOS_JWT_SECRET: ${KIOSKPOS_JWT_SECRET:?define un secreto de 32+ bytes en .env}
+      KIOSKPOS_BOOTSTRAP_SUPERADMINEMAIL: ${KIOSKPOS_BOOTSTRAP_SUPERADMINEMAIL:-}
+      KIOSKPOS_BOOTSTRAP_SUPERADMINPASSWORD: ${KIOSKPOS_BOOTSTRAP_SUPERADMINPASSWORD:-}
+
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${WEB_PORT:-80}:80"
+
+volumes:
+  kioskpos_pgdata:
