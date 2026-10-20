@@ -90,14 +90,33 @@ export async function renovarPermiso(): Promise<{ ok: boolean; estado?: string; 
 // ---------- Inventario ----------
 
 export interface Producto {
-  id: number; codigoBarras: string; nombre: string; precioUsd: number;
-  stockActual: number; categoria: string; activo: boolean;
+  id: number; codigoBarras: string; nombre: string; precioUsd: number; costoUsd: number;
+  stockActual: number; stockMinimo: number; categoria: string; esPesable: boolean; unidadMedida: string; activo: boolean;
 }
 
 export async function listarProductos(q?: string): Promise<Producto[]> {
   const url = "/api/inventario/productos" + (q ? "?q=" + encodeURIComponent(q) : "");
-  const resp = await fetch(url, { headers: auth() });
-  return parse(resp);
+  return parse(await fetch(url, { headers: auth() }));
+}
+
+export interface DatosProducto {
+  codigoBarras: string; nombre: string; precioUsd: number; costoUsd?: number;
+  categoria?: string; stockInicial?: number; esPesable?: boolean; unidadMedida?: string; stockMinimo?: number;
+}
+export async function crearProducto(d: DatosProducto): Promise<Producto> {
+  return parse(await fetch("/api/inventario/productos", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(d) }));
+}
+export async function ajustarStock(id: number, tipo: "ENTRADA" | "SALIDA" | "FIJAR", cantidad: number, motivo?: string): Promise<Producto> {
+  return parse(await fetch("/api/inventario/productos/" + id + "/ajuste", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ tipo, cantidad, motivo }) }));
+}
+export async function importarCsv(csv: string): Promise<{ creados: number; actualizados: number }> {
+  return parse(await fetch("/api/inventario/importar", { method: "POST", headers: { "Content-Type": "text/plain", ...auth() }, body: csv }));
+}
+
+export interface DesglosePago { metodo: string; moneda: string; montoOriginal: number; equivalenteUsd: number; }
+export interface ReporteDia { fecha: string; cantidadVentas: number; totalUsd: number; totalBs: number; costoUsd: number; gananciaUsd: number; pagos: DesglosePago[]; }
+export async function reporteDia(fecha?: string): Promise<ReporteDia> {
+  return parse(await fetch("/api/reportes/dia" + (fecha ? "?fecha=" + fecha : ""), { headers: auth() }));
 }
 
 // ---------- Cobro (con cola offline) ----------

@@ -3,6 +3,8 @@ import { type Sesion } from "../session";
 import { UIcono } from "../icons";
 import { Caja } from "./Caja";
 import { Cuadre } from "./Cuadre";
+import { Inventario } from "./Inventario";
+import { Reportes } from "./Reportes";
 
 interface Tab { id: string; n: string; icon: string; }
 
@@ -44,11 +46,10 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
 
           {tab === "caja" && esCaja && <Caja />}
           {tab === "cuadre" && esCaja && <Cuadre />}
+          {tab === "reportes" && <Reportes />}
+          {tab === "inventario" && <Inventario />}
           {tab === "mas" && (
             <div className="stub"><b>Más</b><p>Ajustes, usuarios y más saldrán aquí.</p><button className="btn ghost" onClick={onSalir}>Cerrar sesión</button></div>
-          )}
-          {(tab === "reportes" || tab === "inventario") && (
-            <div className="stub"><b>{tabs.find((t) => t.id === tab)?.n}</b><p>Pantalla en construcción (saldrá del mockup).</p><button className="btn ghost" onClick={onSalir}>Cerrar sesión</button></div>
           )}
         </div>
       </div>
