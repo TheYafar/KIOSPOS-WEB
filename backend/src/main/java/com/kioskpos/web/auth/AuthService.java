@@ -30,6 +30,7 @@ public class AuthService {
     private final CajaTokenRepository cajaTokenRepository;
     private final UsuarioRepository usuarioRepository;
     private final CajaRepository cajaRepository;
+    private final UsuarioService usuarioService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
@@ -37,12 +38,14 @@ public class AuthService {
                        CajaTokenRepository cajaTokenRepository,
                        UsuarioRepository usuarioRepository,
                        CajaRepository cajaRepository,
+                       UsuarioService usuarioService,
                        PasswordEncoder passwordEncoder,
                        JwtService jwtService) {
         this.cuentaLoginRepository = cuentaLoginRepository;
         this.cajaTokenRepository = cajaTokenRepository;
         this.usuarioRepository = usuarioRepository;
         this.cajaRepository = cajaRepository;
+        this.usuarioService = usuarioService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
     }
@@ -114,7 +117,9 @@ public class AuthService {
                 .orElseThrow(() -> new AuthException("Caja no reconocida"));
         try {
             NegocioContext.set(ct.getNegocioId());
-            return usuarioRepository.findByRolAndActivoTrue(RolUsuario.CAJERO).stream()
+            // Vía un método @Transactional de otro bean para que el SET LOCAL del
+            // negocio se aplique (ver UsuarioService.listarCajerosActivos).
+            return usuarioService.listarCajerosActivos().stream()
                     .map(u -> new CajeroResumen(u.getId(), u.getNombreCompleto()))
                     .toList();
         } finally {

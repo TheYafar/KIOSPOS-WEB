@@ -84,6 +84,19 @@ public class UsuarioService {
     }
 
     /**
+     * Cajeros activos del negocio de la sesión. Es @Transactional a propósito: el
+     * llamador (AuthService) fija el NegocioContext ANTES de invocar este método, y
+     * como es una llamada a otro bean (proxy), la transacción empieza aquí con el
+     * contexto ya puesto, de modo que el TenantAwareJpaTransactionManager aplica el
+     * SET LOCAL del negocio y RLS deja ver las filas. (Una consulta derivada llamada
+     * en línea, sin este límite transaccional, no dispara ese SET y RLS cierra.)
+     */
+    @Transactional(readOnly = true)
+    public List<Usuario> listarCajerosActivos() {
+        return usuarioRepository.findByRolAndActivoTrue(RolUsuario.CAJERO);
+    }
+
+    /**
      * Desactiva un usuario. No permite quedarse sin ningún DUENO activo (regla
      * portada del escritorio: nunca dejar el negocio sin dueño que pueda entrar).
      */
