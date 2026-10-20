@@ -209,4 +209,15 @@ El producto y la UI en **español (Venezuela)**. Montos en Bs y $, a la **tasa B
     al día, aprobar pago reactiva).
   - **Pendiente/consciente:** 2FA del super admin, pago automático (P3), y la lista de negocios cuenta cajas
     con un switch de contexto por negocio (N+1; bien para pocos negocios, revisar si crece).
-- **Paso 5 — Ventas API + pantalla de cobro + ticket:** pendiente (siguiente).
+- **Paso 5 — Ventas API + ticket 40 columnas:** hecho (backend). **Pruebas en verde (12/12).**
+  - `POST /api/ventas` (sesión de caja): el servidor re-valida (CLAUDE.md §2) — recalcula el total con SUS
+    precios (ignora el precio del request), baja stock de forma ATÓMICA (`descontarStock`, UPDATE condicional),
+    valida que los pagos cubran el total y calcula el vuelto (`CobroCalculadora`, portado).
+  - **Kill switch:** cobrar exige el permiso de cobro vigente en el header `X-Permiso`; sin él → 403.
+  - **Factura por caja:** `numero_factura` correlativo por caja. **Idempotencia:** `codigo_unico` (UUID del
+    cliente) dedup reenvíos de la cola offline — no cobra dos veces (modelo para el Paso 8).
+  - **Cobro rápido:** línea sin producto de catálogo (producto_id null), cobrada por monto con su nombre.
+  - **Ticket 40 columnas, texto plano** (`TicketService`, `GET /api/ventas/{id}/ticket`) para el Conector.
+  - **Pendiente/consciente:** sin turno/cuadre todavía (Paso 7, la venta aún no se ata a un turno), sin
+    descuento ni redondeo Bs, sin fiado/avances/recargas (P2). La pantalla de cobro React va con el frontend.
+- **Paso 6 — Inventario API + import CSV:** pendiente (siguiente).
