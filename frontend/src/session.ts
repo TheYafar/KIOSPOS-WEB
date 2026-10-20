@@ -60,3 +60,7 @@ export const setPermiso = (p: string) => set(PERMISO_KEY, p);
 
 export const getTasa = () => get<string>(TASA_KEY) ?? "40";
 export const setTasa = (t: string) => set(TASA_KEY, t);
+
+const TURNO_KEY = "kioskpos.turno";
+export const getTurnoId = () => get<number>(TURNO_KEY);
+export const setTurnoId = (id: number | null) => (id == null ? del(TURNO_KEY) : set(TURNO_KEY, id));

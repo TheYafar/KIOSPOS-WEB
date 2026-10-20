@@ -151,4 +151,28 @@ export async function sincronizar(): Promise<ResultadoSync> {
   return { enviadas, pendientes: (await listar()).length, errores };
 }
 
+// ---------- Cuadre ----------
+
+export interface TurnoResumen {
+  turnoId: number; estado: string;
+  fondoUsd: number; fondoBs: number;
+  efectivoUsd: number; efectivoBs: number;
+  vueltoUsd: number; vueltoBs: number;
+  esperadoUsd: number; esperadoBs: number;
+  declaradoUsd: number | null; declaradoBs: number | null;
+  diferenciaUsd: number | null; diferenciaBs: number | null;
+}
+
+export async function abrirTurno(fondoUsd: number, fondoBs: number): Promise<TurnoResumen> {
+  const resp = await fetch("/api/cuadre/abrir", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ fondoUsd, fondoBs }) });
+  return parse(resp);
+}
+export async function resumenTurno(id: number): Promise<TurnoResumen> {
+  return parse(await fetch("/api/cuadre/turnos/" + id, { headers: auth() }));
+}
+export async function cerrarTurno(id: number, declaradoUsd: number, declaradoBs: number): Promise<TurnoResumen> {
+  const resp = await fetch("/api/cuadre/turnos/" + id + "/cerrar", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ declaradoUsd, declaradoBs }) });
+  return parse(resp);
+}
+
 export { getTasa, setTasa };
