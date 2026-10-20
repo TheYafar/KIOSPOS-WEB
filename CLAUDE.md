@@ -255,4 +255,14 @@ El producto y la UI en **español (Venezuela)**. Montos en Bs y $, a la **tasa B
   - **Pendiente/consciente:** faltan iconos reales (`public/icon-192.png`, `icon-512.png`); la UI de verdad
     (login PIN, catálogo, ticket) es el siguiente gran bloque de frontend; aún no hay pruebas automáticas del
     front.
-- **Paso 9 — Conector de impresión (Windows):** pendiente (siguiente).
+- **Paso 9 — Conector de impresión (Windows):** hecho. **Compila (javac + frontend).**
+  - `conector/`: programa Java pequeño (Java 21, SIN dependencias — solo JDK) que corre junto al navegador.
+    Servidor HTTP **solo en 127.0.0.1:9010** con CORS; `GET /estado`, `POST /imprimir` (cuerpo=ticket,
+    headers `X-Abrir-Gaveta`/`X-Impresora`), `POST /abrir-gaveta`.
+  - `Impresora.java`: ESC/POS crudo al spooler de Windows (`javax.print`) + corte de papel + abrir gaveta
+    (`ESC p 0 25 250`), portado de ImpresionService del escritorio.
+  - Cliente en el frontend: `frontend/src/conector.ts` (la PWA pide el ticket a `GET /api/ventas/{id}/ticket`
+    y se lo pasa al Conector).
+  - **Pendiente/consciente:** empaquetar como servicio de Windows con auto-arranque + icono de bandeja;
+    calibración de impresora desde la PWA.
+- **Paso 10 — Reportes del día + panel del dueño básico:** pendiente (siguiente).
