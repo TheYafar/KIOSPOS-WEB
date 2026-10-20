@@ -241,4 +241,18 @@ El producto y la UI en **español (Venezuela)**. Montos en Bs y $, a la **tasa B
   - **Pendiente/consciente:** sin gastos/avances/devoluciones en el cuadre (P2), sin ticket Z todavía, sin
     cierre "ciego" ni desglose multicaja. Solo efectivo USD/Bs y vuelto (punto/pago móvil/biopago son digitales
     y no afectan la gaveta de efectivo).
-- **Paso 8 — Offline (PWA + cola idempotente):** pendiente (siguiente).
+- **Paso 8 — Offline (PWA + cola idempotente):** hecho (base del frontend). **Compila y construye** (`npm run
+  build` OK: service worker + manifest generados).
+  - Primer código del **frontend**: `frontend/` (Vite + React + TS), PWA instalable con `vite-plugin-pwa`
+    (autoUpdate, precache del shell). En dev, `/api` hace proxy al backend (puerto 8080).
+  - **Cola de envíos** en IndexedDB (`src/outbox.ts`, vía `idb`): cobrar SIEMPRE encola primero (durable) y
+    luego intenta enviar. La clave es el `codigoUnico` de la venta.
+  - **Sincronización idempotente** (`src/api.ts`): al reconectar (evento `online`) se vacía la cola contra
+    `POST /api/ventas` con `codigoUnico`; el servidor deduplica, así que reenviar algo ya cobrado se trata como
+    éxito y se saca de la cola (no cobra dos veces — modelo SincronizadorModoLocal). Error de red → se queda en
+    cola; error de negocio → se marca y no reintenta en bucle; 401/403 → espera permiso/sesión.
+  - `src/App.tsx` es una pantalla de DEMO del mecanismo (no la UI final; esa sale del mockup).
+  - **Pendiente/consciente:** faltan iconos reales (`public/icon-192.png`, `icon-512.png`); la UI de verdad
+    (login PIN, catálogo, ticket) es el siguiente gran bloque de frontend; aún no hay pruebas automáticas del
+    front.
+- **Paso 9 — Conector de impresión (Windows):** pendiente (siguiente).
