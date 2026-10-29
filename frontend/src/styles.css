@@ -560,3 +560,20 @@ svg { display:block; }
 .co2-change { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:13px 16px; border-radius:14px; font-weight:600; }
 .co2-change.neutral { background:var(--surface-2); color:var(--text-2); }
 .co2-change.ok { background:var(--ok-soft); color:var(--ok); }
+
+/* ========================================================================
+   REDISEÑO oct-2026 — Inventario
+   ======================================================================== */
+.btn.outline { background:var(--surface); border:1px solid var(--line); color:var(--text); }
+.btn.outline:hover { background:var(--surface-2); }
+.toolbar .btn { height:48px; font-size:14.5px; padding:0 16px; }
+.ibox { width:40px; height:40px; border-radius:12px; display:grid; place-items:center; flex:none; }
+.ibox svg { width:20px; height:20px; }
+.inv-stats { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:4px; }
+.inv-stat { flex:1; min-width:150px; display:flex; align-items:center; gap:12px; background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--sh-1); padding:14px 16px; }
+.inv-stat.wide { flex-basis:100%; }
+.inv-stat .k { font-size:12.5px; color:var(--text-2); font-weight:600; display:block; }
+.inv-stat .v { font-size:26px; font-weight:800; letter-spacing:-.03em; line-height:1.1; }
+.seg { display:grid; grid-template-columns:repeat(3,1fr); gap:4px; background:var(--surface-2); border-radius:12px; padding:4px; }
+.seg button { height:42px; border:0; border-radius:9px; background:transparent; font-size:14px; font-weight:600; color:var(--text-2); }
+.seg button.on { background:var(--surface); box-shadow:var(--sh-1); color:var(--text); }

@@ -30,7 +30,8 @@ const UI: Record<string, string> = {
   more: '<circle cx="5.5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="18.5" cy="12" r="1.4"/>',
   store: '<path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M5.5 12v8h13v-8"/><path d="M10 20v-4.5h4V20"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
-  close: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>'
+  close: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
+  alert: '<path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4.5M12 17.5v.5"/>'
 };
 
 export function Icono({ k, sw = 1.7 }: { k: string; sw?: number }) {

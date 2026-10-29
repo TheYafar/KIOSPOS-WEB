@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { ajustarStock, crearProducto, importarCsv, listarProductos, type Producto } from "../api";
-import { Icono, catInfo } from "../icons";
+import { Icono, UIcono, catInfo } from "../icons";
 
 const usd = (n: number) => "$ " + n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (s: string) => (s ? parseFloat(s.replace(",", ".")) || 0 : 0);
@@ -34,28 +34,35 @@ export function Inventario() {
   return (
     <div className="caja">
       <div className="toolbar">
-        <div className="search" style={{ flex: 1 }}><Icono k="box" /><input placeholder="Buscar producto o código…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-        <button className="b pri" onClick={() => setModal({ tipo: "nuevo" })}>Nuevo</button>
-        <button className="b" onClick={() => setModal({ tipo: "csv" })}>CSV</button>
+        <div className="search" style={{ flex: 1 }}><UIcono k="search" /><input placeholder="Buscar producto o código…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+        <button className="btn primary press" onClick={() => setModal({ tipo: "nuevo" })}><UIcono k="plus" sw={2.2} />Nuevo</button>
+        <button className="btn outline press" onClick={() => setModal({ tipo: "csv" })}>CSV</button>
       </div>
-      {msg && <div className="toolbar" style={{ paddingTop: 0, color: "var(--ok)", fontSize: 13 }}>{msg}</div>}
+      {msg && <div className="toolbar" style={{ paddingTop: 0 }}><span className="pill ok"><UIcono k="check" sw={2.5} />{msg}</span></div>}
       <div className="scroll">
-        <div className="bento">
-          <div className="bx"><span className="k">Productos</span><span className="v t">{productos.length}</span></div>
-          <div className="bx"><span className="k">Bajo mínimo</span><span className={"v t" + (bajos ? " mg-low" : "")}>{bajos}</span></div>
-          <div className="bx wide"><span className="k">Valor del inventario (a precio de venta)</span><span className="v t">{usd(valorInv)}</span></div>
+        <div className="inv-stats">
+          <div className="inv-stat"><span className="ibox" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}><UIcono k="box" /></span>
+            <div><span className="k">Productos</span><span className="v t">{productos.length}</span></div></div>
+          <div className="inv-stat"><span className="ibox" style={{ background: "var(--warn-soft)", color: "var(--warn)" }}><UIcono k="alert" /></span>
+            <div><span className="k">Bajo mínimo</span><span className={"v t" + (bajos ? " mg-low" : "")}>{bajos}</span></div></div>
+          <div className="inv-stat wide"><span className="ibox" style={{ background: "var(--accent-soft)", color: "var(--warn)" }}><UIcono k="cash" /></span>
+            <div><span className="k">Valor del inventario (a precio de venta)</span><span className="v t">{usd(valorInv)}</span></div></div>
         </div>
         {err && <p className="noresult">{err}</p>}
         {filtrados.map((p) => {
           const info = catInfo(p.categoria);
           const margen = p.costoUsd > 0 ? Math.round(((p.precioUsd - p.costoUsd) / p.costoUsd) * 100) : 0;
+          const out = p.stockActual <= 0; const low = !out && p.stockActual <= p.stockMinimo;
           return (
             <button key={p.id} className="irow press" onClick={() => setModal({ tipo: "ajuste", p })}>
               <span className="pi" style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }}><Icono k={info.icon} /></span>
               <div style={{ minWidth: 0 }}><div className="nm">{p.nombre}</div>
                 <div className="mt"><span>{usd(p.precioUsd)}</span><span>·</span><span className={margen < 10 ? "mg-low" : ""}>+{margen}%</span><span>·</span><span>{p.categoria}</span></div>
               </div>
-              <div className="rt"><b className="t">{p.stockActual}</b><span className="stk">{sbar(p)}</span></div>
+              <div className="rt">
+                <b className="t">{p.stockActual}{p.esPesable ? " " + p.unidadMedida : ""}</b>
+                {out ? <span className="pill danger">Agotado</span> : low ? <span className="pill warn">Bajo</span> : <span className="stk">{sbar(p)}</span>}
+              </div>
             </button>
           );
         })}
@@ -93,7 +100,7 @@ function FormNuevo({ onClose, onSaved, onErr }: { onClose: () => void; onSaved: 
             <label className="lbl">Stock inicial<input className="inp" inputMode="decimal" value={f.stockInicial} onChange={set("stockInicial")} /></label>
           </div>
         </div>
-        <div className="modal-foot"><button className="cta center press" disabled={!ok} onClick={guardar}>Guardar</button></div>
+        <div className="modal-foot"><button className="btn primary big press" disabled={!ok} onClick={guardar}>Guardar</button></div>
       </div>
     </div>
   );
@@ -112,14 +119,15 @@ function FormAjuste({ p, onClose, onSaved, onErr }: { p: Producto; onClose: () =
       <div className="modal-card">
         <div className="modal-head"><h2>{p.nombre}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
         <div className="modal-body">
-          <div className="bx"><span className="k">Stock actual</span><span className="v t">{p.stockActual}</span></div>
-          <div className="seg2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 6, background: "var(--surface-3)", borderRadius: 12, padding: 3 }}>
-            {tipos.map((x) => <button key={x.id} className="b" style={{ background: tipo === x.id ? "var(--surface)" : "transparent", boxShadow: tipo === x.id ? "var(--sh-1)" : "none" }} onClick={() => setTipo(x.id)}>{x.n}</button>)}
+          <div className="inv-stat"><span className="ibox" style={{ background: "var(--surface-2)", color: "var(--text-2)" }}><UIcono k="box" /></span>
+            <div><span className="k">Stock actual</span><span className="v t">{p.stockActual}{p.esPesable ? " " + p.unidadMedida : ""}</span></div></div>
+          <div className="seg">
+            {tipos.map((x) => <button key={x.id} className={tipo === x.id ? "on" : ""} onClick={() => setTipo(x.id)}>{x.n}</button>)}
           </div>
           <label className="lbl">{tipo === "FIJAR" ? "Dejar el stock en" : "Cantidad"}<input className="inp" inputMode="decimal" value={cant} onChange={(e) => setCant(e.target.value)} /></label>
           <label className="lbl">Motivo (opcional)<input className="inp" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Compra, merma, conteo…" /></label>
         </div>
-        <div className="modal-foot"><button className="cta center press" disabled={num(cant) < 0 || !cant} onClick={guardar}>Ajustar</button></div>
+        <div className="modal-foot"><button className="btn primary big press" disabled={num(cant) < 0 || !cant} onClick={guardar}>Ajustar</button></div>
       </div>
     </div>
   );
@@ -136,7 +144,7 @@ function FormCsv({ onClose, onSaved, onErr }: { onClose: () => void; onSaved: (r
           <span className="hint">Columnas: codigo_barras, nombre, precio_usd, costo_usd, categoria, stock, stock_minimo. Si el código ya existe, se actualiza.</span>
           <textarea className="inp" style={{ height: 180, padding: 12, fontFamily: "var(--mono)", fontSize: 12, lineHeight: 1.5 }} value={csv} onChange={(e) => setCsv(e.target.value)} />
         </div>
-        <div className="modal-foot"><button className="cta center press" onClick={subir}>Importar</button></div>
+        <div className="modal-foot"><button className="btn primary big press" onClick={subir}>Importar</button></div>
       </div>
     </div>
   );
