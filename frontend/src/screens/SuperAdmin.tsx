@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { adminAprobarPago, adminCrearNegocio, adminNegocios, adminPagosPendientes, adminReactivar, adminSuspender, type NegocioVista, type PagoPendiente } from "../api";
+import { UIcono } from "../icons";
 
 const usd = (n: number | string) => "$ " + Number(n).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pillCls: Record<string, string> = { ACTIVA: "ok", AVISO: "soon", SUSPENDIDA: "late" };
+const AV = ["var(--c-bebidas)", "var(--c-limpieza)", "var(--c-chucherias)", "var(--c-viveres)", "var(--c-charcuteria)", "var(--c-panaderia)"];
 
 export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
   const [negs, setNegs] = useState<NegocioVista[]>([]);
@@ -25,53 +27,63 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
   return (
     <div className="app">
       <div className="shell">
-        <nav className="rail" aria-label="Menú"><span className="logo">K</span></nav>
+        <nav className="rail" aria-label="Menú">
+          <span className="logo">K</span>
+          <span className="rail-sp" />
+          <button className="rail-item" onClick={onSalir}><UIcono k="user" />Salir</button>
+          <span className="rail-av" style={{ ["--av" as string]: "var(--c-charcuteria)" }}>U</span>
+        </nav>
         <div className="appmain">
           <header className="hdr">
             <div><h1>Administración</h1><div className="sub">Super admin · uriel</div></div>
-            <button className="b" onClick={onSalir}>Salir</button>
+            <div className="hpills"><button className="btn primary press" onClick={() => setModal(true)}><UIcono k="plus" sw={2.2} />Nuevo negocio</button></div>
           </header>
           <div className="caja">
-            <div className="toolbar"><div style={{ flex: 1 }} /><button className="b pri" onClick={() => setModal(true)}>Nuevo negocio</button></div>
-            {msg && <div className="toolbar" style={{ paddingTop: 0, color: "var(--ok)", fontSize: 13 }}>{msg}</div>}
-            <div className="scroll">
-              <div className="bento">
-                <div className="bx"><span className="k">Negocios</span><span className="v t">{negs.length}</span></div>
-                <div className="bx"><span className="k">Activos</span><span className="v t" style={{ color: "var(--ok)" }}>{activos}</span></div>
-                <div className="bx wide"><span className="k">Por cobrar (deuda acumulada)</span><span className="v t">{usd(deuda)}</span></div>
+            <div className="scroll pad">
+              {msg && <span className="pill ok" style={{ alignSelf: "flex-start" }}><UIcono k="check" sw={2.5} />{msg}</span>}
+              <div className="inv-stats">
+                <div className="inv-stat"><span className="ibox" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}><UIcono k="store" /></span>
+                  <div><span className="k">Negocios</span><span className="v t">{negs.length}</span></div></div>
+                <div className="inv-stat"><span className="ibox" style={{ background: "var(--ok-soft)", color: "var(--ok)" }}><UIcono k="check" /></span>
+                  <div><span className="k">Activos</span><span className="v t" style={{ color: "var(--ok)" }}>{activos}</span></div></div>
+                <div className="inv-stat wide"><span className="ibox" style={{ background: "var(--accent-soft)", color: "var(--warn)" }}><UIcono k="cash" /></span>
+                  <div><span className="k">Por cobrar (deuda acumulada)</span><span className="v t">{usd(deuda)}</span></div></div>
               </div>
               {err && <p className="noresult">{err}</p>}
 
               {pagos.length > 0 && (
-                <div className="bx wide">
-                  <span className="k">Pagos por aprobar</span>
+                <div className="card" style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                  <h3>Pagos por aprobar</h3>
                   {pagos.map((p) => (
-                    <div className="mrow" key={p.id} style={{ gridTemplateColumns: "1fr auto", marginTop: 6 }}>
-                      <span className="ml">Negocio #{p.negocioId} · {usd(p.monto)} · {p.metodo}{p.referencia ? " · " + p.referencia : ""} · {p.meses} mes(es)</span>
-                      <button className="b pri" onClick={() => accion(() => adminAprobarPago(p.id), "Pago aprobado")}>Aprobar</button>
+                    <div className="pago-row" key={p.id}>
+                      <div className="grow" style={{ minWidth: 0 }}>
+                        <b>Negocio #{p.negocioId}</b>
+                        <div className="d">{usd(p.monto)} · {p.metodo}{p.referencia ? " · " + p.referencia : ""} · {p.meses} mes(es)</div>
+                      </div>
+                      <button className="btn primary press" onClick={() => accion(() => adminAprobarPago(p.id), "Pago aprobado")}>Aprobar</button>
                     </div>
                   ))}
                 </div>
               )}
 
-              {negs.map((n) => {
+              {negs.map((n, i) => {
                 const s = n.situacion;
                 return (
-                  <div className="irow" key={s.negocioId} style={{ gridTemplateColumns: "1fr auto", alignItems: "start" }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div className="nm">{s.nombre} <span className={"pill " + (pillCls[s.estadoEfectivo] || "late")}><i />{s.estadoEfectivo}</span></div>
-                      <div className="mt">
-                        <span>Plan {s.plan}</span><span>·</span>
-                        <span>Pagó hasta: {s.pagoHasta || "—"}</span><span>·</span>
-                        <span>{n.cajas} caja(s)</span>
-                        {s.mesesPendientes > 0 && <><span>·</span><span className="mg-bad">Debe {usd(s.deuda)}</span></>}
-                      </div>
-                      {n.ultimoPago && <div className="mt">Último pago: {n.ultimoPago.monto}{n.ultimoPago.referencia ? " · " + n.ultimoPago.referencia : ""}</div>}
+                  <div className="card neg" key={s.negocioId}>
+                    <div className="neg-top">
+                      <span className="neg-av" style={{ ["--av" as string]: AV[i % AV.length] }}>{(s.nombre.charAt(0) || "·").toUpperCase()}</span>
+                      <div className="grow" style={{ minWidth: 0 }}><b>{s.nombre}</b><div className="d">Plan {s.plan} · {n.cajas} caja(s)</div></div>
+                      <span className={"pill " + (pillCls[s.estadoEfectivo] || "late")}><i />{s.estadoEfectivo}</span>
                     </div>
-                    <div className="rt">
+                    <div className="mt">
+                      <span>Pagó hasta: {s.pagoHasta || "—"}</span>
+                      {s.mesesPendientes > 0 && <><span>·</span><span className="mg-bad">Debe {usd(s.deuda)}</span></>}
+                      {n.ultimoPago && <><span>·</span><span>Último pago: {n.ultimoPago.monto}{n.ultimoPago.referencia ? " · " + n.ultimoPago.referencia : ""}</span></>}
+                    </div>
+                    <div className="neg-foot">
                       {s.estadoEfectivo === "SUSPENDIDA"
-                        ? <button className="b pri" onClick={() => accion(() => adminReactivar(s.negocioId), "Reactivado")}>Reactivar</button>
-                        : <button className="b bad" onClick={() => accion(() => adminSuspender(s.negocioId), "Suspendido")}>Suspender</button>}
+                        ? <button className="btn primary press" onClick={() => accion(() => adminReactivar(s.negocioId), "Reactivado")}>Reactivar</button>
+                        : <button className="btn danger press" onClick={() => accion(() => adminSuspender(s.negocioId), "Suspendido")}>Suspender</button>}
                     </div>
                   </div>
                 );
@@ -102,7 +114,7 @@ function FormNegocio({ onClose, onSaved, onErr }: { onClose: () => void; onSaved
           <label className="lbl">Correo del dueño<input className="inp" type="email" value={f.email} onChange={set("email")} /></label>
           <label className="lbl">Contraseña (mín. 6)<input className="inp" type="password" value={f.password} onChange={set("password")} /></label>
         </div>
-        <div className="modal-foot"><button className="cta center press" disabled={!ok} onClick={guardar}>Crear negocio y dueño</button></div>
+        <div className="modal-foot"><button className="btn primary big press" disabled={!ok} onClick={guardar}>Crear negocio y dueño</button></div>
       </div>
     </div>
   );
