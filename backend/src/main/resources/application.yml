@@ -1,3 +1,7 @@
+# El puerto HTTP. En local/Docker es 8080; en la nube (Render) se toma de $PORT.
+server:
+  port: ${PORT:8080}
+
 spring:
   application:
     name: kioskpos-web-backend

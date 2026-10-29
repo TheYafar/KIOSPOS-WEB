@@ -1,0 +1,75 @@
+# =============================================================================
+# Blueprint de Render para KioskPOS Web: Postgres + backend (Spring Boot) +
+# frontend (PWA estática con proxy a /api).
+#
+# Cómo usarlo:
+#   1. Entra a https://render.com → New → Blueprint → conecta este repositorio.
+#   2. Render lee este archivo y crea los 3 recursos.
+#   3. HAY UN PASO MANUAL: crear el rol de la app en la base (ver DESPLIEGUE-NUBE.md).
+#   4. Si la URL del backend NO quedó exactamente https://kioskpos-backend.onrender.com,
+#      edita el "destination" del rewrite /api de abajo con la URL real del backend.
+#
+# Nota: el plan free de Render duerme los servicios por inactividad y la base
+# expira a los ~90 días. Suficiente para PROBAR; para producción usa un plan pago
+# o un VPS con docker-compose (ver DESPLIEGUE.md / DESPLIEGUE-NUBE.md).
+# =============================================================================
+
+databases:
+  - name: kioskpos-db
+    databaseName: kioskpos
+    user: kioskpos_admin
+    plan: free
+    region: oregon
+
+services:
+  # ---- Backend: Spring Boot (Docker) ----
+  - type: web
+    name: kioskpos-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free
+    region: oregon
+    healthCheckPath: /actuator/health
+    envVars:
+      - key: DB_HOST
+        fromDatabase: { name: kioskpos-db, property: host }
+      - key: DB_PORT
+        fromDatabase: { name: kioskpos-db, property: port }
+      - key: DB_NAME
+        fromDatabase: { name: kioskpos-db, property: database }
+      # Flyway (migraciones) corre con el usuario dueño de la base.
+      - key: DB_ADMIN_USER
+        fromDatabase: { name: kioskpos-db, property: user }
+      - key: DB_ADMIN_PASSWORD
+        fromDatabase: { name: kioskpos-db, property: password }
+      # Runtime: rol restringido para que RLS no se pueda saltar. Debe existir en
+      # la base (lo crea el script 01-create-app-role.sql con esta misma clave).
+      - key: DB_APP_USER
+        value: kioskpos_app
+      - key: DB_APP_PASSWORD
+        value: kioskpos_app_dev
+      - key: KIOSKPOS_JWT_SECRET
+        generateValue: true
+      # Super admin inicial (cámbialo después del primer arranque).
+      - key: KIOSKPOS_BOOTSTRAP_SUPERADMINEMAIL
+        value: uriel@kioskpos.com
+      - key: KIOSKPOS_BOOTSTRAP_SUPERADMINPASSWORD
+        value: superadmin123
+
+  # ---- Frontend: PWA estática (Vite build) + proxy /api al backend ----
+  - type: web
+    name: kioskpos-frontend
+    runtime: static
+    buildCommand: cd frontend && npm ci && npm run build
+    staticPublishPath: ./frontend/dist
+    pullRequestPreviewsEnabled: false
+    routes:
+      # Las llamadas /api/* se reenvían al backend.
+      - type: rewrite
+        source: /api/*
+        destination: https://kioskpos-backend.onrender.com/api/*
+      # SPA: todo lo demás cae en index.html.
+      - type: rewrite
+        source: /*
+        destination: /index.html
