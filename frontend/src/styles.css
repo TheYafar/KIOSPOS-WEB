@@ -466,3 +466,97 @@ svg { display:block; }
   .caja.desk .searchrow { padding:16px 24px 10px; }
   .caja.desk .cats { padding:0 24px 14px; }
 }
+
+/* ========================================================================
+   REDISEÑO oct-2026 — Cobro con pago dividido (pantallas 02 / 06-07)
+   ======================================================================== */
+.row-between { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.pill.warn { background:var(--warn-soft); color:var(--warn); }
+.pill.brand { background:var(--primary-soft); color:var(--primary); }
+.pill svg { width:13px; height:13px; }
+
+.co2-body { flex:1; min-height:0; overflow-y:auto; display:flex; gap:24px; padding:20px 24px 24px; }
+.co2-main { flex:1; min-width:0; display:flex; flex-direction:column; gap:16px; }
+.co2-side { width:360px; flex:none; display:flex; flex-direction:column; gap:14px; background:var(--surface); border-radius:22px; box-shadow:var(--sh-1); padding:18px; }
+
+/* resumen */
+.co2-sum { background:var(--surface); border-radius:20px; box-shadow:var(--sh-1); padding:18px 20px; display:flex; flex-direction:column; gap:14px; }
+.co2-cells { display:flex; gap:12px; flex-wrap:wrap; }
+.co2-cell { flex:1; min-width:130px; display:flex; flex-direction:column; gap:2px; }
+.co2-cell .k { font-size:12px; font-weight:600; color:var(--text-3); }
+.co2-cell .v { font-size:26px; font-weight:800; letter-spacing:-.03em; }
+.co2-cell .s { font-size:12px; font-weight:500; color:var(--text-3); }
+.co2-cell.ok .v { color:var(--ok); }
+.co2-cell.warn { background:var(--warn-soft); border-radius:14px; padding:10px 12px; }
+.co2-cell.warn .k, .co2-cell.warn .v, .co2-cell.warn .s { color:var(--warn); }
+
+.progress { height:12px; border-radius:999px; background:var(--surface-3); display:flex; overflow:hidden; }
+.progress i { display:block; height:100%; }
+.legend { display:flex; gap:16px; flex-wrap:wrap; }
+.legend span { display:inline-flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--text-2); }
+.legend i { width:9px; height:9px; border-radius:50%; flex:none; }
+
+/* columnas (escritorio) */
+.co2-cols { display:flex; gap:12px; flex-wrap:wrap; align-items:stretch; }
+.co2-col { flex:1; min-width:188px; display:flex; flex-direction:column; gap:12px; padding:16px; border-radius:18px; background:var(--surface); box-shadow:var(--sh-1); border:2px solid transparent; }
+.co2-col.active { border-color:var(--primary); }
+.co2-col.add { background:none; box-shadow:none; border:1.5px dashed var(--line); gap:10px; }
+.co2-col-head { display:flex; align-items:center; gap:10px; }
+.co2-ic { width:36px; height:36px; border-radius:11px; display:grid; place-items:center; flex:none; }
+.co2-ic svg { width:19px; height:19px; }
+.co2-col-head b { font-size:14.5px; font-weight:700; }
+.co2-col-head .sub { font-size:12px; color:var(--text-3); font-weight:500; }
+.co2-x { color:var(--text-3); display:grid; place-items:center; }
+.co2-x svg { width:15px; height:15px; }
+.co2-amt { display:flex; flex-direction:column; gap:2px; padding:12px 14px; border-radius:14px; background:var(--surface-2); text-align:left; }
+.co2-amt.on { background:var(--primary-soft); }
+.co2-amt .k { font-size:12px; font-weight:600; color:var(--text-3); }
+.co2-amt.on .k { color:var(--primary); }
+.co2-amt .v { font-size:22px; font-weight:800; letter-spacing:-.03em; }
+.co2-amt .s { font-size:12px; color:var(--text-2); }
+.co2-reffield { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:transparent; text-align:left; }
+.co2-reffield.on { border-color:var(--primary); }
+.co2-reffield b { font-size:14px; }
+.co2-rest { display:flex; flex-direction:column; gap:1px; padding:10px 12px; border-radius:12px; background:var(--accent); color:var(--nav); text-align:left; border:0; }
+.co2-rest b { font-size:13px; font-weight:700; }
+.co2-rest span { font-size:11.5px; font-weight:600; }
+.co2-addbtn { display:inline-flex; align-items:center; gap:7px; height:38px; padding:0 12px; border-radius:10px; background:var(--surface); border:1px solid var(--line); font-size:12.5px; font-weight:600; }
+.co2-addbtn svg { width:15px; height:15px; }
+
+/* panel teclado (escritorio) */
+.co2-keys { display:flex; flex-direction:column; gap:8px; }
+.co2-scut { display:flex; justify-content:center; align-items:center; height:42px; padding:0 12px; border-radius:11px; background:var(--surface-2); font-size:13px; font-weight:600; }
+.co2-scut.acc { background:var(--accent); color:var(--nav); }
+.disabled-btn { height:58px; border-radius:16px; background:var(--surface-2); color:var(--text-3); font-size:15px; font-weight:700; display:grid; place-items:center; }
+
+/* aviso */
+.tip { display:flex; align-items:flex-start; gap:12px; padding:14px 16px; border-radius:14px; background:var(--accent-soft); }
+.tip svg { width:20px; height:20px; }
+
+/* teléfono (06/07) */
+.co2-tot { background:var(--surface); border-radius:16px; box-shadow:var(--sh-1); padding:16px; display:flex; flex-direction:column; gap:12px; }
+.co2-rows { background:var(--surface); border-radius:16px; box-shadow:var(--sh-1); overflow:hidden; }
+.co2-row { display:flex; align-items:center; gap:12px; padding:14px; border-bottom:1px solid var(--line); width:100%; text-align:left; background:transparent; border-left:0; border-right:0; border-top:0; }
+.co2-row:last-child { border-bottom:0; }
+.co2-row .co2-ic { width:40px; height:40px; }
+.co2-row .co2-ic svg { width:20px; height:20px; }
+.co2-row .txt { flex:1; min-width:0; }
+.co2-row .txt b { display:block; font-size:14.5px; font-weight:700; }
+.co2-row .txt span { font-size:12px; color:var(--text-3); }
+.co2-row .amt { text-align:right; display:flex; flex-direction:column; align-items:flex-end; gap:3px; white-space:nowrap; }
+.co2-row .amt b { font-size:15.5px; font-weight:700; }
+.co2-addrow { display:flex; gap:8px; flex-wrap:wrap; }
+.change.neutral { background:var(--surface-2); color:var(--text-2); }
+.sq34 { width:34px; height:34px; border-radius:10px; background:var(--surface-2); display:grid; place-items:center; color:var(--text-2); flex:none; border:0; }
+.sq34 svg { width:16px; height:16px; }
+.co2-sheet { gap:14px; }
+.co2-sheet-cuts { display:flex; gap:8px; width:100%; }
+.co2-sheet-cuts .co2-scut { flex:1; }
+
+@media (max-width:759px) {
+  .co2-body { flex-direction:column; padding:14px 16px 16px; gap:14px; }
+  .co2-side { display:none; }
+}
+.co2-change { display:flex; justify-content:space-between; align-items:center; gap:10px; padding:13px 16px; border-radius:14px; font-weight:600; }
+.co2-change.neutral { background:var(--surface-2); color:var(--text-2); }
+.co2-change.ok { background:var(--ok-soft); color:var(--ok); }

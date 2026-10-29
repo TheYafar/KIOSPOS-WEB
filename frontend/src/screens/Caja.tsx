@@ -2,24 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { cobrar, getTasa, listarProductos, type PagoCobro, type Producto } from "../api";
 import { conectorDisponible, imprimirTicket } from "../conector";
 import { Icono, UIcono, catInfo } from "../icons";
+import { Cobro, type ResumenPago } from "./Cobro";
 
-type Metodo = "usd" | "ves" | "pm" | "punto" | "bio" | "mix";
 interface Item { producto: Producto; qty: number; }
-
-const METODOS: { id: Metodo; n: string; s: string; i: string }[] = [
-  { id: "usd", n: "Efectivo $", s: "Dólares", i: "cash" },
-  { id: "ves", n: "Efectivo Bs", s: "Bolívares", i: "bills" },
-  { id: "pm", n: "Pago móvil", s: "Bolívares", i: "phone" },
-  { id: "punto", n: "Punto", s: "Débito", i: "card" },
-  { id: "bio", n: "Biopago", s: "Huella", i: "finger" },
-  { id: "mix", n: "Mixto", s: "$ + pago móvil", i: "mix" }
-];
 
 const money = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const usd = (n: number) => "$ " + money(n);
 const bs = (n: number) => "Bs " + money(n);
 const r2 = (n: number) => Math.round(n * 100) / 100;
-const numOf = (s: string) => (s ? parseFloat(s.replace(/\./g, "").replace(",", ".")) || 0 : 0);
 
 interface Done { total: number; totalBs: number; payLine: string; change: string; changeNote: string; receipt: string; }
 
@@ -41,11 +31,6 @@ export function Caja() {
   const [cat, setCat] = useState("all");
   const [carrito, setCarrito] = useState<Map<number, Item>>(new Map());
   const [view, setView] = useState<"caja" | "ticket" | "checkout" | "done">("caja");
-  const [m, setM] = useState<Metodo>("usd");
-  const [recv, setRecv] = useState("");
-  const [ref, setRef] = useState("");
-  const [cash, setCash] = useState("");
-  const [target, setTarget] = useState<"recv" | "cash" | "ref">("recv");
   const [done, setDone] = useState<Done | null>(null);
   const [err, setErr] = useState("");
 
@@ -82,56 +67,13 @@ export function Caja() {
 
   const vaciar = () => setCarrito(new Map());
 
-  const abrirCobro = () => { setM("usd"); setRecv(""); setRef(""); setCash(""); setTarget("recv"); setErr(""); setView("checkout"); };
+  const abrirCobro = () => { setErr(""); setView("checkout"); };
 
-  const coValid = () => {
-    if (m === "usd") return numOf(recv) >= total - 0.001;
-    if (m === "ves") return numOf(recv) >= totalBs - 0.001;
-    if (m === "pm") return ref.length >= 4;
-    if (m === "mix") return ref.length >= 4 && numOf(cash) <= total;
-    return true;
-  };
-
-  const tecla = (k: string) => {
-    const key = m === "pm" ? "ref" : target;
-    const cur = key === "ref" ? ref : key === "cash" ? cash : recv;
-    let s = cur;
-    if (k === "del") s = s.slice(0, -1);
-    else if (k === "clr") s = "";
-    else if (k === ",") { if (key !== "ref" && s.indexOf(",") < 0) s = (s || "0") + ","; }
-    else if (key === "ref") { if (s.length < 6) s += k; }
-    else { const dec = s.indexOf(","); if (dec >= 0 && s.length - dec > 2) return; if (s.replace(/\D/g, "").length < 9) s = (s === "0" ? "" : s) + k; }
-    if (key === "ref") setRef(s); else if (key === "cash") setCash(s); else setRecv(s);
-  };
-
-  const splitChange = (v: number) => { const u = Math.floor(v + 1e-9); return { usd: u, bs: r2((v - u) * tasa) }; };
-
-  const confirmar = async () => {
-    if (!coValid()) return;
-    let pagos: PagoCobro[] = [];
-    let payLine = "", change = "", changeNote = "";
-    if (m === "usd") {
-      const g = numOf(recv); pagos = [{ metodo: "EFECTIVO_USD", moneda: "USD", montoOriginal: g }];
-      payLine = "Efectivo $ · recibido " + usd(g);
-      const v = r2(g - total); if (v > 0) { const sp = splitChange(v); change = (sp.usd ? usd(sp.usd) : "") + (sp.usd && sp.bs ? " + " : "") + (sp.bs ? bs(sp.bs) : ""); if (sp.usd && sp.bs) changeNote = "Los centavos van en bolívares"; }
-    } else if (m === "ves") {
-      const g = numOf(recv); pagos = [{ metodo: "EFECTIVO_BS", moneda: "VES", montoOriginal: g }];
-      payLine = "Efectivo Bs · recibido " + bs(g); const v = r2(g - totalBs); if (v > 0) change = bs(v);
-    } else if (m === "pm") {
-      pagos = [{ metodo: "PAGO_MOVIL", moneda: "VES", montoOriginal: totalBs, referencia: ref }]; payLine = "Pago móvil · ref. " + ref;
-    } else if (m === "punto") {
-      pagos = [{ metodo: "PUNTO", moneda: "VES", montoOriginal: totalBs }]; payLine = "Punto de venta · " + bs(totalBs);
-    } else if (m === "bio") {
-      pagos = [{ metodo: "BIOPAGO", moneda: "VES", montoOriginal: totalBs }]; payLine = "Biopago · " + bs(totalBs);
-    } else {
-      const cashUsd = r2(Math.min(numOf(cash), total)); const restBs = r2((total - cashUsd) * tasa);
-      pagos = [{ metodo: "EFECTIVO_USD", moneda: "USD", montoOriginal: cashUsd }, { metodo: "PAGO_MOVIL", moneda: "VES", montoOriginal: restBs, referencia: ref }];
-      payLine = usd(cashUsd) + " efectivo + pago móvil ref. " + ref;
-    }
+  const confirmar = async (pagos: PagoCobro[], resumen: ResumenPago) => {
     try {
-      const items = [...carrito.values()].map((i) => ({ productoId: i.producto.id, cantidad: i.qty }));
-      await cobrar(items, pagos);
-      setDone({ total, totalBs, payLine, change, changeNote, receipt: recibo(payLine, change) });
+      const its = [...carrito.values()].map((i) => ({ productoId: i.producto.id, cantidad: i.qty }));
+      await cobrar(its, pagos);
+      setDone({ total, totalBs, payLine: resumen.payLine, change: resumen.change, changeNote: resumen.changeNote, receipt: recibo(resumen.payLine, resumen.change) });
       setView("done");
     } catch (e) { setErr((e as Error).message); }
   };
@@ -189,94 +131,12 @@ export function Caja() {
     );
   }
 
-  // ----- COBRO -----
+  // ----- COBRO (pago dividido, pantalla 02 / 06-07) -----
   if (view === "checkout") {
-    const quickUSD = () => { const out = [{ v: total, l: "Exacto" }]; [1, 2, 5, 10, 20, 50].forEach((v) => { if (v > total && out.length < 5) out.push({ v, l: "$" + v }); }); return out; };
-    const quickVES = () => { const out = [{ v: totalBs, l: "Exacto" }]; const seen: Record<number, boolean> = {}; [100, 1000, 5000, 10000].forEach((s) => { const v = Math.ceil(totalBs / s) * s; if (v > totalBs && !seen[v] && out.length < 5) { seen[v] = true; out.push({ v, l: "Bs " + v }); } }); return out; };
-    const numeric = m === "usd" || m === "ves" || m === "pm" || m === "mix";
-    const padKind = (m === "pm" || (m === "mix" && target === "ref")) ? "ref" : "num";
-
     return (
-      <div className="view">
-        <div className="co-head">
-          <button className="back press" onClick={() => setView("ticket")}><UIcono k="back" sw={2} />Ticket</button>
-          <div className="steps">
-            <span className="s done"><i><UIcono k="check" sw={3} /></i></span><span className="bar" />
-            <span className="s now"><i>2</i></span><span className="bar" />
-            <span className="s"><i>3</i></span>
-          </div>
-          <div className="co-tot"><b className="t">{usd(total)}</b><small className="t">{bs(totalBs)}</small></div>
-        </div>
-        <div className="co-body">
-          <div className="big-total"><b className="t">{usd(total)}</b><span className="t"> {bs(totalBs)} · {unidades} {unidades === 1 ? "artículo" : "artículos"}</span></div>
-          <h3 className="h3">¿Cómo paga el cliente?</h3>
-          <div className="mcards">
-            {METODOS.map((x) => (
-              <button key={x.id} className="mc press" aria-pressed={m === x.id} onClick={() => { setM(x.id); setTarget(x.id === "mix" ? "cash" : "recv"); }}>
-                <UIcono k={x.i} /><span><b>{x.n}</b><small>{x.s}</small></span>
-                <span className="ok-tick"><UIcono k="check" sw={3} /></span>
-              </button>
-            ))}
-          </div>
-
-          {(m === "usd" || m === "ves") && (() => {
-            const isU = m === "usd"; const tt = isU ? total : totalBs; const got = numOf(recv);
-            const shown = recv ? (isU ? "$ " : "Bs ") + recv : "";
-            return (
-              <div className="amtpanel">
-                <h3 className="h3">¿Con cuánto paga?</h3>
-                <div className="field" aria-pressed="true"><span>Recibido</span><b className={"t" + (shown ? "" : " ph")}>{shown || (isU ? "$ 0" : "Bs 0")}<span className="caret" /></b></div>
-                <div className="bills">{(isU ? quickUSD() : quickVES()).map((x) => (
-                  <button key={x.l} className="bill press t" aria-pressed={!!recv && Math.abs(got - x.v) < 0.005} onClick={() => setRecv(String(x.v).replace(".", ","))}>{x.l}</button>
-                ))}</div>
-                {!recv ? <div className="banner idle"><span>Toca un billete o escribe cuánto te dio</span></div>
-                  : got < tt - 0.001 ? <div className="banner warn"><span>Faltan</span><span><b className="t">{isU ? usd(r2(tt - got)) : bs(r2(tt - got))}</b></span></div>
-                    : <div className="banner ok"><span>{got - tt > 0.001 ? "Vuelto" : "Pago exacto"}</span><span><b className="t">{isU ? usd(r2(got - tt)) : bs(r2(got - tt))}</b></span></div>}
-              </div>
-            );
-          })()}
-
-          {(m === "pm" || m === "mix") && (() => {
-            const cashUsd = m === "mix" ? Math.min(numOf(cash), total) : 0; const restBs = r2((total - cashUsd) * tasa);
-            return (
-              <div className="amtpanel">
-                <h3 className="h3">{m === "mix" ? "Efectivo + pago móvil" : "Datos del pago móvil"}</h3>
-                <div className="card"><dl className="kv"><dt>Monto a transferir</dt><dd className="t" style={{ fontWeight: 600 }}>{bs(restBs)}</dd><dt>Banco</dt><dd>Banesco (0134)</dd><dt>Teléfono</dt><dd className="t">0412-555-0142</dd></dl></div>
-                <div className="fields">
-                  {m === "mix" && <button className="field press" aria-pressed={target === "cash"} onClick={() => setTarget("cash")}><span>Parte en efectivo</span><b className={"t" + (cash ? "" : " ph")}>{cash ? "$ " + cash : "$ 0"}{target === "cash" && <span className="caret" />}</b></button>}
-                  <button className="field press" aria-pressed={target === "ref"} onClick={() => setTarget("ref")}><span>Referencia del pago móvil</span><b className={"t" + (ref ? "" : " ph")}>{ref || "Últimos 6 dígitos"}{(target === "ref" || m === "pm") && <span className="caret" />}</b></button>
-                </div>
-                {ref.length >= 4 ? <div className="banner ok"><span>Referencia lista</span><span><b className="t">{ref}</b></span></div> : <div className="banner idle"><span>Escribe la referencia del cliente</span></div>}
-              </div>
-            );
-          })()}
-
-          {(m === "punto" || m === "bio") && (
-            <div className="amtpanel">
-              <h3 className="h3">{m === "bio" ? "Cobrar con Biopago" : "Cobrar con el punto"}</h3>
-              <div className="card waiting"><span className="pulse"><UIcono k={m === "bio" ? "finger" : "card"} /></span>
-                <div><div style={{ fontWeight: 600 }}>Marca <span className="t">{bs(totalBs)}</span></div><div className="muted">{m === "bio" ? "El cliente pone la huella. Cuando salga aprobado, confirma." : "Pásale la tarjeta. Cuando el punto diga aprobado, confirma."}</div></div>
-              </div>
-            </div>
-          )}
-
-          {numeric && (
-            <div className="keypad">
-              {["1", "2", "3", "4", "5", "6", "7", "8", "9", padKind === "ref" ? "clr" : ",", "0", "del"].map((k) => (
-                <button key={k} className={"key press" + (k === "clr" ? " fn" : "")} onClick={() => tecla(k)}>
-                  {k === "del" ? <UIcono k="del" /> : k === "clr" ? "Borrar" : k}
-                </button>
-              ))}
-            </div>
-          )}
-          {err && <p className="pinmsg err">{err}</p>}
-        </div>
-        <div className="co-foot">
-          <button className="cta center press" disabled={!coValid()} onClick={confirmar}>
-            {m === "punto" || m === "bio" ? "Ya salió aprobado" : "Confirmar pago"}
-          </button>
-        </div>
-      </div>
+      <Cobro total={total} tasa={tasa} isDesktop={isDesktop} err={err}
+        onBack={() => setView(isDesktop ? "caja" : "ticket")}
+        onConfirm={confirmar} />
     );
   }
 
