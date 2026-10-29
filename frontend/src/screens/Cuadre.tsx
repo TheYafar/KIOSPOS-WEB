@@ -62,7 +62,7 @@ export function Cuadre() {
   if (cerrado) {
     return (
       <div className="czwrap">
-        <div className="card czhero"><UIcono k="cash" sw={1.6} /><div><b>Caja cerrada</b><span>Turno #{cerrado.turnoId}</span></div></div>
+        <div className="card czhero"><span className="ibox" style={{ background: "var(--ok-soft)", color: "var(--ok)" }}><UIcono k="check" sw={2.4} /></span><div><b>Caja cerrada</b><span>Turno #{cerrado.turnoId}</span></div></div>
         <div className="card czres"><div className="cardhead"><h3 className="h3">Dólares</h3>{pill(cerrado.diferenciaUsd ?? 0, false)}</div>
           <div className="cmp"><div><span>Contaste</span><b className="t">{usd(cerrado.declaradoUsd ?? 0)}</b></div><div><span>Debía haber</span><b className="t">{usd(cerrado.esperadoUsd)}</b></div></div></div>
         <div className="card czres"><div className="cardhead"><h3 className="h3">Bolívares</h3>{pill(cerrado.diferenciaBs ?? 0, true)}</div>
@@ -76,7 +76,7 @@ export function Cuadre() {
   if (!turno) {
     return (
       <div className="czwrap">
-        <div className="card czhero"><UIcono k="cash" sw={1.6} /><div><b>La caja está cerrada</b><span>Cuenta el fondo de la gaveta y ábrela para empezar a vender.</span></div></div>
+        <div className="card czhero"><span className="ibox" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}><UIcono k="cash" sw={1.9} /></span><div><b>La caja está cerrada</b><span>Cuenta el fondo de la gaveta y ábrela para empezar a vender.</span></div></div>
         <div className="card fld"><span className="h3">¿Con cuánto abres?</span>
           <div className="two">
             <div className="inpw"><i>$</i><input className="inp pre t" value={fUsd} onChange={(e) => setFUsd(e.target.value)} inputMode="decimal" aria-label="Fondo en dólares" /></div>

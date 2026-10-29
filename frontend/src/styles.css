@@ -594,3 +594,12 @@ svg { display:block; }
 .rep-alert b { display:block; font-size:14.5px; font-weight:600; }
 .rep-alert .d { font-size:12.5px; color:var(--text-3); font-weight:500; }
 .rep .mbar i { background:var(--primary); }
+
+/* ========================================================================
+   REDISEÑO oct-2026 — Cuadre / Cierre: acción primaria en teal
+   ======================================================================== */
+.cta { background:var(--primary); color:var(--on-primary); }
+.cta:hover { background:var(--primary-hover); }
+.cta:disabled { background:var(--surface-3); color:var(--text-3); }
+.czhero { align-items:center; }
+.czsum { color:var(--primary); }
