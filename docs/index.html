@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="es-VE">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KioskPOS · Rediseño</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root{ --page:#E9E7E1; --surface:#fff; --text:#17201E; --text-2:#5B6461; --text-3:#969D9A;
+         --border:#E8E5DE; --primary:#0F766E; --accent:#F4A63A; --nav:#0E2A27;
+         --font:"Plus Jakarta Sans",system-ui,-apple-system,"Segoe UI",sans-serif; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--page);color:var(--text);font-family:var(--font);-webkit-font-smoothing:antialiased}
+  a{color:inherit}
+  .head{position:sticky;top:0;z-index:20;background:rgba(233,231,225,.92);backdrop-filter:blur(8px);
+        border-bottom:1px solid var(--border);padding:14px 20px;display:flex;gap:16px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:11px}
+  .logo{width:38px;height:38px;border-radius:11px;background:var(--accent);color:var(--nav);display:grid;place-items:center;font-weight:800;font-size:18px}
+  .brand b{font-size:16px;font-weight:700}.brand span{display:block;font-size:12.5px;color:var(--text-3);font-weight:500}
+  nav{display:flex;gap:6px;flex-wrap:wrap}
+  nav a{font-size:12px;font-weight:600;color:var(--text-2);text-decoration:none;background:var(--surface);
+        border:1px solid var(--border);border-radius:999px;padding:6px 11px}
+  .intro{max-width:1160px;margin:0 auto;padding:26px 16px 0}
+  .note{background:var(--surface);border:1px solid var(--border);border-radius:16px;padding:16px 18px;font-size:13.5px;color:var(--text-2);line-height:1.5}
+  .note b{color:var(--text)}
+  .gallery{max-width:1160px;margin:0 auto;padding:28px 16px 90px;display:flex;flex-direction:column;gap:48px}
+  .board{display:flex;flex-direction:column;gap:14px;scroll-margin-top:80px}
+  .blabel h2{font-size:22px;font-weight:700;letter-spacing:-.4px}
+  .blabel p{font-size:14px;color:var(--text-3);font-weight:500;margin-top:2px}
+  .fit{position:relative;border-radius:18px;overflow:hidden;box-shadow:0 1px 2px rgba(15,31,28,.05),0 16px 40px -6px rgba(13,38,33,.14);background:#fff}
+  .fit iframe{border:0;display:block}
+  .tag{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:600;color:var(--text-3);
+       border:1px solid var(--border);border-radius:999px;padding:3px 9px;background:var(--surface)}
+  footer{max-width:1160px;margin:0 auto;padding:0 16px 60px;font-size:12.5px;color:var(--text-3)}
+</style>
+</head>
+<body>
+<header class="head">
+  <div class="brand"><span class="logo">K</span><div><b>KioskPOS · Rediseño</b><span>Vista estática del frontend (datos de ejemplo)</span></div></div>
+  <nav>
+    <a href="#login">Entrar</a>
+    <a href="#caja">Caja</a>
+    <a href="#cobro">Cobro</a>
+    <a href="#inicio">Inicio dueño</a>
+    <a href="#inventario">Inventario</a>
+    <a href="#cuadre">Cuadre</a>
+    <a href="#admin">Súper admin</a>
+  </nav>
+</header>
+
+<div class="intro">
+  <div class="note">
+    <b>Esto es una vista estática</b> para ver el diseño: usa el CSS real de la app y datos de ejemplo, pero
+    <b>no tiene backend</b> (no hay login ni datos en vivo). Para probar la app completa (login con PIN, cobrar,
+    inventario real) se levanta en local con Docker — ver el <b>README</b> y <b>seed-dev.mjs</b> del repositorio.
+    Cada pantalla se muestra en escritorio y/o teléfono.
+  </div>
+</div>
+
+<div class="gallery">
+  <section class="board" id="login">
+    <div class="blabel"><h2>Entrar</h2><p>El cajero elige su nombre y marca su PIN · <span class="tag">Escritorio</span></p></div>
+    <div class="fit" data-w="1280" data-h="760"><iframe src="screens/login.html" loading="lazy"></iframe></div>
+  </section>
+
+  <section class="board" id="caja">
+    <div class="blabel"><h2>Caja</h2><p>Catálogo en tarjetas + ticket fijo (escritorio) y lista + barra flotante (teléfono)</p></div>
+    <div class="fit" data-w="1300" data-h="840"><iframe src="screens/caja-desk.html" loading="lazy"></iframe></div>
+    <div class="fit" data-w="390" data-h="844"><iframe src="screens/caja-phone.html" loading="lazy"></iframe></div>
+  </section>
+
+  <section class="board" id="cobro">
+    <div class="blabel"><h2>Cobro (pago dividido)</h2><p>Reparte el total entre varias formas de pago; el vuelto solo del efectivo</p></div>
+    <div class="fit" data-w="1300" data-h="840"><iframe src="screens/cobro-desk.html" loading="lazy"></iframe></div>
+    <div class="fit" data-w="390" data-h="844"><iframe src="screens/cobro-phone.html" loading="lazy"></iframe></div>
+  </section>
+
+  <section class="board" id="inicio">
+    <div class="blabel"><h2>Inicio del dueño</h2><p>Vendido hoy, ganancia, atención y métodos de pago (datos reales del día)</p></div>
+    <div class="fit" data-w="1240" data-h="640"><iframe src="screens/reportes-desk.html" loading="lazy"></iframe></div>
+    <div class="fit" data-w="390" data-h="844"><iframe src="screens/reportes-phone.html" loading="lazy"></iframe></div>
+  </section>
+
+  <section class="board" id="inventario">
+    <div class="blabel"><h2>Inventario</h2><p>Productos, precios, margen y stock · crear, ajustar e importar CSV</p></div>
+    <div class="fit" data-w="1240" data-h="860"><iframe src="screens/inventario-desk.html" loading="lazy"></iframe></div>
+    <div class="fit" data-w="390" data-h="844"><iframe src="screens/inventario-phone.html" loading="lazy"></iframe></div>
+  </section>
+
+  <section class="board" id="cuadre">
+    <div class="blabel"><h2>Cuadre / Cierre</h2><p>Apertura, conteo por denominación y resultado (cuadra / sobran / faltan)</p></div>
+    <div class="fit" data-w="1240" data-h="880"><iframe src="screens/cuadre-desk.html" loading="lazy"></iframe></div>
+    <div class="fit" data-w="390" data-h="844"><iframe src="screens/cuadre-phone.html" loading="lazy"></iframe></div>
+  </section>
+
+  <section class="board" id="admin">
+    <div class="blabel"><h2>Súper admin</h2><p>Negocios, suscripción, aprobar pago, suspender/reactivar · <span class="tag">Escritorio</span></p></div>
+    <div class="fit" data-w="1240" data-h="900"><iframe src="screens/superadmin-desk.html" loading="lazy"></iframe></div>
+  </section>
+</div>
+
+<footer>KioskPOS Web — rediseño oct-2026 · galería estática generada desde el CSS real del frontend.</footer>
+
+<script>
+  function fit(){
+    document.querySelectorAll('.fit').forEach(function(f){
+      var w=+f.dataset.w, h=+f.dataset.h, ifr=f.querySelector('iframe');
+      ifr.style.width=w+'px'; ifr.style.height=h+'px'; ifr.style.transformOrigin='top left';
+      var avail=f.parentElement.clientWidth;
+      var k=Math.min(1, avail/w);
+      ifr.style.transform='scale('+k+')';
+      f.style.width=(w*k)+'px'; f.style.height=(h*k)+'px';
+    });
+  }
+  window.addEventListener('resize',fit); window.addEventListener('load',fit); fit();
+</script>
+</body>
+</html>
