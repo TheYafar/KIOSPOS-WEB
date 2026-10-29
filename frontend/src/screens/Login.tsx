@@ -193,13 +193,11 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
                 {c.nombre.charAt(0).toUpperCase()}
               </span>
               <span className="pnom">{c.nombre.split(" ")[0]}</span>
-              <span className="prol">Cajero</span>
             </button>
           ))}
           <button className="persona" onClick={() => { setErr(""); setVista("dueno"); }}>
             <span className="pav" style={{ ["--av" as string]: "var(--c-chucherias)" }}>D</span>
             <span className="pnom">Dueño</span>
-            <span className="prol">Correo</span>
           </button>
         </div>
         {sel && (

@@ -23,6 +23,18 @@ const numOf = (s: string) => (s ? parseFloat(s.replace(/\./g, "").replace(",", "
 
 interface Done { total: number; totalBs: number; payLine: string; change: string; changeNote: string; receipt: string; }
 
+/** True en escritorio/tablet (riel lateral). Reacciona al cambiar el ancho. */
+function useIsDesktop(): boolean {
+  const [d, setD] = useState(() => typeof window !== "undefined" && window.matchMedia("(min-width:760px)").matches);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width:760px)");
+    const h = () => setD(mq.matches);
+    mq.addEventListener("change", h);
+    return () => mq.removeEventListener("change", h);
+  }, []);
+  return d;
+}
+
 export function Caja() {
   const [productos, setProductos] = useState<Producto[]>([]);
   const [q, setQ] = useState("");
@@ -38,6 +50,7 @@ export function Caja() {
   const [err, setErr] = useState("");
 
   const tasa = Number(getTasa()) || 1;
+  const isDesktop = useIsDesktop();
 
   useEffect(() => { listarProductos().then(setProductos).catch((e) => setErr((e as Error).message)); }, []);
 
@@ -66,6 +79,8 @@ export function Caja() {
     const c = new Map(carrito); const it = c.get(id); if (!it) return;
     const q2 = it.qty + d; if (q2 <= 0) c.delete(id); else c.set(id, { ...it, qty: q2 }); setCarrito(c);
   };
+
+  const vaciar = () => setCarrito(new Map());
 
   const abrirCobro = () => { setM("usd"); setRecv(""); setRef(""); setCash(""); setTarget("recv"); setErr(""); setView("checkout"); };
 
@@ -266,30 +281,116 @@ export function Caja() {
   }
 
   // ----- CAJA + ticket -----
+  const items = [...carrito.values()];
+
+  const searchrow = (
+    <div className="searchrow">
+      <div className="search"><UIcono k="search" /><input placeholder="Buscar producto o código…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+    </div>
+  );
+  const chips = (
+    <div className="cats">
+      <button className="cat press" aria-pressed={cat === "all"} onClick={() => setCat("all")}>Todo <span className="t">{productos.length}</span></button>
+      {cats.map(([c, n]) => {
+        const info = catInfo(c);
+        return <button key={c} className="cat press" style={info.cat ? ({ ["--c" as string]: `var(--c-${info.cat})` }) : undefined} aria-pressed={cat === c} onClick={() => setCat(c)}>{info.cat && <i />}{c} <span className="t">{n}</span></button>;
+      })}
+    </div>
+  );
+
+  // tarjeta de producto (escritorio, pantalla 01)
+  const tarjeta = (p: Producto) => {
+    const info = catInfo(p.categoria); const qn = carrito.get(p.id)?.qty ?? 0; const out = p.stockActual <= 0;
+    return (
+      <button key={p.id} className={"pcard press" + (qn > 0 ? " in-ticket" : "") + (out ? " soldout" : "")} style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }} onClick={() => add(p)} disabled={out}>
+        <div className="pc-top"><span className="tile"><Icono k={info.icon} /></span>{qn > 0 && <span className="pc-badge t">×{qn}</span>}</div>
+        <div className="pc-name">{p.nombre}</div>
+        <div className="pc-price"><strong className="t">{usd(p.precioUsd)}</strong>{out ? <span className="pill danger">Agotado</span> : <span className="bs t">{bs(r2(p.precioUsd * tasa))}</span>}</div>
+      </button>
+    );
+  };
+
+  // fila de producto (teléfono, pantalla 05)
+  const fila = (p: Producto) => {
+    const info = catInfo(p.categoria); const qn = carrito.get(p.id)?.qty ?? 0; const out = p.stockActual <= 0;
+    return (
+      <button key={p.id} className={"prod press" + (out ? " out" : "")} style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }} onClick={() => add(p)} disabled={out}>
+        <span className="pi"><Icono k={info.icon} />{qn > 0 && <span className="badge t">{qn}</span>}</span>
+        <span className="pn">{p.nombre}</span>
+        <span className="pp t"><b>{usd(p.precioUsd)}</b><small>{out ? "Agotado" : bs(r2(p.precioUsd * tasa))}</small></span>
+      </button>
+    );
+  };
+
+  // líneas del ticket (reutilizadas en panel y hoja)
+  const lineaTicket = (i: Item, variante: "panel" | "sheet") => {
+    const info = catInfo(i.producto.categoria);
+    if (variante === "panel") {
+      return (
+        <div className="tkp-ln" key={i.producto.id}>
+          <span className="pi" style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }}><Icono k={info.icon} /></span>
+          <div className="tkp-txt"><b>{i.producto.nombre}</b><span className="t">{i.qty} × {usd(i.producto.precioUsd)}</span></div>
+          <div className="tkp-r"><strong className="t">{usd(r2(i.producto.precioUsd * i.qty))}</strong>
+            <div className="stp"><button onClick={() => paso(i.producto.id, -1)}>−</button><span className="t">{i.qty}</span><button onClick={() => paso(i.producto.id, 1)}>+</button></div>
+          </div>
+        </div>
+      );
+    }
+    return (
+      <div className="ln" key={i.producto.id}>
+        <span className="pi sm" style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }}><Icono k={info.icon} /></span>
+        <div style={{ minWidth: 0 }}><div className="ln-n">{i.producto.nombre}</div><div className="ln-s t">{i.qty} × {usd(i.producto.precioUsd)}</div></div>
+        <div className="ln-r"><div className="ln-a t">{usd(r2(i.producto.precioUsd * i.qty))}</div>
+          <div className="stp"><button onClick={() => paso(i.producto.id, -1)}>−</button><span className="t">{i.qty}</span><button onClick={() => paso(i.producto.id, 1)}>+</button></div>
+        </div>
+      </div>
+    );
+  };
+
+  // ----- ESCRITORIO / TABLET (pantalla 01): catálogo en tarjetas + ticket fijo -----
+  if (isDesktop) {
+    return (
+      <div className="caja-wrap">
+        <div className="caja desk">
+          {searchrow}
+          {chips}
+          <div className="pgrid">
+            {err && <p className="noresult">{err}</p>}
+            {filtrados.map(tarjeta)}
+            {filtrados.length === 0 && !err && <p className="noresult">Sin productos. Cárgalos en Inventario.</p>}
+          </div>
+        </div>
+        <aside className="tkpanel">
+          <div className="tkp-head">
+            <div><h2>Venta actual</h2><div className="sub t">{unidades} {unidades === 1 ? "artículo" : "artículos"}</div></div>
+            {unidades > 0 && <button className="link" onClick={vaciar}>Vaciar</button>}
+          </div>
+          {items.length === 0
+            ? <div className="tkp-empty">Toca un producto para empezar la venta.</div>
+            : (
+              <>
+                <div className="tkp-lines">{items.map((i) => lineaTicket(i, "panel"))}</div>
+                <div className="tkp-foot">
+                  <div className="tkp-sub"><span>Subtotal</span><span className="t">{usd(total)}</span></div>
+                  <div className="tkp-sub"><span>En bolívares · BCV {tasa}</span><span className="t">{bs(totalBs)}</span></div>
+                  <div className="tkp-total"><span>Total</span><b className="t">{usd(total)}</b></div>
+                  <button className="btn primary big press" onClick={abrirCobro}>Cobrar {usd(total)}</button>
+                </div>
+              </>
+            )}
+        </aside>
+      </div>
+    );
+  }
+
+  // ----- TELÉFONO (pantalla 05): lista + barra flotante + hoja -----
   return (
     <div className="caja">
-      <div className="searchrow">
-        <div className="search"><UIcono k="search" /><input placeholder="Buscar producto o código…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
-      </div>
-      <div className="cats">
-        <button className="cat press" aria-pressed={cat === "all"} onClick={() => setCat("all")}>Todo <span className="t">{productos.length}</span></button>
-        {cats.map(([c, n]) => {
-          const info = catInfo(c);
-          return <button key={c} className="cat press" style={info.cat ? ({ ["--c" as string]: `var(--c-${info.cat})` }) : undefined} aria-pressed={cat === c} onClick={() => setCat(c)}>{info.cat && <i />}{c} <span className="t">{n}</span></button>;
-        })}
-      </div>
+      {searchrow}
+      {chips}
       <div className="prods">
         {err && <p className="noresult">{err}</p>}
-        {filtrados.map((p) => {
-          const info = catInfo(p.categoria); const qn = carrito.get(p.id)?.qty ?? 0; const out = p.stockActual <= 0;
-          return (
-            <button key={p.id} className={"prod press" + (out ? " out" : "")} style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }} onClick={() => add(p)} disabled={out}>
-              <span className="pi"><Icono k={info.icon} />{qn > 0 && <span className="badge t">{qn}</span>}</span>
-              <span className="pn">{p.nombre}</span>
-              <span className="pp t"><b>{usd(p.precioUsd)}</b><small>{out ? "Agotado" : bs(r2(p.precioUsd * tasa))}</small></span>
-            </button>
-          );
-        })}
+        {filtrados.map(fila)}
         {filtrados.length === 0 && !err && <p className="noresult">Sin productos. Cárgalos en Inventario.</p>}
       </div>
 
@@ -299,7 +400,7 @@ export function Caja() {
             <span className="peek-n t">{unidades}</span>
             <span className="peek-txt"><b className="t">{usd(total)}</b><small className="t">{bs(totalBs)} · ver</small></span>
           </button>
-          <button className="cta center press" style={{ width: "auto", height: 52, padding: "0 22px" }} onClick={abrirCobro}>Cobrar</button>
+          <button className="cta accent center press" style={{ width: "auto", height: 52, padding: "0 22px" }} onClick={abrirCobro}>Cobrar</button>
         </div>
       )}
 
@@ -308,20 +409,7 @@ export function Caja() {
           <div className="sheet">
             <div className="grab" />
             <div className="tk-head"><div><h2>Ticket</h2><div className="sub t">{unidades} {unidades === 1 ? "artículo" : "artículos"}</div></div><button className="ghost" onClick={() => setView("caja")}>Seguir vendiendo</button></div>
-            <div className="tk-lines">
-              {[...carrito.values()].map((i) => {
-                const info = catInfo(i.producto.categoria);
-                return (
-                  <div className="ln" key={i.producto.id}>
-                    <span className="pi sm" style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }}><Icono k={info.icon} /></span>
-                    <div style={{ minWidth: 0 }}><div className="ln-n">{i.producto.nombre}</div><div className="ln-s t">{i.qty} × {usd(i.producto.precioUsd)}</div></div>
-                    <div className="ln-r"><div className="ln-a t">{usd(r2(i.producto.precioUsd * i.qty))}</div>
-                      <div className="stp"><button onClick={() => paso(i.producto.id, -1)}>−</button><span className="t">{i.qty}</span><button onClick={() => paso(i.producto.id, 1)}>+</button></div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+            <div className="tk-lines">{items.map((i) => lineaTicket(i, "sheet"))}</div>
             <div className="tk-foot">
               <div className="tk-row"><span>En bolívares (BCV {tasa})</span><span className="t">{bs(totalBs)}</span></div>
               <div className="tk-total"><span>Total</span><b className="t">{usd(total)}</b></div>
