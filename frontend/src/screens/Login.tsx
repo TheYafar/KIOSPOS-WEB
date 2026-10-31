@@ -83,6 +83,26 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
     }
   };
 
+  // Teclado físico (PC): en "¿Quién va a cobrar?", con un cajero elegido, los números
+  // escriben el PIN, Backspace borra un dígito y Esc/Supr lo limpia.
+  useEffect(() => {
+    if (vista !== "pin" || !sel) {
+      return;
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key >= "0" && e.key <= "9") {
+        tecla(e.key);
+      } else if (e.key === "Backspace") {
+        e.preventDefault();
+        tecla("del");
+      } else if (e.key === "Delete" || e.key === "Escape") {
+        tecla("clr");
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [vista, sel, pin]);
+
   const entrarDueno = async () => {
     try {
       onLogin(await loginDueno(email.trim(), pass));
@@ -151,7 +171,8 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
               <input className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
             </label>
             <label>Contraseña
-              <input className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="current-password" />
+              <input className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="current-password"
+                onKeyDown={(e) => { if (e.key === "Enter" && email && pass) entrarDueno(); }} />
             </label>
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={entrarDueno} disabled={!email || !pass}>Entrar</button>
@@ -170,7 +191,8 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
           <div className="entrar-head"><h1>Panel de administración</h1><p>Acceso de super admin</p></div>
           <div className="owner">
             <label>Correo<input className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-            <label>Contraseña<input className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)} /></label>
+            <label>Contraseña<input className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter" && email && pass) entrarAdmin(); }} /></label>
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={entrarAdmin} disabled={!email || !pass}>Entrar</button>
             <button className="link" onClick={() => { setErr(""); setVista("dueno"); }}>Volver</button>

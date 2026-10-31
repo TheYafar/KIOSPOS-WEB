@@ -145,7 +145,17 @@ export function Caja() {
 
   const searchrow = (
     <div className="searchrow">
-      <div className="search"><UIcono k="search" /><input placeholder="Buscar producto o código…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+      <div className="search"><UIcono k="search" /><input placeholder="Buscar producto o código…" value={q} autoFocus={isDesktop}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter") { return; }
+          const txt = q.trim();
+          if (!txt) { return; }
+          // Lector de código de barras (teclea el código y da Enter) o un solo resultado.
+          const exacto = productos.find((p) => p.codigoBarras === txt);
+          const objetivo = exacto ?? (filtrados.length === 1 ? filtrados[0] : null);
+          if (objetivo && objetivo.stockActual > 0) { add(objetivo); setQ(""); }
+        }} /></div>
     </div>
   );
   const chips = (
