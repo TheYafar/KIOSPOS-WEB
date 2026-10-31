@@ -52,7 +52,11 @@ export const cerrarSesion = () => {
   del(PERMISO_KEY);
 };
 
-export const getCajaToken = () => get<string>(CAJA_KEY) ?? "";
+// En desarrollo, el token de la caja demo (VITE_DEV_CAJA_TOKEN en .env.local) tiene
+// PRIORIDAD sobre lo guardado en el navegador, para arrancar directo en "¿Quién va a
+// cobrar?" aunque antes se haya guardado un token viejo o incompleto a mano.
+export const getCajaToken = () =>
+  (import.meta.env.VITE_DEV_CAJA_TOKEN as string | undefined) || get<string>(CAJA_KEY) || "";
 export const setCajaToken = (t: string) => set(CAJA_KEY, t);
 
 export const getPermiso = () => get<string>(PERMISO_KEY) ?? "";

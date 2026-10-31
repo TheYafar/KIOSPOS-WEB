@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { type PagoCobro } from "../api";
 import { UIcono } from "../icons";
 
@@ -86,6 +86,21 @@ export function Cobro({ total, tasa, isDesktop, err, onBack, onConfirm }: {
     const change = vuelto > 0.001 ? usd(vuelto) : "";
     onConfirm(pagos, { payLine, change, changeNote: change ? "El vuelto sale del efectivo" : "" });
   };
+
+  // Teclado físico (PC): escribe el monto/referencia de la forma de pago activa.
+  // Números y coma al campo activo, Backspace borra, Esc/Supr limpia, Enter confirma.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Enter") { e.preventDefault(); confirmar(); return; }
+      if (activa == null) { return; }
+      if (e.key >= "0" && e.key <= "9") { tecla(e.key, activa, campo); }
+      else if ((e.key === "," || e.key === ".") && campo === "monto") { tecla(",", activa, campo); }
+      else if (e.key === "Backspace") { e.preventDefault(); tecla("del", activa, campo); }
+      else if (e.key === "Delete" || e.key === "Escape") { tecla("clr", activa, campo); }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [activa, campo, lineas]);
 
   const disponibles = FORMAS.filter((f) => !lineas.some((l) => l.metodo === f.id));
   const colorStyle = (c: string) => ({ background: `color-mix(in srgb, ${c} 15%, var(--surface))`, color: c });
