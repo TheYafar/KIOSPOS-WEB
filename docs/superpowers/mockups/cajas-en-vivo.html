@@ -1,0 +1,104 @@
+<h2>Panel del dueño — "Cajas en vivo" (claro / oscuro)</h2>
+<p class="subtitle">Mismo boceto, ahora con tema propio. Usa el botón para alternar modo claro y oscuro y dime si así se ve bien en los dos.</p>
+
+<style>
+  /* Paleta propia del mockup (no depende del tema del navegador) */
+  .kp{
+    --surface:#ffffff; --surface-2:#f6f5f2; --surface-3:#eceae5;
+    --line:rgba(0,0,0,.09); --ink:#161719; --muted:#6b6b70;
+    --ok:#1f8a52; --ok-soft:rgba(32,160,90,.14);
+    --warn:#c2410c; --warn-soft:rgba(234,88,12,.12);
+    --shadow:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(0,0,0,.05);
+    background:var(--surface-2); color:var(--ink);
+    border-radius:18px; padding:18px; border:1px solid var(--line);
+    transition:background .2s,color .2s;
+  }
+  .kp[data-mode="dark"]{
+    --surface:#1f2023; --surface-2:#161719; --surface-3:#2a2b2f;
+    --line:rgba(255,255,255,.1); --ink:#f3f1ec; --muted:#9a9aa0;
+    --ok:#3ddc84; --ok-soft:rgba(61,220,132,.16);
+    --warn:#ff8a4c; --warn-soft:rgba(255,138,76,.16);
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.4);
+  }
+  .kp-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .kp-bar .t{font-weight:700;font-size:15px;flex:1}
+  .kp-toggle{display:inline-flex;background:var(--surface-3);border-radius:999px;padding:3px;gap:2px}
+  .kp-toggle button{border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13px;padding:6px 14px;border-radius:999px;cursor:pointer}
+  .kp-toggle button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+  .kp-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+  .kp-stat{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px 16px;box-shadow:var(--shadow)}
+  .kp-stat .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .kp-stat .v{font-size:24px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+  .kp-stat .d{font-size:12px;color:var(--muted);margin-top:2px}
+  .kp-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  .kp-caja{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px 18px 16px;position:relative;box-shadow:var(--shadow)}
+  .kp-caja h3{margin:0 0 2px;font-size:17px}
+  .kp-badge{position:absolute;top:16px;right:16px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px}
+  .kp-badge.abierta{background:var(--ok-soft);color:var(--ok)}
+  .kp-badge.cerrada{background:var(--surface-3);color:var(--muted)}
+  .kp-when{font-size:12px;color:var(--muted);margin-bottom:12px}
+  .kp-row{display:flex;justify-content:space-between;align-items:baseline;padding:7px 0;border-top:1px dashed var(--line)}
+  .kp-row:first-of-type{border-top:0}
+  .kp-row .lbl{font-size:13px;color:var(--muted)}
+  .kp-row .amt{font-weight:700;font-variant-numeric:tabular-nums}
+  .kp-gaveta{margin-top:12px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .kp-gaveta .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .kp-gaveta .pair{display:flex;gap:18px;margin-top:6px}
+  .kp-gaveta .pair b{font-size:18px;font-variant-numeric:tabular-nums}
+  .kp-act{margin-top:14px;display:flex;gap:8px}
+  .kp-btn{font-size:13px;font-weight:600;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+  .kp-btn.pri{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+  .kp-flag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--warn);background:var(--warn-soft);padding:4px 10px;border-radius:999px;margin-bottom:10px}
+</style>
+
+<div class="kp" id="kp" data-mode="light">
+  <div class="kp-bar">
+    <span class="t">Bodega Demo · 3:40 p.m.</span>
+    <span class="kp-toggle">
+      <button id="b-light" class="on" onclick="document.getElementById('kp').dataset.mode='light';this.classList.add('on');document.getElementById('b-dark').classList.remove('on')">☀ Claro</button>
+      <button id="b-dark" onclick="document.getElementById('kp').dataset.mode='dark';this.classList.add('on');document.getElementById('b-light').classList.remove('on')">☾ Oscuro</button>
+    </span>
+  </div>
+
+  <div class="kp-sum">
+    <div class="kp-stat"><div class="k">Vendido hoy (todas)</div><div class="v">$ 612,40</div><div class="d">Bs 22.058 · 2 cajas</div></div>
+    <div class="kp-stat"><div class="k">Efectivo en gavetas</div><div class="v">$ 318,00</div><div class="d">+ Bs 9.640 ahora mismo</div></div>
+    <div class="kp-stat"><div class="k">Ganancia hoy</div><div class="v" style="color:var(--ok)">$ 184,10</div><div class="d">30% sobre la venta</div></div>
+    <div class="kp-stat"><div class="k">Cierres</div><div class="v">1 / 2</div><div class="d">Falta cerrar Caja 1</div></div>
+  </div>
+
+  <div class="kp-grid">
+    <div class="kp-caja">
+      <span class="kp-badge abierta">● Abierta</span>
+      <h3>Caja 1</h3>
+      <div class="kp-when">Turno abierto desde las 8:05 a.m. · cajera: Ana Pérez</div>
+      <span class="kp-flag">⏳ Aún no ha hecho cierre</span>
+      <div class="kp-row"><span class="lbl">Efectivo $</span><span class="amt">$ 196,00</span></div>
+      <div class="kp-row"><span class="lbl">Efectivo Bs</span><span class="amt">Bs 6.240</span></div>
+      <div class="kp-row"><span class="lbl">Punto</span><span class="amt">Bs 2.100</span></div>
+      <div class="kp-row"><span class="lbl">Pago móvil</span><span class="amt">Bs 1.480</span></div>
+      <div class="kp-gaveta">
+        <div class="k">Debería haber en gaveta</div>
+        <div class="pair"><b>$ 206,00</b><b>Bs 6.240</b></div>
+      </div>
+      <div class="kp-act"><button class="kp-btn pri">Ver detalle</button><button class="kp-btn">Avisar que cierre</button></div>
+    </div>
+
+    <div class="kp-caja">
+      <span class="kp-badge cerrada">✓ Cerrada 2:30 p.m.</span>
+      <h3>Caja 2</h3>
+      <div class="kp-when">Turno 7:50 a.m. → 2:30 p.m. · cajero: José Marín</div>
+      <div class="kp-row"><span class="lbl">Efectivo $</span><span class="amt">$ 122,00</span></div>
+      <div class="kp-row"><span class="lbl">Efectivo Bs</span><span class="amt">Bs 3.400</span></div>
+      <div class="kp-row"><span class="lbl">Punto</span><span class="amt">Bs 5.260</span></div>
+      <div class="kp-row"><span class="lbl">Biopago</span><span class="amt">Bs 1.918</span></div>
+      <div class="kp-gaveta">
+        <div class="k">Cierre: contado vs esperado</div>
+        <div class="pair"><b>$ 132,00</b><b style="color:var(--ok)">+ $2,00 sobrante</b></div>
+      </div>
+      <div class="kp-act"><button class="kp-btn pri">Ver cierre</button></div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px">Alterna claro/oscuro con el botón de arriba. ¿Así sí? Y dime qué más le falta a la sección.</p>

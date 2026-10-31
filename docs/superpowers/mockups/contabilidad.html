@@ -1,0 +1,148 @@
+<h2>Panel del dueño — módulo Contable</h2>
+<p class="subtitle">Dos secciones separadas. Usa el conmutador "Automática / Mi libro" para ver las dos, y el botón claro/oscuro. Los números del modo automático usan mis propuestas (entró = ganancia, reparto 40% mercancía) — reacciona y ajustamos.</p>
+
+<style>
+  .kp{
+    --surface:#ffffff; --surface-2:#f6f5f2; --surface-3:#eceae5;
+    --line:rgba(0,0,0,.09); --ink:#161719; --muted:#6b6b70;
+    --ok:#1f8a52; --ok-soft:rgba(32,160,90,.14);
+    --warn:#c2410c; --warn-soft:rgba(234,88,12,.12);
+    --bad:#c0392b; --bad-soft:rgba(192,57,43,.12);
+    --accent:#2d6cdf; --accent-soft:rgba(45,108,223,.12);
+    --shadow:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(0,0,0,.05);
+    background:var(--surface-2); color:var(--ink);
+    border-radius:18px; padding:18px; border:1px solid var(--line); transition:background .2s,color .2s;
+  }
+  .kp[data-mode="dark"]{
+    --surface:#1f2023; --surface-2:#161719; --surface-3:#2a2b2f;
+    --line:rgba(255,255,255,.1); --ink:#f3f1ec; --muted:#9a9aa0;
+    --ok:#3ddc84; --ok-soft:rgba(61,220,132,.16);
+    --warn:#ff8a4c; --warn-soft:rgba(255,138,76,.16);
+    --bad:#ff6b5e; --bad-soft:rgba(255,107,94,.16);
+    --accent:#5b8def; --accent-soft:rgba(91,141,239,.18);
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.4);
+  }
+  .kp-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+  .kp-bar .t{font-weight:700;font-size:15px;flex:1;min-width:160px}
+  .kp-seg{display:inline-flex;background:var(--surface-3);border-radius:999px;padding:3px;gap:2px}
+  .kp-seg button{border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13px;padding:6px 14px;border-radius:999px;cursor:pointer}
+  .kp-seg button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+  .per{font-size:12px;color:var(--muted);background:var(--surface-3);padding:6px 11px;border-radius:999px}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:16px;box-shadow:var(--shadow)}
+  .sum3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
+  .sum3 .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .sum3 .v{font-size:26px;font-weight:700;margin-top:4px;font-variant-numeric:tabular-nums}
+  .sum3 .d{font-size:12px;color:var(--muted);margin-top:2px}
+  .up{color:var(--ok)} .down{color:var(--bad)}
+
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+  @media(max-width:720px){.cols{grid-template-columns:1fr}.sum3{grid-template-columns:1fr}}
+  .card h3{margin:0 0 10px;font-size:14px}
+  .erow{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--line)}
+  .erow:first-of-type{border-top:0}
+  .erow .ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center}
+  .erow .nm{flex:1;font-size:13px}
+  .erow .amt{font-weight:700;font-variant-numeric:tabular-nums}
+
+  .reparto{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .rbox{border-radius:14px;padding:16px}
+  .rbox.merc{background:var(--accent-soft)}
+  .rbox.bol{background:var(--ok-soft)}
+  .rbox .k{font-size:12px;font-weight:600;opacity:.8}
+  .rbox .v{font-size:24px;font-weight:800;margin-top:4px;font-variant-numeric:tabular-nums}
+  .rbox .p{font-size:11px;opacity:.7;margin-top:2px}
+
+  table.lib{width:100%;border-collapse:collapse;font-size:13px}
+  table.lib th{text-align:left;font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);font-weight:600;padding:6px 8px}
+  table.lib td{padding:9px 8px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+  table.lib td.money{text-align:right;font-weight:700}
+  .tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px}
+  .tag.ing{background:var(--ok-soft);color:var(--ok)} .tag.egr{background:var(--bad-soft);color:var(--bad)}
+  .libtot{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-top:14px}
+  .btn{font-size:13px;font-weight:600;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+  .btn.pri{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+  .note{font-size:12px;color:var(--muted);background:var(--surface-3);border-radius:10px;padding:10px 12px;margin-bottom:14px}
+</style>
+
+<div class="kp" id="kp" data-mode="light">
+  <div class="kp-bar">
+    <span class="t">Bodega Demo · Contabilidad</span>
+    <span class="kp-seg">
+      <button id="s-auto" class="on" onclick="sec('auto')">Automática</button>
+      <button id="s-manual" onclick="sec('manual')">Mi libro</button>
+    </span>
+    <span class="per" id="perlbl">Octubre 2026 ▾</span>
+    <span class="kp-seg">
+      <button id="bl" class="on" onclick="mode('light')">☀</button>
+      <button id="bd" onclick="mode('dark')">☾</button>
+    </span>
+  </div>
+
+  <!-- ===== AUTOMÁTICA ===== -->
+  <div id="auto">
+    <div class="sum3">
+      <div class="card"><div class="k">Entró (ganancia)</div><div class="v">$ 4.200</div><div class="d">ventas − costo · ≈ Bs 151.200</div></div>
+      <div class="card"><div class="k">Salió</div><div class="v">$ 1.750</div><div class="d">nómina + servicios + otros</div></div>
+      <div class="card"><div class="k">Te queda</div><div class="v up">$ 2.450</div><div class="d up">▲ 12% vs septiembre</div></div>
+    </div>
+
+    <div class="cols">
+      <div class="card">
+        <h3>En qué se fue ($ 1.750)</h3>
+        <div class="erow"><span class="ico" style="background:var(--warn-soft);color:var(--warn)">👥</span><span class="nm">Nómina <span style="color:var(--muted);font-size:11px">· del módulo Nómina</span></span><span class="amt">$ 1.240</span></div>
+        <div class="erow"><span class="ico" style="background:var(--accent-soft);color:var(--accent)">💡</span><span class="nm">Servicios (internet, luz, agua, alquiler)</span><span class="amt">$ 360</span></div>
+        <div class="erow"><span class="ico" style="background:var(--surface-3);color:var(--muted)">•</span><span class="nm">Otros gastos</span><span class="amt">$ 150</span></div>
+      </div>
+
+      <div class="card">
+        <h3>Cómo se reparte lo que queda</h3>
+        <div class="reparto">
+          <div class="rbox merc"><div class="k">Para mercancía</div><div class="v">$ 980</div><div class="p">40% · reponer stock</div></div>
+          <div class="rbox bol"><div class="k">Para tu bolsillo</div><div class="v">$ 1.470</div><div class="p">60% · limpio para ti</div></div>
+        </div>
+        <div class="note" style="margin:14px 0 0">El porcentaje lo configuras tú. ¿40/60 está bien de ejemplo?</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== MI LIBRO (MANUAL) ===== -->
+  <div id="manual" style="display:none">
+    <div class="note">📓 Esta libreta es 100% tuya: la app <b>solo guarda y suma</b> lo que escribes. No mete ningún número por su cuenta.</div>
+    <div class="card">
+      <div style="display:flex;align-items:center;margin-bottom:8px"><h3 style="flex:1;margin:0">Mi libro — octubre</h3><button class="btn pri">+ Agregar línea</button></div>
+      <table class="lib">
+        <thead><tr><th>Fecha</th><th>Concepto</th><th>Tipo</th><th style="text-align:right">Monto</th></tr></thead>
+        <tbody>
+          <tr><td>02 oct</td><td>Venta mostrador (lo que conté)</td><td><span class="tag ing">Ingreso</span></td><td class="money up">+ $ 300,00</td></tr>
+          <tr><td>03 oct</td><td>Compra harina al proveedor</td><td><span class="tag egr">Egreso</span></td><td class="money down">− $ 120,00</td></tr>
+          <tr><td>05 oct</td><td>Pago de la luz</td><td><span class="tag egr">Egreso</span></td><td class="money down">− $ 42,00</td></tr>
+          <tr><td>08 oct</td><td>Venta del fin de semana</td><td><span class="tag ing">Ingreso</span></td><td class="money up">+ $ 540,00</td></tr>
+          <tr><td>10 oct</td><td>Adelanto a Ana</td><td><span class="tag egr">Egreso</span></td><td class="money down">− $ 30,00</td></tr>
+        </tbody>
+      </table>
+      <div class="libtot">
+        <div class="card" style="box-shadow:none"><div class="k" style="font-size:11px;text-transform:uppercase;color:var(--muted)">Ingresos</div><div style="font-size:20px;font-weight:700" class="up">$ 840,00</div></div>
+        <div class="card" style="box-shadow:none"><div class="k" style="font-size:11px;text-transform:uppercase;color:var(--muted)">Egresos</div><div style="font-size:20px;font-weight:700" class="down">$ 192,00</div></div>
+        <div class="card" style="box-shadow:none"><div class="k" style="font-size:11px;text-transform:uppercase;color:var(--muted)">Saldo</div><div style="font-size:20px;font-weight:800">$ 648,00</div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function sec(w){
+    document.getElementById('auto').style.display = w==='auto'?'block':'none';
+    document.getElementById('manual').style.display = w==='manual'?'block':'none';
+    document.getElementById('s-auto').classList.toggle('on', w==='auto');
+    document.getElementById('s-manual').classList.toggle('on', w==='manual');
+    document.getElementById('perlbl').style.visibility = w==='auto'?'visible':'hidden';
+  }
+  function mode(m){
+    document.getElementById('kp').dataset.mode = m;
+    document.getElementById('bl').classList.toggle('on', m==='light');
+    document.getElementById('bd').classList.toggle('on', m==='dark');
+  }
+</script>
+
+<p class="subtitle" style="margin-top:20px">Cambia entre "Automática" y "Mi libro" arriba. Dime qué ajustarías — y de paso eso contesta mis 3 preguntas (qué es "lo que entró", el reparto, y lo de mercancía).</p>

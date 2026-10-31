@@ -1,0 +1,129 @@
+<h2>Panel del dueño — sección "Nómina"</h2>
+<p class="subtitle">Boceto con tus empleados de demo, quincena en curso. A la izquierda la lista; a la derecha el detalle del empleado seleccionado. Fíjate en el saldo en rojo (pregunta 3). Alterna claro/oscuro arriba.</p>
+
+<style>
+  .kp{
+    --surface:#ffffff; --surface-2:#f6f5f2; --surface-3:#eceae5;
+    --line:rgba(0,0,0,.09); --ink:#161719; --muted:#6b6b70;
+    --ok:#1f8a52; --ok-soft:rgba(32,160,90,.14);
+    --warn:#c2410c; --warn-soft:rgba(234,88,12,.12);
+    --bad:#c0392b; --bad-soft:rgba(192,57,43,.12);
+    --accent:#2d6cdf;
+    --shadow:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(0,0,0,.05);
+    background:var(--surface-2); color:var(--ink);
+    border-radius:18px; padding:18px; border:1px solid var(--line); transition:background .2s,color .2s;
+  }
+  .kp[data-mode="dark"]{
+    --surface:#1f2023; --surface-2:#161719; --surface-3:#2a2b2f;
+    --line:rgba(255,255,255,.1); --ink:#f3f1ec; --muted:#9a9aa0;
+    --ok:#3ddc84; --ok-soft:rgba(61,220,132,.16);
+    --warn:#ff8a4c; --warn-soft:rgba(255,138,76,.16);
+    --bad:#ff6b5e; --bad-soft:rgba(255,107,94,.16);
+    --accent:#5b8def;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.4);
+  }
+  .kp-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .kp-bar .t{font-weight:700;font-size:15px;flex:1}
+  .kp-bar .per{font-size:12px;color:var(--muted);background:var(--surface-3);padding:5px 10px;border-radius:999px}
+  .kp-toggle{display:inline-flex;background:var(--surface-3);border-radius:999px;padding:3px;gap:2px}
+  .kp-toggle button{border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13px;padding:6px 14px;border-radius:999px;cursor:pointer}
+  .kp-toggle button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+
+  .kp-layout{display:grid;grid-template-columns:320px 1fr;gap:16px}
+  @media(max-width:720px){.kp-layout{grid-template-columns:1fr}}
+
+  .kp-list{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:8px;box-shadow:var(--shadow)}
+  .kp-emp{display:grid;grid-template-columns:38px 1fr auto;gap:10px;align-items:center;padding:11px 10px;border-radius:12px;cursor:pointer}
+  .kp-emp.sel{background:var(--surface-2);outline:2px solid var(--accent);outline-offset:-2px}
+  .kp-emp:hover{background:var(--surface-2)}
+  .kp-av{width:38px;height:38px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;color:#fff}
+  .kp-emp .nm{font-weight:600;font-size:14px}
+  .kp-emp .rl{font-size:12px;color:var(--muted)}
+  .kp-emp .sal{text-align:right;font-weight:700;font-variant-numeric:tabular-nums}
+  .kp-emp .sal small{display:block;font-size:11px;color:var(--muted);font-weight:500}
+  .pos{color:var(--ok)} .neg{color:var(--bad)}
+
+  .kp-detail{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+  .kp-dhead{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+  .kp-dhead h3{margin:0;font-size:18px}
+  .kp-dhead .rl{font-size:12px;color:var(--muted)}
+  .kp-sum3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+  .kp-box{background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .kp-box .k{font-size:11px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}
+  .kp-box .v{font-size:20px;font-weight:700;margin-top:3px;font-variant-numeric:tabular-nums}
+  .kp-box .d{font-size:11px;color:var(--muted);margin-top:1px}
+
+  .kp-acts{display:flex;gap:8px;margin-bottom:16px}
+  .kp-btn{font-size:13px;font-weight:600;padding:9px 14px;border-radius:10px;border:1px solid var(--line);background:transparent;color:var(--ink);cursor:pointer}
+  .kp-btn.pri{background:var(--ink);color:var(--surface);border-color:var(--ink)}
+
+  .kp-h4{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted);margin:6px 2px 8px}
+  .kp-mov{display:grid;grid-template-columns:28px 1fr auto;gap:10px;align-items:center;padding:9px 2px;border-top:1px solid var(--line)}
+  .kp-mov:first-of-type{border-top:0}
+  .kp-chip{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px}
+  .kp-chip.pago{background:var(--ok-soft);color:var(--ok)}
+  .kp-chip.consumo{background:var(--warn-soft);color:var(--warn)}
+  .kp-mov .ml{font-size:13px}
+  .kp-mov .md{font-size:11px;color:var(--muted)}
+  .kp-mov .mv{font-weight:700;font-variant-numeric:tabular-nums;text-align:right}
+</style>
+
+<div class="kp" id="kp" data-mode="light">
+  <div class="kp-bar">
+    <span class="t">Bodega Demo · Nómina</span>
+    <span class="per">Quincena 16–31 oct</span>
+    <span class="kp-toggle">
+      <button id="bl" class="on" onclick="document.getElementById('kp').dataset.mode='light';this.classList.add('on');document.getElementById('bd').classList.remove('on')">☀ Claro</button>
+      <button id="bd" onclick="document.getElementById('kp').dataset.mode='dark';this.classList.add('on');document.getElementById('bl').classList.remove('on')">☾ Oscuro</button>
+    </span>
+  </div>
+
+  <div class="kp-layout">
+    <!-- LISTA -->
+    <div class="kp-list">
+      <div class="kp-emp sel" data-choice="ana" onclick="toggleSelect(this)">
+        <span class="kp-av" style="background:#c0392b">A</span>
+        <div><div class="nm">Ana Pérez</div><div class="rl">Cajera · $120 / quincena</div></div>
+        <div class="sal pos">$ 25,50<small>le debes</small></div>
+      </div>
+      <div class="kp-emp" data-choice="jose" onclick="toggleSelect(this)">
+        <span class="kp-av" style="background:#2d6cdf">J</span>
+        <div><div class="nm">José Marín</div><div class="rl">Cajero · $120 / quincena</div></div>
+        <div class="sal neg">−$ 7,00<small>te debe</small></div>
+      </div>
+      <div class="kp-emp" data-choice="carlos" onclick="toggleSelect(this)">
+        <span class="kp-av" style="background:#1f8a52">C</span>
+        <div><div class="nm">Carlos</div><div class="rl">Encargado · $200 / quincena</div></div>
+        <div class="sal pos">$ 100,00<small>le debes</small></div>
+      </div>
+    </div>
+
+    <!-- DETALLE -->
+    <div class="kp-detail">
+      <div class="kp-dhead">
+        <span class="kp-av" style="background:#c0392b;width:44px;height:44px;font-size:17px">A</span>
+        <div><h3>Ana Pérez</h3><div class="rl">Cajera · sueldo $120 por quincena</div></div>
+      </div>
+
+      <div class="kp-sum3">
+        <div class="kp-box"><div class="k">Le toca</div><div class="v">$ 120,00</div><div class="d">esta quincena</div></div>
+        <div class="kp-box"><div class="k">Le has pagado</div><div class="v">$ 80,00</div><div class="d">− consumos $14,50</div></div>
+        <div class="kp-box"><div class="k">Saldo: le debes</div><div class="v pos">$ 25,50</div><div class="d">≈ Bs 918</div></div>
+      </div>
+
+      <div class="kp-acts">
+        <button class="kp-btn pri">+ Registrar pago</button>
+        <button class="kp-btn">+ Registrar consumo</button>
+      </div>
+
+      <div class="kp-h4">Movimientos de la quincena</div>
+      <div class="kp-mov"><span class="kp-chip pago">↓</span><div><div class="ml">Pago / abono</div><div class="md">30 oct · efectivo</div></div><div class="mv pos">+ $ 30,00</div></div>
+      <div class="kp-mov"><span class="kp-chip consumo">🛒</span><div><div class="ml">Consumo · Harina Pan 1kg ×1</div><div class="md">28 oct · a precio de venta</div></div><div class="mv neg">− $ 3,50</div></div>
+      <div class="kp-mov"><span class="kp-chip consumo">🛒</span><div><div class="ml">Consumo · Refresco 2L ×2</div><div class="md">24 oct · a precio de venta</div></div><div class="mv neg">− $ 4,00</div></div>
+      <div class="kp-mov"><span class="kp-chip consumo">🛒</span><div><div class="ml">Consumo · Pan canilla ×3</div><div class="md">21 oct · a precio de venta</div></div><div class="mv neg">− $ 7,00</div></div>
+      <div class="kp-mov"><span class="kp-chip pago">↓</span><div><div class="ml">Pago / abono</div><div class="md">16 oct · pago móvil</div></div><div class="mv pos">+ $ 50,00</div></div>
+    </div>
+  </div>
+</div>
+
+<p class="subtitle" style="margin-top:20px">Haz clic en los empleados de la izquierda si quieres marcar cuál te parece mejor, y dime en el terminal qué cambiarías.</p>

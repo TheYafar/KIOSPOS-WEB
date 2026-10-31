@@ -1,0 +1,149 @@
+<h2>Caja (cajero) — Avance / Recarga</h2>
+<p class="subtitle">Así lo vería el cajero dentro de la pantalla de Caja. Cambia entre Avance y Recarga, y dentro de Avance entre las dos formas. La comisión viene prellenada (configurable) y editable. Prueba claro/oscuro.</p>
+
+<style>
+  .kp{
+    --surface:#ffffff; --surface-2:#f6f5f2; --surface-3:#eceae5;
+    --line:rgba(0,0,0,.09); --ink:#161719; --muted:#6b6b70;
+    --ok:#1f8a52; --ok-soft:rgba(32,160,90,.14);
+    --accent:#2d6cdf; --accent-soft:rgba(45,108,223,.12);
+    --shadow:0 1px 2px rgba(0,0,0,.05),0 8px 24px rgba(0,0,0,.05);
+    background:var(--surface-2); color:var(--ink);
+    border-radius:18px; padding:18px; border:1px solid var(--line); transition:background .2s,color .2s;
+  }
+  .kp[data-mode="dark"]{
+    --surface:#1f2023; --surface-2:#161719; --surface-3:#2a2b2f;
+    --line:rgba(255,255,255,.1); --ink:#f3f1ec; --muted:#9a9aa0;
+    --ok:#3ddc84; --ok-soft:rgba(61,220,132,.16);
+    --accent:#5b8def; --accent-soft:rgba(91,141,239,.18);
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.4);
+  }
+  .kp-bar{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+  .kp-bar .t{font-weight:700;font-size:15px;flex:1}
+  .kp-seg{display:inline-flex;background:var(--surface-3);border-radius:999px;padding:3px;gap:2px}
+  .kp-seg button{border:0;background:transparent;color:var(--muted);font-weight:600;font-size:13px;padding:6px 14px;border-radius:999px;cursor:pointer}
+  .kp-seg button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+
+  .wrap{max-width:460px;margin:0 auto}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+  .lbl{display:block;font-size:12px;color:var(--muted);font-weight:600;margin:12px 2px 5px}
+  .lbl:first-child{margin-top:0}
+  .inp{width:100%;box-sizing:border-box;background:var(--surface-2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;color:var(--ink);font-size:15px;font-variant-numeric:tabular-nums}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:13px;font-weight:600;padding:8px 12px;border-radius:10px;border:1px solid var(--line);background:var(--surface-2);color:var(--ink);cursor:pointer}
+  .chip.on{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+  .resumen{margin-top:16px;background:var(--surface-2);border:1px solid var(--line);border-radius:12px;padding:14px}
+  .rrow{display:flex;justify-content:space-between;align-items:baseline;padding:4px 0}
+  .rrow .k{font-size:13px;color:var(--muted)}
+  .rrow .v{font-weight:700;font-variant-numeric:tabular-nums}
+  .rrow.big .v{font-size:20px}
+  .rrow.gain .v{color:var(--ok)}
+  .cta{width:100%;margin-top:14px;background:var(--ink);color:var(--surface);border:0;border-radius:12px;padding:13px;font-size:15px;font-weight:700;cursor:pointer}
+  .hide{display:none}
+  .seg-sub{margin:4px 0 2px}
+</style>
+
+<div class="kp" id="kp" data-mode="light">
+  <div class="kp-bar">
+    <span class="t">Caja 1 · Ana Pérez</span>
+    <span class="kp-seg">
+      <button id="bl" class="on" onclick="mode('light')">☀</button>
+      <button id="bd" onclick="mode('dark')">☾</button>
+    </span>
+  </div>
+
+  <div class="wrap">
+    <div class="kp-seg" style="width:100%;margin-bottom:14px">
+      <button id="t-av" class="on" style="flex:1" onclick="tipo('avance')">💵 Avance</button>
+      <button id="t-re" style="flex:1" onclick="tipo('recarga')">📱 Recarga</button>
+    </div>
+
+    <div class="card">
+      <!-- ===== AVANCE ===== -->
+      <div id="avance">
+        <span class="lbl">Forma del avance</span>
+        <div class="kp-seg seg-sub" style="width:100%">
+          <button id="f1" class="on" style="flex:1" onclick="forma(1)">Paga por un método mío</button>
+          <button id="f2" style="flex:1" onclick="forma(2)">Pago móvil a mi cuenta</button>
+        </div>
+
+        <span class="lbl">Monto que paga el cliente (Bs)</span>
+        <input class="inp" value="1.000,00">
+
+        <div id="met-wrap">
+          <span class="lbl">Método por el que paga</span>
+          <div class="chips">
+            <span class="chip on">Punto</span><span class="chip">Pago móvil</span><span class="chip">Biopago</span>
+          </div>
+        </div>
+
+        <div id="cuenta-wrap" class="hide">
+          <span class="lbl">Cuenta a la que te hace el pago móvil</span>
+          <input class="inp" placeholder="Banco · 0412… · CI">
+        </div>
+
+        <span class="lbl">Comisión</span>
+        <div class="two">
+          <input class="inp" value="10 %">
+          <input class="inp" value="Bs 100,00" readonly style="color:var(--muted)">
+        </div>
+
+        <div class="resumen">
+          <div class="rrow"><span class="k">Entra (digital)</span><span class="v">Bs 1.000,00</span></div>
+          <div class="rrow big"><span class="k">Le entregas en efectivo</span><span class="v">Bs 900,00</span></div>
+          <div class="rrow gain"><span class="k">Ganas (comisión)</span><span class="v">Bs 100,00</span></div>
+        </div>
+        <button class="cta">Registrar avance</button>
+      </div>
+
+      <!-- ===== RECARGA ===== -->
+      <div id="recarga" class="hide">
+        <span class="lbl">Servicio</span>
+        <div class="chips">
+          <span class="chip on">Telefonía</span><span class="chip">Internet</span><span class="chip">Otro</span>
+        </div>
+
+        <span class="lbl">Referencia (línea / número / contrato)</span>
+        <input class="inp" placeholder="0414 123 4567">
+
+        <span class="lbl">Monto de la recarga (Bs)</span>
+        <input class="inp" value="500,00">
+
+        <span class="lbl">Cómo paga el cliente</span>
+        <div class="chips">
+          <span class="chip on">Efectivo Bs</span><span class="chip">Punto</span><span class="chip">Pago móvil</span>
+        </div>
+
+        <span class="lbl">Comisión</span>
+        <div class="two">
+          <input class="inp" value="8 %">
+          <input class="inp" value="Bs 40,00" readonly style="color:var(--muted)">
+        </div>
+
+        <div class="resumen">
+          <div class="rrow"><span class="k">Recarga</span><span class="v">Bs 500,00</span></div>
+          <div class="rrow gain"><span class="k">Ganas (comisión)</span><span class="v">Bs 40,00</span></div>
+        </div>
+        <button class="cta">Registrar recarga</button>
+      </div>
+    </div>
+    <p class="subtitle" style="margin-top:14px;text-align:center">En "Avance" cambia entre las dos formas: la 2ª pide la cuenta a la que te hacen el pago móvil.</p>
+  </div>
+</div>
+
+<script>
+  function mode(m){document.getElementById('kp').dataset.mode=m;document.getElementById('bl').classList.toggle('on',m==='light');document.getElementById('bd').classList.toggle('on',m==='dark');}
+  function tipo(t){
+    document.getElementById('avance').classList.toggle('hide',t!=='avance');
+    document.getElementById('recarga').classList.toggle('hide',t!=='recarga');
+    document.getElementById('t-av').classList.toggle('on',t==='avance');
+    document.getElementById('t-re').classList.toggle('on',t==='recarga');
+  }
+  function forma(n){
+    document.getElementById('met-wrap').classList.toggle('hide',n===2);
+    document.getElementById('cuenta-wrap').classList.toggle('hide',n===1);
+    document.getElementById('f1').classList.toggle('on',n===1);
+    document.getElementById('f2').classList.toggle('on',n===2);
+  }
+</script>
