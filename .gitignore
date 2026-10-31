@@ -25,3 +25,6 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Borradores de brainstorming (mockups del visual companion)
+.superpowers/
