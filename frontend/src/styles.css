@@ -284,7 +284,12 @@ svg { display:block; }
 .rail-item svg { width:22px; height:22px; }
 .rail-item[aria-current="page"] { background:var(--rail-2,#212327); color:#fff; }
 @media (min-width:760px) {
-  .app { max-width:1180px; margin:0 auto; width:100%; }
+  /* Ancho completo en todas las pestañas: barra lateral + contenido fluido.
+     Antes la app se topaba en 1180px centrada, salvo en Vender, por lo que la
+     interfaz "saltaba" de tamaño al cambiar de pestaña y se veía chica en
+     monitores grandes. Cada pantalla de contenido se auto-limita (p. ej.
+     .czwrap a 760px) para mantener la lectura cómoda. */
+  .app { width:100%; }
   .tabbar { display:none; }
   .rail { display:flex; flex-direction:column; gap:4px; padding:14px 10px; background:var(--rail); align-items:center; }
   .rail .logo { margin-bottom:10px; }
@@ -460,7 +465,6 @@ svg { display:block; }
 
 /* --- Caja escritorio: catálogo + ticket en fila --- */
 @media (min-width:760px) {
-  .app.caja-app { max-width:none; }
   .caja-wrap { flex:1; min-height:0; display:flex; }
   .caja.desk { flex:1; min-width:0; }
   .caja.desk .searchrow { padding:16px 24px 10px; }
