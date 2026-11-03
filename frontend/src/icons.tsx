@@ -31,7 +31,10 @@ const UI: Record<string, string> = {
   store: '<path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M5.5 12v8h13v-8"/><path d="M10 20v-4.5h4V20"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   close: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
-  alert: '<path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4.5M12 17.5v.5"/>'
+  alert: '<path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4.5M12 17.5v.5"/>',
+  wallet: '<path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H16v3"/><rect x="4" y="7.5" width="16.5" height="11" rx="2.5"/><path d="M20.5 11.5H17a2 2 0 0 0 0 4h3.5"/>',
+  trash: '<path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6.5 7l.9 12a1 1 0 0 0 1 .95h7.2a1 1 0 0 0 1-.95L18.5 7M10 11v6M14 11v6"/>',
+  edit: '<path d="M4 20h4L18.5 9.5a1.95 1.95 0 0 0 0-2.8l-1.2-1.2a1.95 1.95 0 0 0-2.8 0L4 16v4Z"/><path d="M13.5 6.5l4 4"/>'
 };
 
 export function Icono({ k, sw = 1.7 }: { k: string; sw?: number }) {

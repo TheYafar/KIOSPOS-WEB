@@ -4,6 +4,7 @@ import { UIcono } from "../icons";
 import { Caja } from "./Caja";
 import { Cuadre } from "./Cuadre";
 import { Inventario } from "./Inventario";
+import { Nomina } from "./Nomina";
 import { Reportes } from "./Reportes";
 import { Usuarios } from "./Usuarios";
 
@@ -19,7 +20,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
   const esCaja = sesion.cajaId != null;
   const tabs: Tab[] = esCaja
     ? [{ id: "caja", n: "Vender", icon: "cart" }, { id: "cuadre", n: "Cierre", icon: "cash" }, { id: "mas", n: "Más", icon: "more" }]
-    : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "mas", n: "Más", icon: "more" }];
+    : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "nomina", n: "Nómina", icon: "wallet" }, { id: "mas", n: "Más", icon: "more" }];
   const [tab, setTab] = useState(tabs[0].id);
   const [online, setOnline] = useState(navigator.onLine);
 
@@ -68,6 +69,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
           {tab === "cuadre" && esCaja && <Cuadre />}
           {tab === "reportes" && <Reportes />}
           {tab === "inventario" && <Inventario />}
+          {tab === "nomina" && !esCaja && <Nomina />}
           {tab === "mas" && (esCaja
             ? <div className="stub"><b>Más</b><p>El manejo de usuarios y cajas lo hace el dueño desde su panel.</p><button className="btn ghost" onClick={onSalir}>Cerrar sesión</button></div>
             : <Usuarios onSalir={onSalir} />)}
