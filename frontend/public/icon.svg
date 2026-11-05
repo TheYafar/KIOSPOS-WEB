@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="KioskPOS">
+  <rect width="512" height="512" rx="112" fill="#0E2A27"/>
+  <g fill="none" stroke="#F4A63A" stroke-width="58" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M190 150 V362"/>
+    <path d="M190 262 L342 150"/>
+    <path d="M190 262 L350 362"/>
+  </g>
+</svg>

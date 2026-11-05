@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { crearCaja, crearUsuario, listarCajas, listarUsuarios, type CajaInfo, type Usuario } from "../api";
 import { type Rol } from "../session";
+import { MiPlan } from "./MiPlan";
 
 const ROL_N: Record<string, string> = { DUENO: "Dueño", ENCARGADO: "Encargado", CAJERO: "Cajero", SOPORTE: "Soporte Técnico", SUPER_ADMIN: "Super admin" };
 
@@ -23,6 +24,7 @@ export function Usuarios({ onSalir }: { onSalir: () => void }) {
       </div>
       {msg && <div className="toolbar" style={{ paddingTop: 0, color: "var(--ok)", fontSize: 13 }}>{msg}</div>}
       <div className="scroll">
+        <MiPlan />
         {err && <p className="noresult">{err}</p>}
         <span className="k" style={{ color: "var(--text-2)", fontWeight: 500 }}>Usuarios</span>
         {usuarios.map((u) => (
@@ -104,9 +106,12 @@ function TokenCaja({ token, onClose }: { token: string; onClose: () => void }) {
       <div className="modal-card">
         <div className="modal-head"><h2>Token de la caja</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
         <div className="modal-body">
-          <span className="hint">Cópialo y pégalo en la configuración de la caja (pantalla de entrada del equipo). No se vuelve a mostrar.</span>
+          <span className="hint">En el equipo de la caja: <b>abre el enlace de configuración</b> (lo más fácil) o pega el token a mano. No se vuelve a mostrar.</span>
           <div className="receipt"><pre className="t" style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{token}</pre></div>
-          <button className="b pri" onClick={() => navigator.clipboard?.writeText(token)}>Copiar</button>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <button className="b pri" onClick={() => navigator.clipboard?.writeText(window.location.origin + "/#caja=" + encodeURIComponent(token))}>Copiar enlace</button>
+            <button className="b" onClick={() => navigator.clipboard?.writeText(token)}>Copiar token</button>
+          </div>
         </div>
         <div className="modal-foot"><button className="cta center press" onClick={onClose}>Listo</button></div>
       </div>

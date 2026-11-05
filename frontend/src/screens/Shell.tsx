@@ -67,7 +67,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
 
           {tab === "caja" && esCaja && <Caja />}
           {tab === "cuadre" && esCaja && <Cuadre />}
-          {tab === "reportes" && <Reportes />}
+          {tab === "reportes" && <Reportes onIr={setTab} />}
           {tab === "inventario" && <Inventario />}
           {tab === "contabilidad" && <Contabilidad />}
           {tab === "mas" && (esCaja

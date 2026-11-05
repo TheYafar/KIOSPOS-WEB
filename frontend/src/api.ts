@@ -227,7 +227,15 @@ export async function adminLogin(email: string, password: string): Promise<strin
   return r.token;
 }
 
-export interface Situacion { negocioId: number; nombre: string; plan: string; estadoEfectivo: string; puedeCobrar: boolean; pagoHasta: string | null; diasVencido: number; mesesPendientes: number; deuda: number; mensaje: string; }
+export interface Situacion { negocioId: number; nombre: string; plan: string; estadoEfectivo: string; puedeCobrar: boolean; soloConsulta?: boolean; pagoHasta: string | null; diasVencido: number; mesesPendientes: number; deuda: number; mensaje: string; }
+
+// ---------- Mi negocio (suscripción del dueño) ----------
+export interface MiPago { id: number; monto: number; moneda: string; metodo: string; referencia: string | null; meses: number; estado: string; }
+export async function miSuscripcion(): Promise<Situacion> { return parse(await fetch("/api/mi-negocio/suscripcion", { headers: auth() })); }
+export async function misPagos(): Promise<MiPago[]> { return parse(await fetch("/api/mi-negocio/pagos", { headers: auth() })); }
+export async function reportarPago(body: { monto: number; moneda?: string; metodo: string; referencia?: string; meses?: number }): Promise<void> {
+  await parse(await fetch("/api/mi-negocio/pagos", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
 export interface NegocioVista { situacion: Situacion; cajas: number; ultimaVezEnLinea: string | null; ultimoPago: { monto: string; referencia: string | null; fecha: string } | null; }
 export async function adminNegocios(): Promise<NegocioVista[]> { return parse(await fetch("/api/admin/negocios", { headers: auth() })); }
 export async function adminCrearNegocio(body: { nombreNegocio: string; nombreDueno: string; email: string; password: string }): Promise<{ negocioId: number; duenoId: number }> {
