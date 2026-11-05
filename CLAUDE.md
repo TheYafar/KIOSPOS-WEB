@@ -276,6 +276,31 @@ El producto y la UI en **español (Venezuela)**. Montos en Bs y $, a la **tasa B
   - **Pendiente/consciente:** productos más vendidos y gráficos, y el panel del dueño como pantalla React (va
     con el frontend completo).
 
+### Módulos P2 (panel del dueño)
+
+- **Contabilidad:** hecho (backend + frontend). **Pruebas en verde (4/4).** Sigue el diseño
+  `docs/superpowers/specs/2026-10-31-contabilidad-design.md`: dos modos separados.
+  - **Migración `V7__contabilidad.sql`** (RLS FORCE en las tres tablas): `conta_gastos` (gastos de
+    servicios/otros del modo automático; la nómina NO va aquí), `conta_libro` (líneas del libro manual) y
+    `conta_config` (`reparto_mercancia_pct`, default 40%). OJO con el número: Contabilidad tomó **V7** (secuencial
+    tras V6); cuando se construya el backend de **Nómina** le toca **V8** (no reusar V7).
+  - **Backend** `com.kioskpos.web.contabilidad`: `ContabilidadService.resumen(desde,hasta)` calcula entró
+    (ganancia de ventas, vía `ReporteService.gananciaEntre` que extendí a rangos), salió (nómina + servicios +
+    otros), queda, reparto mercancía/bolsillo y comparación con el período anterior del mismo largo. Libro manual:
+    suma simple de lo que escribe el dueño, sin mezclar datos del sistema. CRUD de gastos y de líneas + config.
+    `ContabilidadController` bajo `/api/contabilidad/**`, **solo DUENO** (candado en `SecurityConfig`).
+  - **Costura de nómina:** `ContabilidadService.egresoNominaEntre(...)` devuelve **$0** porque el módulo Nómina aún
+    no tiene backend; es la ÚNICA línea a cambiar cuando exista (así nunca se cuenta doble — anti-objetivo del spec).
+  - **Frontend:** `screens/Contabilidad.tsx` (segmentado Automática / Mi libro, como el mockup; un solo tab en el
+    riel en vez de dos entradas), capa de datos en `api.ts` (`conta*`), estilos `.conta-*` en `styles.css`
+    (claro/oscuro por tokens). Entrada en `Shell.tsx` **solo si `rol === "DUENO"`**. Selector de período
+    Día/Semana/Mes/Rango (default: mes en curso). Pruebas en
+    `src/test/java/.../contabilidad/ContabilidadServiceTest.java` (aislamiento por negocio, cálculo del resumen y
+    reparto, y que el libro manual no mezcla datos del sistema).
+  - **Pendiente/consciente:** wiring del egreso de nómina (cuando exista su backend); "para mercancía" es solo
+    presupuesto sugerido (no descuenta en compras); sin gráficos. Falta aún el backend de Nómina y los módulos
+    Recargas/Avances.
+
 ---
 
 ## 12. P1 (MVP) — estado general

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { getTasa, type Sesion } from "../session";
 import { UIcono } from "../icons";
 import { Caja } from "./Caja";
+import { Contabilidad } from "./Contabilidad";
 import { Cuadre } from "./Cuadre";
 import { Inventario } from "./Inventario";
 import { Nomina } from "./Nomina";
@@ -18,9 +19,17 @@ function saludo(): string {
 /** Armazón responsive: riel lateral en escritorio, pestañas abajo en móvil. */
 export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void }) {
   const esCaja = sesion.cajaId != null;
+  const panelTabs: Tab[] = [
+    { id: "reportes", n: "Reportes", icon: "chart" },
+    { id: "inventario", n: "Productos", icon: "box" },
+    { id: "nomina", n: "Nómina", icon: "wallet" },
+    // Contabilidad es dato sensible: solo el dueño (coincide con el candado del backend).
+    ...(sesion.rol === "DUENO" ? [{ id: "conta", n: "Contabilidad", icon: "bills" }] : []),
+    { id: "mas", n: "Más", icon: "more" },
+  ];
   const tabs: Tab[] = esCaja
     ? [{ id: "caja", n: "Vender", icon: "cart" }, { id: "cuadre", n: "Cierre", icon: "cash" }, { id: "mas", n: "Más", icon: "more" }]
-    : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "nomina", n: "Nómina", icon: "wallet" }, { id: "mas", n: "Más", icon: "more" }];
+    : panelTabs;
   const [tab, setTab] = useState(tabs[0].id);
   const [online, setOnline] = useState(navigator.onLine);
 
@@ -70,6 +79,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
           {tab === "reportes" && <Reportes />}
           {tab === "inventario" && <Inventario />}
           {tab === "nomina" && !esCaja && <Nomina />}
+          {tab === "conta" && !esCaja && sesion.rol === "DUENO" && <Contabilidad />}
           {tab === "mas" && (esCaja
             ? <div className="stub"><b>Más</b><p>El manejo de usuarios y cajas lo hace el dueño desde su panel.</p><button className="btn ghost" onClick={onSalir}>Cerrar sesión</button></div>
             : <Usuarios onSalir={onSalir} />)}

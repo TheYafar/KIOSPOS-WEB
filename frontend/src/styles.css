@@ -728,3 +728,93 @@ svg { display:block; }
 .nom-edit { position:absolute; top:8px; right:8px; color:var(--text-3); display:flex; }
 .nom-edit svg { width:14px; height:14px; }
 .nom-box.editable:hover .nom-edit { color:var(--primary); }
+
+/* ===================== CONTABILIDAD ===================== */
+.conta-wrap { width:100%; max-width:980px; margin:0 auto; padding:12px 16px 90px; display:flex; flex-direction:column; gap:14px; }
+.conta-bar { display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap; }
+.conta-title { margin:0; font-size:22px; font-weight:700; letter-spacing:-.02em; }
+
+.conta-seg { display:inline-flex; gap:4px; background:var(--surface-2); border-radius:12px; padding:4px; }
+.conta-seg button { height:38px; padding:0 16px; border:0; border-radius:9px; background:transparent; font-size:14px; font-weight:600; color:var(--text-2); cursor:pointer; }
+.conta-seg button.on { background:var(--surface); box-shadow:var(--sh-1); color:var(--text); }
+
+.conta-per { display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
+.conta-per > button { height:34px; padding:0 14px; border:1px solid var(--line); border-radius:999px; background:var(--surface); font-size:13px; font-weight:600; color:var(--text-2); cursor:pointer; }
+.conta-per > button.on { background:var(--ink); color:var(--on-ink); border-color:var(--ink); }
+.conta-perlbl { font-size:13px; color:var(--text-3); margin-left:4px; }
+.conta-rango { display:inline-flex; align-items:center; gap:6px; margin-left:4px; }
+.conta-rango .inp { height:38px; width:auto; }
+.conta-rango span { font-size:13px; color:var(--text-3); }
+
+.conta-toast { display:inline-flex; align-items:center; gap:6px; align-self:flex-start; color:var(--ok); background:var(--ok-soft); padding:6px 12px; border-radius:999px; font-size:13px; font-weight:600; }
+.conta-toast svg { width:16px; height:16px; }
+
+.conta-sum3 { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.conta-kpi .k { font-size:13px; color:var(--text-2); }
+.conta-kpi .v { font-size:28px; font-weight:800; letter-spacing:-.03em; margin:4px 0 2px; font-variant-numeric:tabular-nums; }
+.conta-kpi .d { font-size:12px; color:var(--text-3); }
+.conta-kpi .v.up, .up { color:var(--ok); }
+.conta-kpi .v.down, .down { color:var(--bad); }
+.conta-kpi .d.up { color:var(--ok); }
+.conta-kpi .d.down { color:var(--bad); }
+
+.conta-cols { display:grid; grid-template-columns:1fr 1fr; gap:12px; align-items:start; }
+.conta-cols h3, .card .cardhead h3 { margin:0; font-size:14px; }
+
+.conta-erow { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line); }
+.conta-erow:first-of-type { border-top:0; }
+.conta-erow .ico { width:30px; height:30px; border-radius:9px; display:flex; align-items:center; justify-content:center; flex:none; }
+.conta-erow .ico svg { width:17px; height:17px; }
+.conta-erow .ico.warn { background:var(--warn-soft); color:var(--warn); }
+.conta-erow .ico.accent { background:var(--accent-soft); color:var(--accent); }
+.conta-erow .ico.mute { background:var(--surface-3); color:var(--text-3); }
+.conta-erow .nm { flex:1; font-size:13px; }
+.conta-erow .nm .sub { color:var(--text-3); font-size:11px; }
+.conta-erow .amt { font-weight:700; font-variant-numeric:tabular-nums; }
+
+.conta-reparto { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+.rbox { border-radius:14px; padding:16px; background:var(--surface-2); }
+.rbox.merc { background:var(--accent-soft); }
+.rbox.bol { background:var(--ok-soft); }
+.rbox .k { font-size:12px; font-weight:600; opacity:.8; }
+.rbox .v { font-size:22px; font-weight:800; margin-top:4px; font-variant-numeric:tabular-nums; }
+.rbox .p { font-size:11px; opacity:.7; margin-top:2px; }
+.conta-pct { display:flex; align-items:flex-end; gap:10px; margin-top:12px; }
+
+.conta-gastos { display:flex; flex-direction:column; }
+.conta-grow { display:flex; align-items:center; gap:10px; padding:9px 0; border-top:1px solid var(--line); }
+.conta-grow:first-child { border-top:0; }
+.conta-grow .grow { flex:1; min-width:0; }
+.conta-grow .ml { font-size:14px; font-weight:600; }
+.conta-grow .md { font-size:12px; color:var(--text-3); }
+.conta-grow .amt { font-weight:700; font-variant-numeric:tabular-nums; }
+
+.conta-lib { width:100%; border-collapse:collapse; font-size:13px; }
+.conta-lib th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--text-3); font-weight:600; padding:6px 8px; }
+.conta-lib th.r, .conta-lib td.r { text-align:right; }
+.conta-lib td { padding:9px 8px; border-top:1px solid var(--line); font-variant-numeric:tabular-nums; }
+.conta-lib td.money { font-weight:700; }
+.conta-libtot { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:14px; }
+
+.conta-note { font-size:13px; color:var(--text-2); background:var(--surface-3); border-radius:12px; padding:12px 14px; }
+
+.tag { font-size:11px; font-weight:600; padding:2px 9px; border-radius:999px; background:var(--surface-3); color:var(--text-2); white-space:nowrap; }
+.tag.ing { background:var(--ok-soft); color:var(--ok); }
+.tag.egr { background:var(--bad-soft); color:var(--bad); }
+.tag.cat-servicios, .tag.cat-internet, .tag.cat-alquiler { background:var(--accent-soft); color:var(--accent); }
+.tag.cat-otro { background:var(--surface-3); color:var(--text-2); }
+
+.iconbtn { width:34px; height:34px; border:0; border-radius:9px; background:transparent; color:var(--text-3); display:inline-flex; align-items:center; justify-content:center; cursor:pointer; }
+.iconbtn:hover { background:var(--surface-2); color:var(--text); }
+.iconbtn svg { width:17px; height:17px; }
+
+.conta-catseg { display:grid; grid-template-columns:repeat(4,1fr); gap:4px; background:var(--surface-2); border-radius:12px; padding:4px; }
+.conta-catseg.dos { grid-template-columns:1fr 1fr; }
+.conta-catseg button { height:40px; border:0; border-radius:9px; background:transparent; font-size:13px; font-weight:600; color:var(--text-2); cursor:pointer; }
+.conta-catseg button.on { background:var(--surface); box-shadow:var(--sh-1); color:var(--text); }
+.conta-confacts { display:flex; gap:10px; justify-content:flex-end; margin-top:4px; }
+
+@media (max-width:720px) {
+  .conta-sum3, .conta-cols, .conta-reparto, .conta-libtot { grid-template-columns:1fr; }
+  .conta-catseg { grid-template-columns:repeat(2,1fr); }
+}

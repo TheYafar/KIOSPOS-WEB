@@ -40,6 +40,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/inventario/**").hasAnyRole("DUENO", "ENCARGADO")
                         .requestMatchers(HttpMethod.PUT, "/api/inventario/**").hasAnyRole("DUENO", "ENCARGADO")
                         .requestMatchers(HttpMethod.DELETE, "/api/inventario/**").hasAnyRole("DUENO", "ENCARGADO")
+                        // Contabilidad: dato sensible, SOLO el dueño (spec de Contabilidad).
+                        .requestMatchers("/api/contabilidad/**").hasRole("DUENO")
                         .anyRequest().authenticated())
                 .addFilterBefore(new JwtAuthFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
         return http.build();

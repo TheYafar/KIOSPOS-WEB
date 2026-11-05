@@ -230,4 +230,70 @@ export interface PagoPendiente { id: number; negocioId: number; monto: number; m
 export async function adminPagosPendientes(): Promise<PagoPendiente[]> { return parse(await fetch("/api/admin/pagos-pendientes", { headers: auth() })); }
 export async function adminAprobarPago(pagoId: number): Promise<void> { await parse(await fetch(`/api/admin/pagos/${pagoId}/aprobar`, { method: "POST", headers: auth() })); }
 
+// ---------- Contabilidad (solo dueño) ----------
+
+export type CategoriaGasto = "SERVICIOS" | "INTERNET" | "ALQUILER" | "OTRO";
+export type TipoLinea = "INGRESO" | "EGRESO";
+
+export interface ComparacionConta {
+  entroAnterior: number; salioAnterior: number; quedaAnterior: number;
+  diferenciaQueda: number; variacionPct: number | null;
+}
+export interface ResumenConta {
+  desde: string; hasta: string;
+  entro: number; nomina: number; servicios: number; otros: number; salio: number;
+  queda: number; repartoMercanciaPct: number; mercancia: number; bolsillo: number;
+  anterior: ComparacionConta;
+}
+export interface Gasto { id: number; fecha: string; categoria: CategoriaGasto; concepto: string; montoUsd: number; }
+export interface LineaLibro { id: number; fecha: string; concepto: string; tipo: TipoLinea; montoUsd: number; }
+export interface LibroConta { lineas: LineaLibro[]; ingresos: number; egresos: number; saldo: number; }
+
+function rangoQS(desde?: string, hasta?: string): string {
+  const p = new URLSearchParams();
+  if (desde) p.set("desde", desde);
+  if (hasta) p.set("hasta", hasta);
+  const s = p.toString();
+  return s ? "?" + s : "";
+}
+
+export async function contaResumen(desde?: string, hasta?: string): Promise<ResumenConta> {
+  return parse(await fetch("/api/contabilidad/resumen" + rangoQS(desde, hasta), { headers: auth() }));
+}
+
+export async function contaGastos(desde?: string, hasta?: string): Promise<Gasto[]> {
+  return parse(await fetch("/api/contabilidad/gastos" + rangoQS(desde, hasta), { headers: auth() }));
+}
+export async function contaCrearGasto(g: Omit<Gasto, "id">): Promise<Gasto> {
+  return parse(await fetch("/api/contabilidad/gastos", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(g) }));
+}
+export async function contaActualizarGasto(id: number, g: Omit<Gasto, "id">): Promise<Gasto> {
+  return parse(await fetch("/api/contabilidad/gastos/" + id, { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(g) }));
+}
+export async function contaEliminarGasto(id: number): Promise<void> {
+  await parse(await fetch("/api/contabilidad/gastos/" + id, { method: "DELETE", headers: auth() }));
+}
+
+export async function contaLibro(desde?: string, hasta?: string): Promise<LibroConta> {
+  return parse(await fetch("/api/contabilidad/libro" + rangoQS(desde, hasta), { headers: auth() }));
+}
+export async function contaCrearLinea(l: Omit<LineaLibro, "id">): Promise<LineaLibro> {
+  return parse(await fetch("/api/contabilidad/libro", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(l) }));
+}
+export async function contaActualizarLinea(id: number, l: Omit<LineaLibro, "id">): Promise<LineaLibro> {
+  return parse(await fetch("/api/contabilidad/libro/" + id, { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(l) }));
+}
+export async function contaEliminarLinea(id: number): Promise<void> {
+  await parse(await fetch("/api/contabilidad/libro/" + id, { method: "DELETE", headers: auth() }));
+}
+
+export async function contaGetReparto(): Promise<number> {
+  const r = await parse(await fetch("/api/contabilidad/config", { headers: auth() }));
+  return Number(r.repartoMercanciaPct);
+}
+export async function contaSetReparto(pct: number): Promise<number> {
+  const r = await parse(await fetch("/api/contabilidad/config", { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ repartoMercanciaPct: pct }) }));
+  return Number(r.repartoMercanciaPct);
+}
+
 export { getTasa, setTasa };

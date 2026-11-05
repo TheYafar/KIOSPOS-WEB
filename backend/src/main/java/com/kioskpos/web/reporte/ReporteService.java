@@ -60,6 +60,27 @@ public class ReporteService {
         return new ResumenDia(d.toString(), cantidad, totalUsd, totalBs, costo, ganancia, desglose);
     }
 
+    /**
+     * Ganancia de ventas en un rango de fechas INCLUSIVO (desde y hasta cuentan),
+     * en zona America/Caracas: total vendido − costo de lo vendido. La usa el módulo
+     * de Contabilidad como "lo que entró" del período. Reusa las mismas consultas por
+     * rango que el resumen del día.
+     */
+    @Transactional(readOnly = true)
+    public BigDecimal gananciaEntre(LocalDate desde, LocalDate hasta) {
+        Instant i0 = desde.atStartOfDay(ZONA).toInstant();
+        Instant i1 = hasta.plusDays(1).atStartOfDay(ZONA).toInstant();
+
+        Object[] tot = ventaRepository.totalesEntre(i0, i1).get(0);
+        BigDecimal totalUsd = dec(tot[0]);
+
+        BigDecimal costo = detalleVentaRepository.costoEntre(i0, i1);
+        if (costo == null) {
+            costo = BigDecimal.ZERO;
+        }
+        return totalUsd.subtract(costo);
+    }
+
     private static BigDecimal dec(Object o) {
         if (o == null) {
             return BigDecimal.ZERO;
