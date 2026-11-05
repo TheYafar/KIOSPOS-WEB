@@ -297,3 +297,28 @@ levanta Postgres + backend + PWA.
 devoluciones, facturas de compra, crédito a empleados, multicaja/supervisión, habladores de precio. Cocoa usa
 fiado/recargas/avances a diario (ver nota §6), así que es lo próximo tras probar el P1 desplegado. También:
 empaquetar el Conector como servicio de Windows, y HTTPS en el despliegue (la PWA lo requiere para instalarse).
+
+## 13. Módulo Contabilidad (panel del dueño) — primera versión
+
+Pantalla pensada para un dueño SIN conocimientos contables (no para un contador): ver cuánto entró, cuánto le
+quedó y comparar. Vive en el riel del dueño como **"Cuentas"** (`frontend/src/screens/Contabilidad.tsx`). Dos
+modos:
+
+- **Automática** (datos reales del servidor): ganancia del día, **cierre por cierre** y desglose por método de
+  pago. Usa `GET /api/reportes/dia` (ya existía) y el nuevo `GET /api/reportes/cierres?fecha=` — lista los
+  turnos CERRADOS del día con vendido/ganancia/cuadre por cierre (`ReporteService.cierresDelDia`, bajo RLS,
+  queries derivadas en `TurnoRepository`/`DetalleVentaRepository.costoDeTurno`). Incluye un bloque que
+  **compara** el cálculo automático contra lo que el dueño anotó a mano (para detectar descuadres).
+- **A mano** (guardado LOCAL por ahora, `frontend/src/contabilidad-local.ts` en localStorage): (1) **Libreta
+  guiada** — anota cierres/gastos/entradas y suma; (2) **Hoja libre** tipo Excel — varias hojas con nombre,
+  columnas propias (renombrar + marcar $ o Bs con la tasa del día para convertir a $), plantillas, y
+  **exportar a CSV** (copia de seguridad que abre en Excel).
+
+**Decisión de diseño:** se quitó el "repartidor de sobres" con % impuesto; cuánto apartar para reponer
+mercancía lo decide el dueño a mano (plantilla "Mis cuentas" en la Hoja libre).
+
+**Pendiente/consciente:** lo de "A mano" se guarda en el equipo (per-dispositivo); el siguiente paso es
+persistirlo en Postgres con `negocio_id` + RLS (tablas nuevas) y mover el export a `.xlsx` real / endpoint.
+Falta también el filtro por semana/mes (hoy solo "hoy"). El backend nuevo es mínimo y sigue los patrones
+existentes, pero NO se pudo compilar en el entorno de desarrollo remoto (Maven Central bloqueado por política,
+§9): se verifica en CI / entorno con dependencias.

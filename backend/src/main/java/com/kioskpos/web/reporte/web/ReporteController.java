@@ -2,6 +2,7 @@ package com.kioskpos.web.reporte.web;
 
 import com.kioskpos.web.reporte.ReporteService;
 import java.time.LocalDate;
+import java.util.List;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,5 +28,12 @@ public class ReporteController {
             @RequestParam(value = "fecha", required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
         return reporteService.resumenDelDia(fecha);
+    }
+
+    @GetMapping("/cierres")
+    public List<ReporteService.CierreDia> cierres(
+            @RequestParam(value = "fecha", required = false)
+            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fecha) {
+        return reporteService.cierresDelDia(fecha);
     }
 }

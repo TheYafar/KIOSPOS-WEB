@@ -119,6 +119,15 @@ export async function reporteDia(fecha?: string): Promise<ReporteDia> {
   return parse(await fetch("/api/reportes/dia" + (fecha ? "?fecha=" + fecha : ""), { headers: auth() }));
 }
 
+export interface CierreDia {
+  turnoId: number; cajaId: number; fechaCierre: string;
+  vendidoUsd: number; gananciaUsd: number;
+  diferenciaUsd: number | null; diferenciaBs: number | null;
+}
+export async function cierresDia(fecha?: string): Promise<CierreDia[]> {
+  return parse(await fetch("/api/reportes/cierres" + (fecha ? "?fecha=" + fecha : ""), { headers: auth() }));
+}
+
 // ---------- Cobro (con cola offline) ----------
 
 export interface LineaCobro { productoId?: number | null; cantidad: number; precioUsd?: number; nombre?: string; }
