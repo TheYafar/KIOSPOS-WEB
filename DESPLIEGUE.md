@@ -31,8 +31,12 @@ pantalla de configuración.
      `backend/src/main/resources/db/init/01-create-app-role.sql` contra esa BD.
    - Si usas la BD en Docker (más simple para empezar): deja el compose como está.
 4. `docker compose -f docker-compose.prod.yml up -d --build`.
-5. Apunta tu dominio al servidor y pon HTTPS (ej. un proxy con Caddy/Traefik o el
-   balanceador de Vultr). La PWA necesita HTTPS para instalarse y para el service worker.
+5. HTTPS ya viene incluido con **Caddy** (certificado Let's Encrypt automático). Solo:
+   - Apunta tu dominio al servidor (ej. `kiospos.duckdns.org` → IP del servidor).
+   - Pon `DOMAIN=tudominio` en el `.env`.
+   - Abre los puertos **80 y 443** en el firewall del servidor.
+   Al levantar, Caddy saca el certificado solo y sirve `https://tudominio`. (La PWA
+   necesita HTTPS para instalarse y para el service worker.)
 6. Monitoreo: UptimeRobot gratis al `/` del sitio. Respaldo diario (lo da la BD
    administrada de Vultr) o `pg_dump` off-site si usas la BD en Docker.
 

@@ -17,7 +17,7 @@ function saludoHora(): string {
 
 /** Pantalla de entrada (rediseño 04): panel oscuro con reloj + "¿Quién va a cobrar?" con PIN. */
 export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
-  const [vista, setVista] = useState<Vista>(getCajaToken() ? "pin" : "config");
+  const [vista, setVista] = useState<Vista>(getCajaToken() ? "pin" : "dueno");
   const [cajeros, setCajeros] = useState<Cajero[]>([]);
   const [sel, setSel] = useState<Cajero | null>(null);
   const [pin, setPin] = useState("");
@@ -34,6 +34,16 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
   useEffect(() => {
     const t = setInterval(() => setReloj(new Date()), 1000);
     return () => clearInterval(t);
+  }, []);
+
+  // Enlace de configuración: abrir .../#caja=TOKEN en el equipo lo precarga y abre la config.
+  useEffect(() => {
+    const m = window.location.hash.match(/caja=([^&]+)/);
+    if (m && !getCajaToken()) {
+      setCajaTok(decodeURIComponent(m[1]));
+      setVista("config");
+      try { history.replaceState(null, "", window.location.pathname); } catch { /* ignore */ }
+    }
   }, []);
 
   const cargarCajeros = useCallback(async () => {
@@ -125,7 +135,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
     return (
       <div className="app"><div className="entrar">{side}
         <main className="entrar-main">
-          <div className="entrar-head"><h1>Configura esta caja</h1><p>Pega el token del panel del dueño y la tasa del día</p></div>
+          <div className="entrar-head"><h1>Configurar este equipo como caja</h1><p>Solo para el equipo donde se cobra. Pega el token (o abre el enlace de configuración del panel del dueño) y la tasa del día.</p></div>
           <div className="owner">
             <label>Token de la caja
               <input className="inp" value={cajaTok} onChange={(e) => setCajaTok(e.target.value)} placeholder="Pegado del panel del dueño" />
@@ -134,7 +144,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
               <input className="inp" value={tasa} onChange={(e) => setTasaLocal(e.target.value)} />
             </label>
             <button className="btn primary" onClick={guardarConfig} disabled={!cajaTok.trim()}>Guardar</button>
-            <button className="link" onClick={() => setVista("dueno")}>Entrar como dueño</button>
+            <button className="link" onClick={() => setVista("dueno")}>Volver a entrar con correo</button>
           </div>
         </main>
       </div></div>
@@ -145,7 +155,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
     return (
       <div className="app"><div className="entrar">{side}
         <main className="entrar-main">
-          <div className="entrar-head"><h1>{saludoHora()}</h1><p>Entra con tu correo y contraseña</p></div>
+          <div className="entrar-head"><h1>{saludoHora()}</h1><p>Entra a tu negocio con tu correo, desde cualquier dispositivo</p></div>
           <div className="owner">
             <label>Correo
               <input className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
@@ -155,8 +165,10 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
             </label>
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={entrarDueno} disabled={!email || !pass}>Entrar</button>
+            {getCajaToken()
+              ? <button className="link" onClick={() => { setErr(""); setVista("pin"); }}>Volver a los cajeros</button>
+              : <button className="link" onClick={() => { setErr(""); setVista("config"); }}>Configurar este equipo como caja</button>}
             <button className="link" onClick={() => { setErr(""); setEmail(""); setPass(""); setVista("admin"); }}>Soy el administrador</button>
-            <button className="link" onClick={() => { setErr(""); setVista(getCajaToken() ? "pin" : "config"); }}>Volver</button>
           </div>
         </main>
       </div></div>

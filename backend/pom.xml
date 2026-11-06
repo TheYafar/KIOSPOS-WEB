@@ -53,6 +53,11 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>
         </dependency>
+        <!-- Correo transaccional por SMTP (provider-agnóstico: Resend/Brevo/…). -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
 
         <!-- ======================================================= -->
         <!-- JWT (jjwt) — tokens de sesión firmados por el servidor  -->

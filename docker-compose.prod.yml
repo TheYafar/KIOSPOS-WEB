@@ -34,14 +34,39 @@ services:
       KIOSKPOS_JWT_SECRET: ${KIOSKPOS_JWT_SECRET:?define un secreto de 32+ bytes en .env}
       KIOSKPOS_BOOTSTRAP_SUPERADMINEMAIL: ${KIOSKPOS_BOOTSTRAP_SUPERADMINEMAIL:-}
       KIOSKPOS_BOOTSTRAP_SUPERADMINPASSWORD: ${KIOSKPOS_BOOTSTRAP_SUPERADMINPASSWORD:-}
+      # Correo transaccional (Resend por SMTP). Déjalo vacío/false para no enviar.
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USER: ${MAIL_USER:-resend}
+      MAIL_PASS: ${MAIL_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-KioskPOS <onboarding@resend.dev>}
+      MAIL_APP_URL: ${MAIL_APP_URL:-https://app.kioskpos.app}
 
   frontend:
     build: ./frontend
     restart: unless-stopped
     depends_on:
       - backend
+    # Sin puerto público: Caddy (abajo) es la entrada y lo alcanza como frontend:80.
+
+  # Proxy con HTTPS automático (Let's Encrypt). Pon tu dominio en DOMAIN (.env).
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - frontend
+    environment:
+      DOMAIN: ${DOMAIN:-kiospos.duckdns.org}
     ports:
-      - "${WEB_PORT:-80}:80"
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
 
 volumes:
   kioskpos_pgdata:
+  caddy_data:
+  caddy_config:

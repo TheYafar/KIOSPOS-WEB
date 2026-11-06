@@ -297,3 +297,69 @@ levanta Postgres + backend + PWA.
 devoluciones, facturas de compra, crédito a empleados, multicaja/supervisión, habladores de precio. Cocoa usa
 fiado/recargas/avances a diario (ver nota §6), así que es lo próximo tras probar el P1 desplegado. También:
 empaquetar el Conector como servicio de Windows, y HTTPS en el despliegue (la PWA lo requiere para instalarse).
+
+## 13. Módulo Contabilidad (panel del dueño) — primera versión
+
+Pantalla pensada para un dueño SIN conocimientos contables (no para un contador): ver cuánto entró, cuánto le
+quedó y comparar. Vive en el riel del dueño como **"Cuentas"** (`frontend/src/screens/Contabilidad.tsx`). Dos
+modos:
+
+- **Automática** (datos reales del servidor): ganancia del día, **cierre por cierre** y desglose por método de
+  pago. Usa `GET /api/reportes/dia` (ya existía) y el nuevo `GET /api/reportes/cierres?fecha=` — lista los
+  turnos CERRADOS del día con vendido/ganancia/cuadre por cierre (`ReporteService.cierresDelDia`, bajo RLS,
+  queries derivadas en `TurnoRepository`/`DetalleVentaRepository.costoDeTurno`). Incluye un bloque que
+  **compara** el cálculo automático contra lo que el dueño anotó a mano (para detectar descuadres).
+- **A mano** (guardado LOCAL por ahora, `frontend/src/contabilidad-local.ts` en localStorage): (1) **Libreta
+  guiada** — anota cierres/gastos/entradas y suma; (2) **Hoja libre** tipo Excel — varias hojas con nombre,
+  columnas propias (renombrar + marcar $ o Bs con la tasa del día para convertir a $), plantillas, y
+  **exportar a CSV** (copia de seguridad que abre en Excel).
+
+**Decisión de diseño:** se quitó el "repartidor de sobres" con % impuesto; cuánto apartar para reponer
+mercancía lo decide el dueño a mano (plantilla "Mis cuentas" en la Hoja libre).
+
+**Pendiente/consciente:** lo de "A mano" se guarda en el equipo (per-dispositivo); el siguiente paso es
+persistirlo en Postgres con `negocio_id` + RLS (tablas nuevas) y mover el export a `.xlsx` real / endpoint.
+Falta también el filtro por semana/mes (hoy solo "hoy"). El backend nuevo es mínimo y sigue los patrones
+existentes, pero NO se pudo compilar en el entorno de desarrollo remoto (Maven Central bloqueado por política,
+§9): se verifica en CI / entorno con dependencias.
+
+## 14. Profesionalización / onboarding (quick wins, solo frontend)
+
+Mejoras para que la app se vea más profesional y el alta de un negocio sea intuitiva. **Todo frontend, build
+verificado (`npm run build` OK).**
+
+- **Login desde cualquier dispositivo** (`Login.tsx`): un equipo nuevo abre con **"Entra a tu negocio"**
+  (correo/clave del dueño, funciona desde donde sea) en vez de exigir "Configura esta caja". Esa config queda
+  como opción secundaria ("Configurar este equipo como caja"), y solo el equipo-caja registrado abre con los
+  cajeros + PIN. **Enlace de configuración**: abrir `.../#caja=TOKEN` precarga el token (el panel del dueño,
+  en `Usuarios.tsx`, ahora copia ese enlace, no solo el token). Los cajeros siguen entrando SOLO en la caja
+  registrada (seguridad del PIN de 4 dígitos, §4).
+- **Guía "Primeros pasos"** (`PrimerosPasos.tsx`, arriba de Reportes): checklist que aparece solo mientras
+  falta algo (0 cajas / 0 cajeros / 0 productos) y lleva al dueño paso a paso; se oculta sola al completar.
+- **"Mi plan"** (`MiPlan.tsx`, arriba de la pestaña "Más"/Equipo y cajas): el dueño ve su estado
+  (ACTIVA/AVISO/SUSPENDIDA), hasta cuándo pagó y su deuda, y **reporta un pago** (que el super admin aprueba).
+  Usa endpoints que YA existían: `GET /api/mi-negocio/suscripcion`, `GET/POST /api/mi-negocio/pagos`.
+- **Iconos/splash PWA**: `public/icon.svg` (marca KioskPOS) + manifest y `index.html` apuntando a él; faltaban
+  los PNG. Splash oscuro de marca.
+
+**Pendiente/consciente (necesitan backend, van con PR):** "Olvidé mi contraseña" (endpoint de reset + correo),
+ajustes del negocio (nombre/logo/dirección) y **marca del negocio en el ticket** (hoy el ticket es genérico;
+`TicketService` es backend), QR de emparejamiento (hoy solo enlace/copiar), HTTPS en despliegue, y WhatsApp
+transaccional.
+
+## 15. Correo transaccional (Resend por SMTP)
+
+`EmailService` (`backend/.../correo/EmailService.java`) envía correos a los dueños. Va por **SMTP** con
+`spring-boot-starter-mail`, así que es **agnóstico del proveedor** (Resend elegido; Brevo/SES solo cambian las
+variables). **Async (`@EnableAsync`) y a prueba de fallos**: si el correo no está configurado o falla, NO rompe
+el alta/venta/login (try/catch + log).
+
+- **Config por entorno** (en `application.yml`, `.env.example`, `docker-compose.prod.yml`): `MAIL_ENABLED`
+  (default false → no envía), `MAIL_HOST` (Resend: `smtp.resend.com`), `MAIL_PORT` (587), `MAIL_USER`
+  (`resend`), `MAIL_PASS` (= API key de Resend), `MAIL_FROM`, `MAIL_APP_URL`.
+- **Enganchado:** correo de **bienvenida** al crear un negocio (`AdminService.crearNegocio`). Ya existe el
+  método `pagoAprobado(...)` para cuando el super admin aprueba (falta engancharlo: necesita el correo del
+  dueño del negocio, que hay que resolver desde su `cuenta_login`/usuario).
+- **Deliverability:** para no caer en spam hay que **verificar el dominio** en Resend (registros DNS SPF/DKIM)
+  y usar `no-reply@tudominio.com`; antes de eso, el remitente de prueba es `onboarding@resend.dev`.
+- **Consciente:** backend NO compilado aquí (Maven bloqueado, §9); se verifica en CI.

@@ -28,4 +28,11 @@ public interface DetalleVentaRepository extends JpaRepository<DetalleVenta, Long
             + "WHERE p.id = d.productoId AND d.venta.estado = 'COMPLETADA' "
             + "AND d.venta.fechaHora >= :desde AND d.venta.fechaHora < :hasta")
     BigDecimal costoEntre(@Param("desde") Instant desde, @Param("hasta") Instant hasta);
+
+    /** Costo de lo vendido en un turno (CERRADO o no). Mismo criterio que {@link #costoEntre}. */
+    @Query("SELECT COALESCE(SUM(p.costoUsd * d.cantidad), 0) FROM DetalleVenta d, "
+            + "com.kioskpos.web.producto.Producto p "
+            + "WHERE p.id = d.productoId AND d.venta.estado = 'COMPLETADA' "
+            + "AND d.venta.turnoId = :turnoId")
+    BigDecimal costoDeTurno(@Param("turnoId") Long turnoId);
 }

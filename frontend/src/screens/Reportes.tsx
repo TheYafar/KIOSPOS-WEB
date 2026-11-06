@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { listarProductos, reporteDia, type Producto, type ReporteDia } from "../api";
 import { UIcono } from "../icons";
+import { PrimerosPasos } from "./PrimerosPasos";
 
 const usd = (n: number) => "$ " + n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const bs = (n: number) => "Bs " + n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const METODO: Record<string, string> = { EFECTIVO_USD: "Efectivo $", EFECTIVO_BS: "Efectivo Bs", PUNTO: "Punto", PAGO_MOVIL: "Pago móvil", BIOPAGO: "Biopago" };
 
-export function Reportes() {
+export function Reportes({ onIr }: { onIr?: (tab: string) => void }) {
   const [r, setR] = useState<ReporteDia | null>(null);
   const [productos, setProductos] = useState<Producto[]>([]);
   const [err, setErr] = useState("");
@@ -30,6 +31,7 @@ export function Reportes() {
   return (
     <div className="caja">
       <div className="scroll pad rep">
+        {onIr && <PrimerosPasos onIr={onIr} />}
         <div className="rep-row">
           <div className="card rep-hero">
             <b style={{ opacity: .85 }}>Vendido hoy</b>

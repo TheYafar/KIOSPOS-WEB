@@ -35,12 +35,34 @@ spring:
     locations: classpath:db/migration
     baseline-on-migrate: false
 
+  # Correo transaccional por SMTP. Con Resend: host smtp.resend.com, user "resend",
+  # pass = tu API key de Resend. Agnóstico del proveedor (cambias estas variables y
+  # funciona con Brevo, SES, etc.). Si no se configura, EmailService no envía (no rompe).
+  mail:
+    host: ${MAIL_HOST:}
+    port: ${MAIL_PORT:587}
+    username: ${MAIL_USER:resend}
+    password: ${MAIL_PASS:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
 kioskpos:
   jwt:
     # En dev hay un secreto por defecto; en producción SIEMPRE via variable de entorno
     # KIOSKPOS_JWT_SECRET (>= 32 bytes). Firmar los tokens: el servidor es la autoridad.
     secret: ${KIOSKPOS_JWT_SECRET:dev-secret-cambiar-en-produccion-min-32-bytes!!}
     ttl-minutes: ${KIOSKPOS_JWT_TTL_MINUTES:720}
+  mail:
+    # El correo solo se envía si enabled=true Y hay MAIL_HOST configurado.
+    enabled: ${MAIL_ENABLED:false}
+    # Remitente. Antes de verificar tu dominio en Resend puedes usar onboarding@resend.dev.
+    from: ${MAIL_FROM:KioskPOS <onboarding@resend.dev>}
+    # URL pública de la app, para los enlaces de los correos.
+    app-url: ${MAIL_APP_URL:https://app.kioskpos.app}
 
 management:
   endpoints:
