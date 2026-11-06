@@ -74,3 +74,9 @@ management:
     web:
       exposure:
         include: health,info
+  health:
+    # El health check de correo prueba el SMTP, que Render bloquea → el chequeo se
+    # colgaba ~134s y daba DOWN, y Render marcaba el servicio caído. Se apaga (no
+    # afecta el envío real de correos).
+    mail:
+      enabled: false
