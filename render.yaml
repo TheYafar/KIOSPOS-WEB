@@ -56,6 +56,22 @@ services:
         value: uriel@kioskpos.com
       - key: KIOSKPOS_BOOTSTRAP_SUPERADMINPASSWORD
         value: superadmin123
+      # Correo transaccional (Resend por SMTP). MAIL_PASS se pone en el dashboard
+      # de Render (sync:false = secreto, no se sube al repo).
+      - key: MAIL_ENABLED
+        value: "true"
+      - key: MAIL_HOST
+        value: smtp.resend.com
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_USER
+        value: resend
+      - key: MAIL_PASS
+        sync: false
+      - key: MAIL_FROM
+        value: KioskPOS <onboarding@resend.dev>
+      - key: MAIL_APP_URL
+        value: https://kioskpos-frontend.onrender.com
 
   # ---- Frontend: PWA estática (Vite build) + proxy /api al backend ----
   - type: web
