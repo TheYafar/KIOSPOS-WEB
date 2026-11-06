@@ -344,5 +344,22 @@ verificado (`npm run build` OK).**
 
 **Pendiente/consciente (necesitan backend, van con PR):** "Olvidé mi contraseña" (endpoint de reset + correo),
 ajustes del negocio (nombre/logo/dirección) y **marca del negocio en el ticket** (hoy el ticket es genérico;
-`TicketService` es backend), QR de emparejamiento (hoy solo enlace/copiar), HTTPS en despliegue, y correos/
-WhatsApp transaccionales.
+`TicketService` es backend), QR de emparejamiento (hoy solo enlace/copiar), HTTPS en despliegue, y WhatsApp
+transaccional.
+
+## 15. Correo transaccional (Resend por SMTP)
+
+`EmailService` (`backend/.../correo/EmailService.java`) envía correos a los dueños. Va por **SMTP** con
+`spring-boot-starter-mail`, así que es **agnóstico del proveedor** (Resend elegido; Brevo/SES solo cambian las
+variables). **Async (`@EnableAsync`) y a prueba de fallos**: si el correo no está configurado o falla, NO rompe
+el alta/venta/login (try/catch + log).
+
+- **Config por entorno** (en `application.yml`, `.env.example`, `docker-compose.prod.yml`): `MAIL_ENABLED`
+  (default false → no envía), `MAIL_HOST` (Resend: `smtp.resend.com`), `MAIL_PORT` (587), `MAIL_USER`
+  (`resend`), `MAIL_PASS` (= API key de Resend), `MAIL_FROM`, `MAIL_APP_URL`.
+- **Enganchado:** correo de **bienvenida** al crear un negocio (`AdminService.crearNegocio`). Ya existe el
+  método `pagoAprobado(...)` para cuando el super admin aprueba (falta engancharlo: necesita el correo del
+  dueño del negocio, que hay que resolver desde su `cuenta_login`/usuario).
+- **Deliverability:** para no caer en spam hay que **verificar el dominio** en Resend (registros DNS SPF/DKIM)
+  y usar `no-reply@tudominio.com`; antes de eso, el remitente de prueba es `onboarding@resend.dev`.
+- **Consciente:** backend NO compilado aquí (Maven bloqueado, §9); se verifica en CI.

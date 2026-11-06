@@ -34,6 +34,14 @@ services:
       KIOSKPOS_JWT_SECRET: ${KIOSKPOS_JWT_SECRET:?define un secreto de 32+ bytes en .env}
       KIOSKPOS_BOOTSTRAP_SUPERADMINEMAIL: ${KIOSKPOS_BOOTSTRAP_SUPERADMINEMAIL:-}
       KIOSKPOS_BOOTSTRAP_SUPERADMINPASSWORD: ${KIOSKPOS_BOOTSTRAP_SUPERADMINPASSWORD:-}
+      # Correo transaccional (Resend por SMTP). Déjalo vacío/false para no enviar.
+      MAIL_ENABLED: ${MAIL_ENABLED:-false}
+      MAIL_HOST: ${MAIL_HOST:-}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USER: ${MAIL_USER:-resend}
+      MAIL_PASS: ${MAIL_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-KioskPOS <onboarding@resend.dev>}
+      MAIL_APP_URL: ${MAIL_APP_URL:-https://app.kioskpos.app}
 
   frontend:
     build: ./frontend

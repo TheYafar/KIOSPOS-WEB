@@ -3,6 +3,7 @@ package com.kioskpos.web.admin;
 import com.kioskpos.web.auth.Caja;
 import com.kioskpos.web.auth.CajaRepository;
 import com.kioskpos.web.auth.NegocioRegistroService;
+import com.kioskpos.web.correo.EmailService;
 import com.kioskpos.web.negocio.Negocio;
 import com.kioskpos.web.negocio.NegocioRepository;
 import com.kioskpos.web.suscripcion.Pago;
@@ -28,17 +29,20 @@ public class AdminService {
     private final CajaRepository cajaRepository;
     private final SuscripcionService suscripcionService;
     private final NegocioRegistroService negocioRegistroService;
+    private final EmailService emailService;
 
     public AdminService(NegocioRepository negocioRepository,
                         PagoRepository pagoRepository,
                         CajaRepository cajaRepository,
                         SuscripcionService suscripcionService,
-                        NegocioRegistroService negocioRegistroService) {
+                        NegocioRegistroService negocioRegistroService,
+                        EmailService emailService) {
         this.negocioRepository = negocioRepository;
         this.pagoRepository = pagoRepository;
         this.cajaRepository = cajaRepository;
         this.suscripcionService = suscripcionService;
         this.negocioRegistroService = negocioRegistroService;
+        this.emailService = emailService;
     }
 
     public List<NegocioVista> listarNegocios() {
@@ -53,7 +57,11 @@ public class AdminService {
 
     public NegocioRegistroService.NegocioCreado crearNegocio(
             String nombreNegocio, String nombreDueno, String email, String password) {
-        return negocioRegistroService.registrarNegocioConDueno(nombreNegocio, nombreDueno, email, password);
+        NegocioRegistroService.NegocioCreado creado =
+                negocioRegistroService.registrarNegocioConDueno(nombreNegocio, nombreDueno, email, password);
+        // Correo de bienvenida (async y a prueba de fallos: no rompe el alta si falla).
+        emailService.bienvenida(email, nombreDueno, nombreNegocio);
+        return creado;
     }
 
     public Negocio aprobarPago(Long pagoId, Long superAdminId) {
