@@ -1,0 +1,9 @@
+# HTTPS automático (Let's Encrypt) para KioskPOS.
+# Caddy termina TLS y reenvía al frontend (nginx), que sirve la PWA y hace de
+# proxy de /api al backend. El dominio se toma de la variable DOMAIN del .env
+# (por defecto kiospos.duckdns.org). Requiere que el DNS del dominio apunte a
+# este servidor y que los puertos 80 y 443 estén abiertos.
+{$DOMAIN:kiospos.duckdns.org} {
+	encode gzip
+	reverse_proxy frontend:80
+}
