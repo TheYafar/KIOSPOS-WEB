@@ -10,4 +10,6 @@ FROM eclipse-temurin:21-jre
 WORKDIR /app
 COPY --from=build /app/target/kioskpos-web-backend-*.jar app.jar
 EXPOSE 8080
-ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-jar", "app.jar"]
+# Flags para arrancar rápido en instancias chicas (Render free, VPS 1GB):
+# SerialGC (poca RAM), TieredStopAtLevel=1 (JIT rápido de arranque).
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-jar", "app.jar"]
