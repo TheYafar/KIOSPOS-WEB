@@ -6,6 +6,11 @@ spring:
   application:
     name: kioskpos-web-backend
 
+  # Arranque perezoso: los beans se crean al primer uso, así el servidor abre el
+  # puerto mucho antes (clave en instancias lentas como Render free / VPS 1GB).
+  main:
+    lazy-initialization: true
+
   # Datasource de RUNTIME: lo usa Hibernate/JPA para servir requests.
   # Se conecta como kioskpos_app (sin privilegios de superusuario/propietario),
   # creado por db/init/01-create-app-role.sql — así Row Level Security no se

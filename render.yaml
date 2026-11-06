@@ -44,7 +44,7 @@ services:
       - key: DB_ADMIN_PASSWORD
         fromDatabase: { name: kioskpos-db, property: password }
       # Runtime: rol restringido para que RLS no se pueda saltar. Debe existir en
-      # la base (lo crea el script 01-create-app-role.sql con esta misma clave).
+      # la base (lo crea el callback beforeMigrate de Flyway con esta misma clave).
       - key: DB_APP_USER
         value: kioskpos_app
       - key: DB_APP_PASSWORD
@@ -56,10 +56,12 @@ services:
         value: uriel@kioskpos.com
       - key: KIOSKPOS_BOOTSTRAP_SUPERADMINPASSWORD
         value: superadmin123
-      # Correo transaccional (Resend por SMTP). MAIL_PASS se pone en el dashboard
-      # de Render (sync:false = secreto, no se sube al repo).
+      # Correo transaccional. OJO: Render (y casi todo PaaS) bloquea los puertos SMTP,
+      # así que en Render el correo por SMTP NO funciona → por defecto apagado aquí.
+      # (El arreglo real es usar la API HTTP de Resend; ver nota en el repo.)
+      # MAIL_PASS se pone en el dashboard de Render (sync:false = secreto).
       - key: MAIL_ENABLED
-        value: "true"
+        value: "false"
       - key: MAIL_HOST
         value: smtp.resend.com
       - key: MAIL_PORT
