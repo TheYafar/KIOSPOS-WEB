@@ -63,6 +63,8 @@ svg { display:block; }
 .tab-i { width:22px; height:22px; }
 
 .btn { height:50px; border:0; border-radius:14px; background:var(--ink); color:var(--on-ink); font-size:16px; font-weight:600; padding:0 18px; }
+/* Íconos dentro de botones: sin tamaño el SVG se infla gigante. Los dimensiona en línea. */
+.btn svg { width:18px; height:18px; display:inline-block; vertical-align:middle; margin-right:6px; flex:none; }
 .btn:hover { background:var(--ink-hover); }
 .btn:disabled { background:var(--surface-3); color:var(--text-3); }
 .btn.ghost { background:var(--surface-2); color:var(--text); }
