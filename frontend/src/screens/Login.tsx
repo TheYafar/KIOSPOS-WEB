@@ -135,16 +135,20 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
     return (
       <div className="app"><div className="entrar">{side}
         <main className="entrar-main">
-          <div className="entrar-head"><h1>Configurar este equipo como caja</h1><p>Solo para el equipo donde se cobra. Pega el token (o abre el enlace de configuración del panel del dueño) y la tasa del día.</p></div>
+          <div className="entrar-head"><h1>Primera vez en este equipo</h1><p>Vas a dejar este equipo listo como la caja donde se cobra.</p></div>
           <div className="owner">
+            <div className="entry-seg">
+              <button onClick={() => { setErr(""); setVista("dueno"); }}>Entrar</button>
+              <button className="on">Primera vez</button>
+            </div>
+            <p className="hint">Pega el <b>enlace</b> o el <b>token</b> que te dio el dueño en su panel, y la tasa del dólar de hoy.</p>
             <label>Token de la caja
               <input className="inp" value={cajaTok} onChange={(e) => setCajaTok(e.target.value)} placeholder="Pegado del panel del dueño" />
             </label>
             <label>Tasa BCV del día
               <input className="inp" value={tasa} onChange={(e) => setTasaLocal(e.target.value)} />
             </label>
-            <button className="btn primary" onClick={guardarConfig} disabled={!cajaTok.trim()}>Guardar</button>
-            <button className="link" onClick={() => setVista("dueno")}>Volver a entrar con correo</button>
+            <button className="btn primary" onClick={guardarConfig} disabled={!cajaTok.trim()}>Guardar y continuar</button>
           </div>
         </main>
       </div></div>
@@ -157,6 +161,10 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
         <main className="entrar-main">
           <div className="entrar-head"><h1>{saludoHora()}</h1><p>Entra a tu negocio con tu correo, desde cualquier dispositivo</p></div>
           <div className="owner">
+            <div className="entry-seg">
+              <button className="on">Entrar</button>
+              <button onClick={() => { setErr(""); setVista("config"); }}>Primera vez</button>
+            </div>
             <label>Correo
               <input className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
             </label>
@@ -165,9 +173,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
             </label>
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={entrarDueno} disabled={!email || !pass}>Entrar</button>
-            {getCajaToken()
-              ? <button className="link" onClick={() => { setErr(""); setVista("pin"); }}>Volver a los cajeros</button>
-              : <button className="link" onClick={() => { setErr(""); setVista("config"); }}>Configurar este equipo como caja</button>}
+            {getCajaToken() && <button className="link" onClick={() => { setErr(""); setVista("pin"); }}>Volver a los cajeros</button>}
             <button className="link" onClick={() => { setErr(""); setEmail(""); setPass(""); setVista("admin"); }}>Soy el administrador</button>
           </div>
         </main>

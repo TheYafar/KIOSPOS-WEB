@@ -122,13 +122,20 @@ svg { display:block; }
 .owner-pill svg { width:17px; height:17px; }
 .owner { width:100%; max-width:360px; display:flex; flex-direction:column; gap:12px; }
 .owner label { display:flex; flex-direction:column; gap:6px; font-size:13px; font-weight:600; color:var(--text-2); }
+/* Selector "Entrar / Primera vez" en la pantalla de entrada. */
+.entry-seg { display:flex; background:var(--surface-2); border-radius:12px; padding:4px; gap:2px; width:100%; margin-bottom:4px; }
+.entry-seg button { flex:1; border:0; background:transparent; color:var(--text-2); font:inherit; font-weight:600; font-size:14px; padding:10px 0; border-radius:9px; cursor:pointer; }
+.entry-seg button.on { background:var(--surface); color:var(--text); box-shadow:var(--sh-1); }
+.owner .hint { font-size:13px; color:var(--text-3); font-weight:500; margin:0; line-height:1.4; }
 
 @media (min-width:760px) {
   .entrar { flex-direction:row; }
-  .entrar-side { flex:0 0 42%; max-width:600px; padding:52px 48px; justify-content:space-between; gap:0; }
+  /* Mitad y mitad: el panel oscuro de marca llena su lado, el formulario el otro.
+     Sin el max-width el lado izquierdo ya no deja un vacío negro a la derecha. */
+  .entrar-side { flex:1; padding:52px 56px; justify-content:space-between; gap:0; }
   .entrar-clock .hh { font-size:104px; }
   .entrar-clock .dd { font-size:17px; }
-  .entrar-main { justify-content:center; gap:26px; }
+  .entrar-main { flex:1; justify-content:center; gap:26px; }
 }
 
 /* CAJA */
