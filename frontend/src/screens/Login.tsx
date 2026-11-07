@@ -28,6 +28,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
 
   const [cajaTok, setCajaTok] = useState(getCajaToken());
   const [tasa, setTasaLocal] = useState(getTasa());
+  const [guardando, setGuardando] = useState(false);
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
 
@@ -37,9 +38,10 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
   }, []);
 
   // Enlace de configuración: abrir .../#caja=TOKEN en el equipo lo precarga y abre la config.
+  // Siempre lo lleva a la config (aunque ya haya un token guardado) para poder re-emparejar.
   useEffect(() => {
     const m = window.location.hash.match(/caja=([^&]+)/);
-    if (m && !getCajaToken()) {
+    if (m) {
       setCajaTok(decodeURIComponent(m[1]));
       setVista("config");
       try { history.replaceState(null, "", window.location.pathname); } catch { /* ignore */ }
@@ -61,10 +63,22 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
     }
   }, [vista, cargarCajeros]);
 
-  const guardarConfig = () => {
-    setCajaToken(cajaTok.trim());
+  const guardarConfig = async () => {
+    const tok = cajaTok.trim();
+    const prev = getCajaToken();
+    setGuardando(true);
+    setErr("");
+    setCajaToken(tok);          // listarCajeros usa el token guardado (header X-Caja-Token)
     setTasa(tasa.trim());
-    setVista("pin");
+    try {
+      await listarCajeros();    // valida el token contra el servidor ANTES de dejar entrar
+      setVista("pin");
+    } catch {
+      setCajaToken(prev);       // token inválido: revertir para no dejar el equipo roto
+      setErr("Esa caja no se reconoce. Revisa el enlace o el token que te dio el dueño en su panel.");
+    } finally {
+      setGuardando(false);
+    }
   };
 
   const confirmarPin = useCallback(async (persona: Cajero, codigo: string) => {
@@ -148,7 +162,8 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
             <label>Tasa BCV del día
               <input className="inp" value={tasa} onChange={(e) => setTasaLocal(e.target.value)} />
             </label>
-            <button className="btn primary" onClick={guardarConfig} disabled={!cajaTok.trim()}>Guardar y continuar</button>
+            {err && <p className="pinmsg err">{err}</p>}
+            <button className="btn primary" onClick={guardarConfig} disabled={!cajaTok.trim() || guardando}>{guardando ? "Verificando…" : "Guardar y continuar"}</button>
           </div>
         </main>
       </div></div>
@@ -235,6 +250,11 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
           </>
         )}
         {cajeros.length === 0 && !err && <p className="pinmsg">Cargando cajeros…</p>}
+        {err && (
+          <button className="owner-pill" onClick={() => { setErr(""); setVista("config"); }}>
+            <UIcono k="plus" />Configurar este equipo como caja
+          </button>
+        )}
         <button className="owner-pill" onClick={() => { setErr(""); setVista("dueno"); }}>
           <UIcono k="user" />¿Eres el dueño? Entra con tu correo
         </button>
