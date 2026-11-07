@@ -79,9 +79,25 @@ public class AdminController {
         return Map.of("negocioId", negocio.getId(), "pagoHasta", String.valueOf(negocio.getPagoHasta()));
     }
 
+    /** Registrar un pago ya recibido del dueño (pago móvil, efectivo, etc.) y empujar pago_hasta. */
+    @PostMapping("/negocios/{id}/pagos")
+    public Map<String, Object> registrarPago(@PathVariable Long id,
+                                             @RequestBody RegistrarPagoRequest req,
+                                             @AuthenticationPrincipal KioskPrincipal principal) {
+        var negocio = adminService.registrarPago(id, req.monto(), req.moneda(), req.metodo(),
+                req.referencia(), req.meses() == null ? 1 : req.meses(), principal.usuarioId());
+        return Map.of("negocioId", negocio.getId(), "pagoHasta", String.valueOf(negocio.getPagoHasta()),
+                "estado", String.valueOf(negocio.getEstado()));
+    }
+
     public record CrearNegocioRequest(
             @NotBlank String nombreNegocio, @NotBlank String nombreDueno,
             @NotBlank String email, @NotBlank String password,
             String telefono, String direccion, Integer cajasContratadas, String horariosCierre) {
+    }
+
+    public record RegistrarPagoRequest(
+            java.math.BigDecimal monto, String moneda,
+            @NotBlank String metodo, String referencia, Integer meses) {
     }
 }

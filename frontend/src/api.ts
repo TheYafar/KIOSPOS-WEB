@@ -253,5 +253,8 @@ export async function adminReactivar(id: number): Promise<void> { await parse(aw
 export interface PagoPendiente { id: number; negocioId: number; monto: number; moneda: string; metodo: string; referencia: string | null; meses: number; estado: string; }
 export async function adminPagosPendientes(): Promise<PagoPendiente[]> { return parse(await fetch("/api/admin/pagos-pendientes", { headers: auth() })); }
 export async function adminAprobarPago(pagoId: number): Promise<void> { await parse(await fetch(`/api/admin/pagos/${pagoId}/aprobar`, { method: "POST", headers: auth() })); }
+export async function adminRegistrarPago(negocioId: number, body: { monto: number; moneda?: string; metodo: string; referencia?: string; meses?: number }): Promise<void> {
+  await parse(await fetch(`/api/admin/negocios/${negocioId}/pagos`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
 
 export { getTasa, setTasa };

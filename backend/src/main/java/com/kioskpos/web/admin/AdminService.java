@@ -79,6 +79,12 @@ public class AdminService {
         return suscripcionService.aprobarPago(pagoId, superAdminId);
     }
 
+    /** El super admin registra un pago ya recibido del dueño (y reactiva si estaba suspendido). */
+    public Negocio registrarPago(Long negocioId, java.math.BigDecimal monto, String moneda,
+                                 String metodo, String referencia, int meses, Long superAdminId) {
+        return suscripcionService.registrarPagoAdmin(negocioId, monto, moneda, metodo, referencia, meses, superAdminId);
+    }
+
     public void suspender(Long negocioId) {
         suscripcionService.suspender(negocioId);
     }

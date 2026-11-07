@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { adminAprobarPago, adminCrearNegocio, adminNegocios, adminPagosPendientes, adminReactivar, adminSuspender, type NegocioVista, type PagoPendiente } from "../api";
+import { adminAprobarPago, adminCrearNegocio, adminNegocios, adminPagosPendientes, adminReactivar, adminRegistrarPago, adminSuspender, type NegocioVista, type PagoPendiente } from "../api";
 import { UIcono } from "../icons";
 import { HorariosCierre } from "./negocio";
 
@@ -31,6 +31,7 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
   const [msg, setMsg] = useState("");
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState("");
+  const [pagoNeg, setPagoNeg] = useState<NegocioVista | null>(null);
 
   const cargar = async () => {
     try { setNegs(await adminNegocios()); setPagos(await adminPagosPendientes()); setErr(""); }
@@ -118,6 +119,7 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
                         <div className="nd"><span className="k">Último pago</span><b>{n.ultimoPago ? usd(n.ultimoPago.monto) : "—"}</b></div>
                       </div>
                       <div className="neg-foot">
+                        <button className="btn ghost press" onClick={() => setPagoNeg(n)}>Registrar pago</button>
                         {s.estadoEfectivo === "SUSPENDIDA"
                           ? <button className="btn primary press" onClick={() => accion(() => adminReactivar(s.negocioId), "Reactivado")}>Reactivar</button>
                           : <button className="btn danger press" onClick={() => accion(() => adminSuspender(s.negocioId), "Suspendido")}>Suspender</button>}
@@ -134,6 +136,45 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
       </div>
 
       {modal && <FormNegocio onClose={() => setModal(false)} onSaved={() => { setModal(false); setMsg("Negocio creado"); cargar(); }} onErr={setErr} />}
+      {pagoNeg && <FormPago neg={pagoNeg} onClose={() => setPagoNeg(null)} onSaved={() => { setPagoNeg(null); setMsg("Pago registrado"); cargar(); }} onErr={(e) => { setPagoNeg(null); setErr(e); }} />}
+    </div>
+  );
+}
+
+const METODOS_PAGO = ["Pago móvil", "Transferencia", "Zelle", "Binance / USDT", "Efectivo"];
+
+function FormPago({ neg, onClose, onSaved, onErr }: { neg: NegocioVista; onClose: () => void; onSaved: () => void; onErr: (s: string) => void }) {
+  const [monto, setMonto] = useState("25");
+  const [metodo, setMetodo] = useState(METODOS_PAGO[0]);
+  const [referencia, setReferencia] = useState("");
+  const [meses, setMeses] = useState("1");
+  const m = Number(monto.replace(",", "."));
+  const nm = Number(meses) || 1;
+  const ok = m > 0 && !!metodo;
+  const guardar = async () => {
+    try { await adminRegistrarPago(neg.situacion.negocioId, { monto: m, moneda: "USD", metodo, referencia: referencia.trim() || undefined, meses: nm }); onSaved(); }
+    catch (e) { onErr((e as Error).message); }
+  };
+  return (
+    <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-card">
+        <div className="modal-head"><h2>Registrar pago</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="modal-body">
+          <span className="hint">Registra un pago que te hizo <b>{neg.situacion.nombre}</b>. Empuja su fecha de “pagó hasta” y reactiva el negocio si estaba suspendido.</span>
+          <div className="two">
+            <label className="lbl">Monto (USD)<div className="inpw"><i>$</i><input className="inp t pre" inputMode="decimal" value={monto} onChange={(e) => setMonto(e.target.value)} /></div></label>
+            <label className="lbl">Meses<input className="inp t" inputMode="numeric" value={meses} onChange={(e) => setMeses(e.target.value.replace(/\D/g, "").slice(0, 2))} /></label>
+          </div>
+          <label className="lbl">Método de pago
+            <select className="inp" value={metodo} onChange={(e) => setMetodo(e.target.value)}>
+              {METODOS_PAGO.map((x) => <option key={x}>{x}</option>)}
+            </select>
+          </label>
+          <label className="lbl">Referencia <span className="opt">(opcional)</span><input className="inp" value={referencia} onChange={(e) => setReferencia(e.target.value)} placeholder="N° de referencia" /></label>
+          <span className="hint">Suma <b>{nm} mes(es)</b> a partir de hoy o de su fecha vigente.</span>
+        </div>
+        <div className="modal-foot"><button className="cta center press" disabled={!ok} onClick={guardar}>Confirmar pago</button></div>
+      </div>
     </div>
   );
 }

@@ -102,6 +102,24 @@ public class SuscripcionService {
         return pagoRepository.save(pago);
     }
 
+    /**
+     * El super admin registra un pago YA RECIBIDO (ej. pago móvil que le hizo el dueño):
+     * crea el pago, lo aprueba (empuja pago_hasta) y reactiva el negocio si estaba
+     * suspendido. Equivale a "reportar + aprobar + reactivar" en un solo paso.
+     */
+    @Transactional
+    public Negocio registrarPagoAdmin(Long negocioId, BigDecimal monto, String moneda,
+                                      String metodo, String referencia, int meses, Long superAdminId) {
+        Pago pago = reportarPago(negocioId, monto, moneda, metodo, referencia, meses);
+        Negocio negocio = aprobarPago(pago.getId(), superAdminId);
+        // Registrar un pago reactiva un negocio suspendido (el dueño ya pagó).
+        if (SUSPENDIDA.equalsIgnoreCase(negocio.getEstado())) {
+            negocio.setEstado(ACTIVA);
+            negocioRepository.save(negocio);
+        }
+        return negocio;
+    }
+
     /** El super admin aprueba un pago: lo marca APROBADO y empuja pago_hasta del negocio. */
     @Transactional
     public Negocio aprobarPago(Long pagoId, Long superAdminId) {
