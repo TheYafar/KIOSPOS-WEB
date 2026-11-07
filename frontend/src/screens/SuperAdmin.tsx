@@ -7,12 +7,30 @@ const usd = (n: number | string) => "$ " + Number(n).toLocaleString("es-VE", { m
 const pillCls: Record<string, string> = { ACTIVA: "ok", AVISO: "soon", SUSPENDIDA: "late" };
 const AV = ["var(--c-bebidas)", "var(--c-limpieza)", "var(--c-chucherias)", "var(--c-viveres)", "var(--c-charcuteria)", "var(--c-panaderia)"];
 
+const FILTROS: { id: string; n: string }[] = [
+  { id: "", n: "Todos" }, { id: "ACTIVA", n: "Activos" }, { id: "AVISO", n: "En aviso" }, { id: "SUSPENDIDA", n: "Suspendidos" },
+];
+
+/** Fecha ISO → "hoy / ayer / hace N días" para "última vez en línea". */
+function desde(iso: string | null): string {
+  if (!iso) return "nunca";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "—";
+  const dias = Math.floor((Date.now() - d.getTime()) / 86400000);
+  if (dias <= 0) return "hoy";
+  if (dias === 1) return "ayer";
+  if (dias < 30) return "hace " + dias + " días";
+  return d.toLocaleDateString("es-VE", { day: "numeric", month: "short" });
+}
+
 export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
   const [negs, setNegs] = useState<NegocioVista[]>([]);
   const [pagos, setPagos] = useState<PagoPendiente[]>([]);
   const [modal, setModal] = useState(false);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
+  const [q, setQ] = useState("");
+  const [filtro, setFiltro] = useState("");
 
   const cargar = async () => {
     try { setNegs(await adminNegocios()); setPagos(await adminPagosPendientes()); setErr(""); }
@@ -24,6 +42,10 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
 
   const activos = negs.filter((n) => n.situacion.estadoEfectivo === "ACTIVA").length;
   const deuda = negs.reduce((s, n) => s + n.situacion.deuda, 0);
+  const qn = q.trim().toLowerCase();
+  const lista = negs.filter((n) =>
+    (!filtro || n.situacion.estadoEfectivo === filtro) &&
+    (!qn || n.situacion.nombre.toLowerCase().includes(qn)));
 
   return (
     <div className="app">
@@ -47,14 +69,14 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
                   <div><span className="k">Negocios</span><span className="v t">{negs.length}</span></div></div>
                 <div className="inv-stat"><span className="ibox" style={{ background: "var(--ok-soft)", color: "var(--ok)" }}><UIcono k="check" /></span>
                   <div><span className="k">Activos</span><span className="v t" style={{ color: "var(--ok)" }}>{activos}</span></div></div>
-                <div className="inv-stat wide"><span className="ibox" style={{ background: "var(--accent-soft)", color: "var(--warn)" }}><UIcono k="cash" /></span>
-                  <div><span className="k">Por cobrar (deuda acumulada)</span><span className="v t">{usd(deuda)}</span></div></div>
+                <div className="inv-stat"><span className="ibox" style={{ background: "var(--accent-soft)", color: "var(--warn)" }}><UIcono k="cash" /></span>
+                  <div><span className="k">Por cobrar</span><span className="v t">{usd(deuda)}</span><span className="d">deuda acumulada</span></div></div>
               </div>
               {err && <p className="noresult">{err}</p>}
 
               {pagos.length > 0 && (
                 <div className="card" style={{ display: "flex", flexDirection: "column", gap: 2 }}>
-                  <h3>Pagos por aprobar</h3>
+                  <h3>Pagos por aprobar <span className="cuenta">{pagos.length}</span></h3>
                   {pagos.map((p) => (
                     <div className="pago-row" key={p.id}>
                       <div className="grow" style={{ minWidth: 0 }}>
@@ -67,29 +89,45 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
                 </div>
               )}
 
-              {negs.map((n, i) => {
-                const s = n.situacion;
-                return (
-                  <div className="card neg" key={s.negocioId}>
-                    <div className="neg-top">
-                      <span className="neg-av" style={{ ["--av" as string]: AV[i % AV.length] }}>{(s.nombre.charAt(0) || "·").toUpperCase()}</span>
-                      <div className="grow" style={{ minWidth: 0 }}><b>{s.nombre}</b><div className="d">Plan {s.plan} · {n.cajas} caja(s)</div></div>
-                      <span className={"pill " + (pillCls[s.estadoEfectivo] || "late")}><i />{s.estadoEfectivo}</span>
+              <div className="adm-bar">
+                <label className="search">
+                  <UIcono k="search" sw={2} />
+                  <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Buscar negocio…" aria-label="Buscar negocio" />
+                </label>
+                <div className="admf">
+                  {FILTROS.map((f) => (
+                    <button key={f.id} className={"b" + (filtro === f.id ? " on" : "")} onClick={() => setFiltro(f.id)}>{f.n}</button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="neg-grid">
+                {lista.map((n, i) => {
+                  const s = n.situacion;
+                  return (
+                    <div className="card neg" key={s.negocioId}>
+                      <div className="neg-top">
+                        <span className="neg-av" style={{ ["--av" as string]: AV[i % AV.length] }}>{(s.nombre.charAt(0) || "·").toUpperCase()}</span>
+                        <div className="grow" style={{ minWidth: 0 }}><b>{s.nombre}</b><div className="d">Plan {s.plan} · {n.cajas} caja(s)</div></div>
+                        <span className={"pill " + (pillCls[s.estadoEfectivo] || "late")}><i />{s.estadoEfectivo}</span>
+                      </div>
+                      <div className="neg-data">
+                        <div className="nd"><span className="k">Pagó hasta</span><b>{s.pagoHasta || "—"}</b></div>
+                        <div className="nd"><span className="k">Deuda</span>{s.mesesPendientes > 0 ? <b className="mg-bad">{usd(s.deuda)}</b> : <b>—</b>}</div>
+                        <div className="nd"><span className="k">En línea</span><b>{desde(n.ultimaVezEnLinea)}</b></div>
+                        <div className="nd"><span className="k">Último pago</span><b>{n.ultimoPago ? usd(n.ultimoPago.monto) : "—"}</b></div>
+                      </div>
+                      <div className="neg-foot">
+                        {s.estadoEfectivo === "SUSPENDIDA"
+                          ? <button className="btn primary press" onClick={() => accion(() => adminReactivar(s.negocioId), "Reactivado")}>Reactivar</button>
+                          : <button className="btn danger press" onClick={() => accion(() => adminSuspender(s.negocioId), "Suspendido")}>Suspender</button>}
+                      </div>
                     </div>
-                    <div className="mt">
-                      <span>Pagó hasta: {s.pagoHasta || "—"}</span>
-                      {s.mesesPendientes > 0 && <><span>·</span><span className="mg-bad">Debe {usd(s.deuda)}</span></>}
-                      {n.ultimoPago && <><span>·</span><span>Último pago: {n.ultimoPago.monto}{n.ultimoPago.referencia ? " · " + n.ultimoPago.referencia : ""}</span></>}
-                    </div>
-                    <div className="neg-foot">
-                      {s.estadoEfectivo === "SUSPENDIDA"
-                        ? <button className="btn primary press" onClick={() => accion(() => adminReactivar(s.negocioId), "Reactivado")}>Reactivar</button>
-                        : <button className="btn danger press" onClick={() => accion(() => adminSuspender(s.negocioId), "Suspendido")}>Suspender</button>}
-                    </div>
-                  </div>
-                );
-              })}
-              {negs.length === 0 && !err && <p className="noresult">Sin negocios aún.</p>}
+                  );
+                })}
+              </div>
+              {negs.length === 0 && !err && <p className="noresult">Sin negocios aún. Crea el primero con “Nuevo negocio”.</p>}
+              {negs.length > 0 && lista.length === 0 && <p className="noresult">Ningún negocio coincide con la búsqueda.</p>}
             </div>
           </div>
         </div>

@@ -619,13 +619,30 @@ svg { display:block; }
 .btn.danger { background:var(--bad-soft); color:var(--bad); }
 .btn.danger:hover { filter:brightness(.97); }
 .hpills .btn { height:44px; font-size:14px; padding:0 16px; }
-.neg { gap:12px; }
+/* Barra de búsqueda + filtros de estado */
+.adm-bar { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+.adm-bar .search { flex:1 1 240px; height:44px; }
+.admf { display:flex; gap:6px; overflow-x:auto; scrollbar-width:none; }
+.admf::-webkit-scrollbar { display:none; }
+.admf .b { height:44px; white-space:nowrap; background:var(--surface); box-shadow:var(--sh-1); color:var(--text-2); }
+.admf .b.on { background:var(--ink); color:var(--on-ink); box-shadow:none; }
+.cuenta { display:inline-grid; place-items:center; min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:var(--bad-soft); color:var(--bad); font-size:12px; font-weight:700; vertical-align:middle; margin-left:4px; }
+
+/* Cuadrícula responsive de negocios: 1 col móvil, 2 col en pantallas anchas */
+.neg-grid { display:grid; grid-template-columns:1fr; gap:12px; }
+@media (min-width:720px) { .neg-grid { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+
+.neg { display:flex; flex-direction:column; gap:14px; height:100%; }
 .neg-top { display:flex; align-items:center; gap:12px; }
 .neg-av { width:42px; height:42px; border-radius:50%; display:grid; place-items:center; color:#fff; font-weight:700; font-size:16px; flex:none; background:var(--av,var(--primary)); }
 .neg-top b { font-size:15.5px; font-weight:700; display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .neg-top .d { font-size:12.5px; color:var(--text-3); font-weight:500; }
 .neg .mt { font-size:12.5px; color:var(--text-3); display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
-.neg-foot { display:flex; justify-content:flex-end; }
+.neg-data { display:grid; grid-template-columns:1fr 1fr; gap:10px 14px; padding:12px 14px; background:var(--surface-2); border-radius:12px; }
+.neg-data .nd { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.neg-data .nd .k { font-size:11.5px; color:var(--text-3); font-weight:500; text-transform:uppercase; letter-spacing:.02em; }
+.neg-data .nd b { font-size:14.5px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.neg-foot { display:flex; justify-content:flex-end; margin-top:auto; }
 .neg-foot .btn { height:42px; font-size:14px; padding:0 18px; }
 .pago-row { display:flex; align-items:center; gap:12px; padding:12px 0; }
 .pago-row + .pago-row { border-top:1px solid var(--line); }
