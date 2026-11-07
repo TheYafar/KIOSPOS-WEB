@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { crearCaja, crearUsuario, listarCajas, listarUsuarios, type CajaInfo, type Usuario } from "../api";
 import { type Rol } from "../session";
 import { MiPlan } from "./MiPlan";
+import { AjustesNegocio } from "./negocio";
 
 const ROL_N: Record<string, string> = { DUENO: "Dueño", ENCARGADO: "Encargado", CAJERO: "Cajero", SOPORTE: "Soporte Técnico", SUPER_ADMIN: "Super admin" };
 
@@ -25,6 +26,7 @@ export function Usuarios({ onSalir }: { onSalir: () => void }) {
       {msg && <div className="toolbar" style={{ paddingTop: 0, color: "var(--ok)", fontSize: 13 }}>{msg}</div>}
       <div className="scroll">
         <MiPlan />
+        <AjustesNegocio />
         {err && <p className="noresult">{err}</p>}
         <span className="k" style={{ color: "var(--text-2)", fontWeight: 500 }}>Usuarios</span>
         {usuarios.map((u) => (

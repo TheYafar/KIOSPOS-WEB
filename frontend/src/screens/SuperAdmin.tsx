@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { adminAprobarPago, adminCrearNegocio, adminNegocios, adminPagosPendientes, adminReactivar, adminSuspender, type NegocioVista, type PagoPendiente } from "../api";
 import { UIcono } from "../icons";
+import { HorariosCierre } from "./negocio";
 
 const usd = (n: number | string) => "$ " + Number(n).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pillCls: Record<string, string> = { ACTIVA: "ok", AVISO: "soon", SUSPENDIDA: "late" };
@@ -100,10 +101,21 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
 }
 
 function FormNegocio({ onClose, onSaved, onErr }: { onClose: () => void; onSaved: () => void; onErr: (s: string) => void }) {
-  const [f, setF] = useState({ nombreNegocio: "", nombreDueno: "", email: "", password: "" });
+  const [f, setF] = useState({ nombreNegocio: "", nombreDueno: "", email: "", password: "", telefono: "", direccion: "", cajasContratadas: "1" });
+  const [horarios, setHorarios] = useState("");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const ok = f.nombreNegocio.trim() && f.nombreDueno.trim() && f.email.trim() && f.password.length >= 6;
-  const guardar = async () => { try { await adminCrearNegocio({ ...f, nombreNegocio: f.nombreNegocio.trim(), nombreDueno: f.nombreDueno.trim(), email: f.email.trim() }); onSaved(); } catch (e) { onErr((e as Error).message); onClose(); } };
+  const guardar = async () => {
+    try {
+      await adminCrearNegocio({
+        nombreNegocio: f.nombreNegocio.trim(), nombreDueno: f.nombreDueno.trim(),
+        email: f.email.trim(), password: f.password,
+        telefono: f.telefono.trim() || undefined, direccion: f.direccion.trim() || undefined,
+        cajasContratadas: Number(f.cajasContratadas) || 1, horariosCierre: horarios || undefined
+      });
+      onSaved();
+    } catch (e) { onErr((e as Error).message); onClose(); }
+  };
   return (
     <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card">
@@ -113,6 +125,10 @@ function FormNegocio({ onClose, onSaved, onErr }: { onClose: () => void; onSaved
           <label className="lbl">Nombre del dueño<input className="inp" value={f.nombreDueno} onChange={set("nombreDueno")} /></label>
           <label className="lbl">Correo del dueño<input className="inp" type="email" value={f.email} onChange={set("email")} /></label>
           <label className="lbl">Contraseña (mín. 6)<input className="inp" type="password" value={f.password} onChange={set("password")} /></label>
+          <label className="lbl">Teléfono<input className="inp" value={f.telefono} onChange={set("telefono")} placeholder="0412-1234567" /></label>
+          <label className="lbl">Dirección / local<input className="inp" value={f.direccion} onChange={set("direccion")} placeholder="Dónde queda la bodega" /></label>
+          <label className="lbl">¿Cuántas cajas?<input className="inp t" type="number" min="1" value={f.cajasContratadas} onChange={set("cajasContratadas")} /></label>
+          <div className="lbl"><span>Horarios de cierre de caja</span><HorariosCierre value={horarios} onChange={setHorarios} /></div>
         </div>
         <div className="modal-foot"><button className="btn primary big press" disabled={!ok} onClick={guardar}>Crear negocio y dueño</button></div>
       </div>

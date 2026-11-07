@@ -7,6 +7,7 @@ import { Cuadre } from "./Cuadre";
 import { Inventario } from "./Inventario";
 import { Reportes } from "./Reportes";
 import { Usuarios } from "./Usuarios";
+import { CierreAviso } from "./negocio";
 
 interface Tab { id: string; n: string; icon: string; }
 
@@ -38,6 +39,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
 
   return (
     <div className={"app" + (tab === "caja" ? " caja-app" : "")}>
+      {esCaja && <CierreAviso />}
       <div className="shell">
         <nav className="rail" aria-label="Menú">
           <span className="logo">K</span>

@@ -238,8 +238,15 @@ export async function reportarPago(body: { monto: number; moneda?: string; metod
 }
 export interface NegocioVista { situacion: Situacion; cajas: number; ultimaVezEnLinea: string | null; ultimoPago: { monto: string; referencia: string | null; fecha: string } | null; }
 export async function adminNegocios(): Promise<NegocioVista[]> { return parse(await fetch("/api/admin/negocios", { headers: auth() })); }
-export async function adminCrearNegocio(body: { nombreNegocio: string; nombreDueno: string; email: string; password: string }): Promise<{ negocioId: number; duenoId: number }> {
+export async function adminCrearNegocio(body: { nombreNegocio: string; nombreDueno: string; email: string; password: string; telefono?: string; direccion?: string; cajasContratadas?: number; horariosCierre?: string }): Promise<{ negocioId: number; duenoId: number }> {
   return parse(await fetch("/api/admin/negocios", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+
+// ---------- Config del negocio (perfil + horarios de cierre) ----------
+export interface ConfigNegocio { nombre: string; telefono: string | null; direccion: string | null; cajasContratadas: number; horariosCierre: string | null; }
+export async function getConfigNegocio(): Promise<ConfigNegocio> { return parse(await fetch("/api/mi-negocio/config", { headers: auth() })); }
+export async function putConfigNegocio(body: { telefono?: string; direccion?: string; horariosCierre?: string }): Promise<ConfigNegocio> {
+  return parse(await fetch("/api/mi-negocio/config", { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
 }
 export async function adminSuspender(id: number): Promise<void> { await parse(await fetch(`/api/admin/negocios/${id}/suspender`, { method: "POST", headers: auth() })); }
 export async function adminReactivar(id: number): Promise<void> { await parse(await fetch(`/api/admin/negocios/${id}/reactivar`, { method: "POST", headers: auth() })); }

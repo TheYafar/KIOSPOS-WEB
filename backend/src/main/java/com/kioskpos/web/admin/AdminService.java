@@ -56,9 +56,20 @@ public class AdminService {
     }
 
     public NegocioRegistroService.NegocioCreado crearNegocio(
-            String nombreNegocio, String nombreDueno, String email, String password) {
+            String nombreNegocio, String nombreDueno, String email, String password,
+            String telefono, String direccion, Integer cajasContratadas, String horariosCierre) {
         NegocioRegistroService.NegocioCreado creado =
                 negocioRegistroService.registrarNegocioConDueno(nombreNegocio, nombreDueno, email, password);
+        // Guarda el perfil del negocio recién creado (negocios no tiene RLS).
+        negocioRepository.findById(creado.negocioId()).ifPresent(n -> {
+            n.setTelefono(telefono);
+            n.setDireccion(direccion);
+            if (cajasContratadas != null && cajasContratadas > 0) {
+                n.setCajasContratadas(cajasContratadas);
+            }
+            n.setHorariosCierre(horariosCierre);
+            negocioRepository.save(n);
+        });
         // Correo de bienvenida (async y a prueba de fallos: no rompe el alta si falla).
         emailService.bienvenida(email, nombreDueno, nombreNegocio);
         return creado;

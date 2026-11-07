@@ -46,6 +46,21 @@ public class Negocio {
     @Column(name = "pago_hasta")
     private LocalDate pagoHasta;
 
+    // --- Perfil / configuración del negocio ---
+
+    @Column(length = 40)
+    private String telefono;
+
+    @Column(length = 200)
+    private String direccion;
+
+    @Column(name = "cajas_contratadas", nullable = false)
+    private Integer cajasContratadas = 1;
+
+    /** Horas de cierre de caja "HH:mm" separadas por coma (ej. "15:00,19:00,22:00"). */
+    @Column(name = "horarios_cierre", length = 200)
+    private String horariosCierre;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
 }

@@ -40,7 +40,8 @@ public class AdminController {
 
     @PostMapping("/negocios")
     public NegocioRegistroService.NegocioCreado crearNegocio(@RequestBody CrearNegocioRequest req) {
-        return adminService.crearNegocio(req.nombreNegocio(), req.nombreDueno(), req.email(), req.password());
+        return adminService.crearNegocio(req.nombreNegocio(), req.nombreDueno(), req.email(), req.password(),
+                req.telefono(), req.direccion(), req.cajasContratadas(), req.horariosCierre());
     }
 
     @GetMapping("/negocios/{id}/cajas")
@@ -80,6 +81,7 @@ public class AdminController {
 
     public record CrearNegocioRequest(
             @NotBlank String nombreNegocio, @NotBlank String nombreDueno,
-            @NotBlank String email, @NotBlank String password) {
+            @NotBlank String email, @NotBlank String password,
+            String telefono, String direccion, Integer cajasContratadas, String horariosCierre) {
     }
 }
