@@ -626,6 +626,7 @@ svg { display:block; }
 .admf::-webkit-scrollbar { display:none; }
 .admf .b { height:44px; white-space:nowrap; background:var(--surface); box-shadow:var(--sh-1); color:var(--text-2); }
 .admf .b.on { background:var(--ink); color:var(--on-ink); box-shadow:none; }
+.b.ok { background:var(--ok-soft); color:var(--ok); box-shadow:none; }
 .cuenta { display:inline-grid; place-items:center; min-width:20px; height:20px; padding:0 6px; border-radius:10px; background:var(--bad-soft); color:var(--bad); font-size:12px; font-weight:700; vertical-align:middle; margin-left:4px; }
 
 /* Cuadrícula responsive de negocios: 1 col móvil, 2 col en pantallas anchas */

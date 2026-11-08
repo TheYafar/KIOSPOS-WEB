@@ -102,7 +102,30 @@ function FormCaja({ onClose, onToken, onErr }: { onClose: () => void; onToken: (
   );
 }
 
+/** Copia texto al portapapeles con respaldo (execCommand) si el navegador bloquea la API moderna. */
+async function copiarTexto(texto: string): Promise<boolean> {
+  try {
+    if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(texto); return true; }
+  } catch { /* cae al respaldo */ }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = texto; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    const ok = document.execCommand("copy");
+    document.body.removeChild(ta);
+    return ok;
+  } catch { return false; }
+}
+
 function TokenCaja({ token, onClose }: { token: string; onClose: () => void }) {
+  const [copiado, setCopiado] = useState<"" | "enlace" | "token">("");
+  const [falló, setFalló] = useState(false);
+  const enlace = window.location.origin + "/#caja=" + encodeURIComponent(token);
+  const copiar = async (texto: string, cual: "enlace" | "token") => {
+    const ok = await copiarTexto(texto);
+    if (ok) { setFalló(false); setCopiado(cual); setTimeout(() => setCopiado(""), 2000); }
+    else { setFalló(true); }
+  };
   return (
     <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card">
@@ -111,9 +134,11 @@ function TokenCaja({ token, onClose }: { token: string; onClose: () => void }) {
           <span className="hint">En el equipo de la caja: <b>abre el enlace de configuración</b> (lo más fácil) o pega el token a mano. No se vuelve a mostrar.</span>
           <div className="receipt"><pre className="t" style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}>{token}</pre></div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-            <button className="b pri" onClick={() => navigator.clipboard?.writeText(window.location.origin + "/#caja=" + encodeURIComponent(token))}>Copiar enlace</button>
-            <button className="b" onClick={() => navigator.clipboard?.writeText(token)}>Copiar token</button>
+            <button className={"b pri" + (copiado === "enlace" ? " ok" : "")} onClick={() => copiar(enlace, "enlace")}>{copiado === "enlace" ? "✓ ¡Copiado!" : "Copiar enlace"}</button>
+            <button className={"b" + (copiado === "token" ? " ok" : "")} onClick={() => copiar(token, "token")}>{copiado === "token" ? "✓ ¡Copiado!" : "Copiar token"}</button>
           </div>
+          {copiado && <span className="pill ok" style={{ alignSelf: "flex-start" }}>{copiado === "enlace" ? "Enlace copiado" : "Token copiado"} — pégalo en el equipo de la caja</span>}
+          {falló && <span className="pinmsg err">No se pudo copiar automáticamente. Selecciona el token de arriba y cópialo a mano (Ctrl+C).</span>}
         </div>
         <div className="modal-foot"><button className="cta center press" onClick={onClose}>Listo</button></div>
       </div>
