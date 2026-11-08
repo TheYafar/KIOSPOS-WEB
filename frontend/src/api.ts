@@ -189,6 +189,7 @@ export interface TurnoResumen {
   esperadoUsd: number; esperadoBs: number;
   declaradoUsd: number | null; declaradoBs: number | null;
   diferenciaUsd: number | null; diferenciaBs: number | null;
+  metodos: { metodo: string; moneda: string; esperado: number; digital: boolean }[];
 }
 
 export async function abrirTurno(fondoUsd: number, fondoBs: number): Promise<TurnoResumen> {

@@ -4,6 +4,7 @@ import { getTurnoId, setTurnoId } from "../session";
 import { UIcono } from "../icons";
 
 const DEN = [100, 50, 20, 10, 5, 2, 1];
+const METODO_N: Record<string, string> = { EFECTIVO_USD: "Efectivo $", EFECTIVO_BS: "Efectivo Bs", PUNTO: "Punto", PAGO_MOVIL: "Pago móvil", BIOPAGO: "Biopago" };
 const money = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const usd = (n: number) => "$ " + money(n);
 const bs = (n: number) => "Bs " + money(n);
@@ -25,6 +26,7 @@ export function Cuadre() {
   const [fBs, setFBs] = useState("0");
   const [cnt, setCnt] = useState<Record<number, number>>({ 100: 0, 50: 0, 20: 0, 10: 0, 5: 0, 2: 0, 1: 0 });
   const [cBs, setCBs] = useState("");
+  const [verif, setVerif] = useState<Record<string, string>>({}); // lo que reporta cada método digital
   const [cerrado, setCerrado] = useState<TurnoResumen | null>(null);
   const [err, setErr] = useState("");
 
@@ -135,19 +137,32 @@ export function Cuadre() {
         </>
       )}
 
-      {step === 3 && (() => {
-        const dU = r2(cntUsd - turno.esperadoUsd), dB = r2(numOf(cBs) - turno.esperadoBs);
-        return (
-          <>
-            <div className="card czres"><div className="cardhead"><h3 className="h3">Dólares</h3>{pill(dU, false)}</div>
-              <div className="cmp"><div><span>Contaste</span><b className="t">{usd(cntUsd)}</b></div><div><span>Debería haber</span><b className="t">{usd(turno.esperadoUsd)}</b></div></div></div>
-            <div className="card czres"><div className="cardhead"><h3 className="h3">Bolívares</h3>{pill(dB, true)}</div>
-              <div className="cmp"><div><span>Contaste</span><b className="t">{bs(numOf(cBs))}</b></div><div><span>Debería haber</span><b className="t">{bs(turno.esperadoBs)}</b></div></div></div>
-            {err && <p className="pinmsg err">{err}</p>}
-            <div className="two"><button className="btn2 press" onClick={() => setStep(2)}>Volver a contar</button><button className="cta center press" onClick={cerrar}>Cerrar caja</button></div>
-          </>
-        );
-      })()}
+      {step === 3 && (
+        <>
+          {turno.metodos.map((m) => {
+            const isBs = m.moneda === "VES";
+            const fmt = isBs ? bs : usd;
+            const contaste = m.metodo === "EFECTIVO_USD" ? cntUsd
+              : m.metodo === "EFECTIVO_BS" ? numOf(cBs)
+              : numOf(verif[m.metodo] || "");
+            const diff = r2(contaste - m.esperado);
+            return (
+              <div className="card czres" key={m.metodo}>
+                <div className="cardhead"><h3 className="h3">{METODO_N[m.metodo] || m.metodo}</h3>{pill(diff, isBs)}</div>
+                {m.digital && (
+                  <div className="fld" style={{ marginTop: 6 }}>
+                    <div className="inpw"><i>{isBs ? "Bs" : "$"}</i><input className="inp t" style={{ paddingLeft: 40 }} value={verif[m.metodo] || ""} onChange={(e) => setVerif({ ...verif, [m.metodo]: e.target.value })} placeholder="0" inputMode="decimal" aria-label={"Reporte de " + (METODO_N[m.metodo] || m.metodo)} /></div>
+                    <span className="hint">Escribe lo que te reporta {METODO_N[m.metodo] || m.metodo}.</span>
+                  </div>
+                )}
+                <div className="cmp"><div><span>{m.digital ? "Reportó" : "Contaste"}</span><b className="t">{fmt(contaste)}</b></div><div><span>Debería haber</span><b className="t">{fmt(m.esperado)}</b></div></div>
+              </div>
+            );
+          })}
+          {err && <p className="pinmsg err">{err}</p>}
+          <div className="two"><button className="btn2 press" onClick={() => setStep(2)}>Volver a contar</button><button className="cta center press" onClick={cerrar}>Cerrar caja</button></div>
+        </>
+      )}
     </div>
   );
 }

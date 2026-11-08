@@ -8,6 +8,8 @@ import com.kioskpos.web.venta.VentaRepository;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -76,7 +78,7 @@ public class CuadreService {
 
         return new Resumen(turno.getId(), turno.getEstado(), r.fondoUsd(), r.fondoBs(),
                 r.efectivoUsd(), r.efectivoBs(), r.vueltoUsd(), r.vueltoBs(),
-                r.esperadoUsd(), r.esperadoBs(), dUsd, dBs, difUsd, difBs);
+                r.esperadoUsd(), r.esperadoBs(), dUsd, dBs, difUsd, difBs, r.metodos());
     }
 
     private Resumen calcular(Turno turno) {
@@ -84,6 +86,11 @@ public class CuadreService {
         BigDecimal efectivoBs = BigDecimal.ZERO;
         BigDecimal vueltoUsd = BigDecimal.ZERO;
         BigDecimal vueltoBs = BigDecimal.ZERO;
+        // Métodos digitales (en Bs): no afectan la gaveta, pero se muestran para verificar
+        // contra lo que reporta el punto / pago móvil / Biopago.
+        BigDecimal puntoBs = BigDecimal.ZERO;
+        BigDecimal pagoMovilBs = BigDecimal.ZERO;
+        BigDecimal biopagoBs = BigDecimal.ZERO;
 
         for (Venta v : ventaRepository.findByTurnoId(turno.getId())) {
             if ("ANULADA".equals(v.getEstado())) {
@@ -92,10 +99,14 @@ public class CuadreService {
             vueltoUsd = vueltoUsd.add(v.getVueltoUsd());
             vueltoBs = vueltoBs.add(v.getVueltoBs());
             for (PagoVenta p : v.getPagos()) {
-                if (p.getMetodo() == MetodoPago.EFECTIVO_USD) {
-                    efectivoUsd = efectivoUsd.add(p.getMontoOriginal());
-                } else if (p.getMetodo() == MetodoPago.EFECTIVO_BS) {
-                    efectivoBs = efectivoBs.add(p.getMontoOriginal());
+                BigDecimal m = p.getMontoOriginal();
+                switch (p.getMetodo()) {
+                    case EFECTIVO_USD -> efectivoUsd = efectivoUsd.add(m);
+                    case EFECTIVO_BS -> efectivoBs = efectivoBs.add(m);
+                    case PUNTO -> puntoBs = puntoBs.add(m);
+                    case PAGO_MOVIL -> pagoMovilBs = pagoMovilBs.add(m);
+                    case BIOPAGO -> biopagoBs = biopagoBs.add(m);
+                    default -> { /* nada */ }
                 }
             }
         }
@@ -105,10 +116,19 @@ public class CuadreService {
         BigDecimal esperadoUsd = noNeg(fondoUsd.add(efectivoUsd).subtract(vueltoUsd)).setScale(2, RoundingMode.HALF_UP);
         BigDecimal esperadoBs = noNeg(fondoBs.add(efectivoBs).subtract(vueltoBs)).setScale(2, RoundingMode.HALF_UP);
 
+        // Lista con TODOS los métodos (el cajero ve cada uno y si cuadra). El efectivo lleva
+        // el esperado de la gaveta (fondo + cobrado − vuelto); los digitales, lo cobrado exacto.
+        List<MetodoLinea> metodos = new ArrayList<>();
+        metodos.add(new MetodoLinea("EFECTIVO_USD", "USD", esperadoUsd, false));
+        metodos.add(new MetodoLinea("EFECTIVO_BS", "VES", esperadoBs, false));
+        metodos.add(new MetodoLinea("PUNTO", "VES", puntoBs.setScale(2, RoundingMode.HALF_UP), true));
+        metodos.add(new MetodoLinea("PAGO_MOVIL", "VES", pagoMovilBs.setScale(2, RoundingMode.HALF_UP), true));
+        metodos.add(new MetodoLinea("BIOPAGO", "VES", biopagoBs.setScale(2, RoundingMode.HALF_UP), true));
+
         return new Resumen(turno.getId(), turno.getEstado(), fondoUsd, fondoBs,
                 efectivoUsd.setScale(2, RoundingMode.HALF_UP), efectivoBs.setScale(2, RoundingMode.HALF_UP),
                 vueltoUsd.setScale(2, RoundingMode.HALF_UP), vueltoBs.setScale(2, RoundingMode.HALF_UP),
-                esperadoUsd, esperadoBs, null, null, null, null);
+                esperadoUsd, esperadoBs, null, null, null, null, metodos);
     }
 
     private Turno cargar(Long id) {
@@ -129,6 +149,11 @@ public class CuadreService {
                           BigDecimal vueltoUsd, BigDecimal vueltoBs,
                           BigDecimal esperadoUsd, BigDecimal esperadoBs,
                           BigDecimal declaradoUsd, BigDecimal declaradoBs,
-                          BigDecimal diferenciaUsd, BigDecimal diferenciaBs) {
+                          BigDecimal diferenciaUsd, BigDecimal diferenciaBs,
+                          List<MetodoLinea> metodos) {
+    }
+
+    /** Un método de pago en el cuadre: cuánto debería haber según el servidor. */
+    public record MetodoLinea(String metodo, String moneda, BigDecimal esperado, boolean digital) {
     }
 }
