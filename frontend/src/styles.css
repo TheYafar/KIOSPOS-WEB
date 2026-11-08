@@ -927,3 +927,71 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
 .cierre-aviso .ca-txt b { font-weight:800; }
 .cierre-aviso .ca-x { flex:none; width:30px; height:30px; border:0; border-radius:8px; background:transparent; color:inherit; font-size:15px; cursor:pointer; opacity:.75; }
 .cierre-aviso .ca-x:hover { opacity:1; }
+
+/* ========================================================================
+   Cierre de caja en una sola pantalla (como el KioskPOS de escritorio)
+   ======================================================================== */
+.czwrap.wide { max-width:1100px; }
+.pill.info { background:color-mix(in srgb, var(--c-bebidas) 14%, transparent); color:var(--c-bebidas); }
+.cz-top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.cz-tag { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 12px; border-radius:999px; background:var(--surface); border:1px solid var(--line); font-size:13px; color:var(--text-2); }
+.cz-tag b { color:var(--text); font-weight:700; }
+.cz-sp { flex:1; }
+.btn2.cz-ref { height:38px; font-size:13.5px; padding:0 14px; }
+
+.cz-kpis { display:grid; grid-template-columns:repeat(auto-fit, minmax(150px, 1fr)); gap:10px; }
+.cz-kpi { background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--sh-1); padding:14px 16px; display:flex; flex-direction:column; gap:2px; min-width:0; }
+.cz-kpi .k { font-size:11.5px; font-weight:600; color:var(--text-3); text-transform:uppercase; letter-spacing:.03em; }
+.cz-kpi b { font-size:22px; font-weight:700; letter-spacing:-.02em; }
+.cz-kpi .d { font-size:12.5px; color:var(--text-3); }
+.cz-kpi.hl { background:var(--primary); color:var(--on-primary); }
+.cz-kpi.hl .k, .cz-kpi.hl .d { color:var(--on-primary); opacity:.8; }
+
+.cz-cols { display:grid; grid-template-columns:1fr; gap:12px; }
+@media (min-width:860px) { .cz-cols { grid-template-columns:1fr 1fr; } }
+.cz-block { display:flex; flex-direction:column; gap:2px; }
+.cz-block .h3 { font-size:14px; color:var(--text); margin-bottom:6px; }
+.cz-block .h3 small { font-weight:500; color:var(--text-3); font-size:12px; }
+.cz-row { display:flex; justify-content:space-between; align-items:baseline; gap:12px; padding:9px 0; border-bottom:1px solid var(--line); font-size:14px; }
+.cz-row span { color:var(--text-2); }
+.cz-row b { font-weight:600; text-align:right; white-space:nowrap; }
+.cz-row b small { font-weight:500; color:var(--text-3); font-size:12.5px; }
+.cz-row b.neg { color:var(--bad); }
+.cz-total { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-top:10px; padding:12px 14px; border-radius:12px; background:var(--surface-2); }
+.cz-total > span { font-weight:600; font-size:13.5px; }
+.cz-total > div { display:flex; flex-direction:column; align-items:flex-end; gap:1px; }
+.cz-total b { font-size:17px; font-weight:700; }
+.cz-total small { font-size:12px; color:var(--text-3); }
+.cz-block .hint { margin-top:8px; }
+
+.cz-count { display:flex; flex-direction:column; gap:14px; }
+.cz-count .h3 { font-size:14px; color:var(--text); }
+.cz-fields { display:grid; grid-template-columns:1fr; gap:14px; }
+@media (min-width:860px) { .cz-fields { grid-template-columns:1fr 1fr; } }
+.cz-field { display:flex; flex-direction:column; gap:8px; }
+.cz-field .k { font-size:13px; font-weight:600; color:var(--text-2); }
+.cz-in { display:flex; gap:8px; }
+.cz-in .inpw { flex:1; min-width:0; }
+.cz-in .btn2 { height:50px; font-size:13.5px; padding:0 14px; flex:none; white-space:nowrap; }
+.cz-dline { display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; font-size:13px; color:var(--text-2); }
+.cz-dline b { color:var(--text); }
+.cta.cz-cerrar { gap:8px; }
+.cta.cz-cerrar svg { width:20px; height:20px; }
+
+.cz-diffs { display:grid; grid-template-columns:1fr; gap:12px; }
+@media (min-width:640px) { .cz-diffs { grid-template-columns:1fr 1fr; } }
+.cz-diff { background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--sh-1); padding:16px; display:flex; flex-direction:column; gap:4px; align-items:flex-start; }
+.cz-diff .k { font-size:12.5px; font-weight:600; color:var(--text-3); }
+.cz-diff b { font-size:24px; font-weight:700; }
+.cz-diff .d { font-size:12.5px; color:var(--text-3); margin-bottom:6px; }
+
+/* Calculadora de billetes */
+.calc-rows { display:flex; flex-direction:column; }
+.calc-row { display:grid; grid-template-columns:76px auto 1fr; gap:12px; align-items:center; padding:7px 0; border-bottom:1px solid var(--line); }
+.calc-row:last-child { border-bottom:0; }
+.calc-row .bn { font-weight:700; font-size:14.5px; text-align:center; padding:7px 0; border-radius:9px; background:var(--surface-2); border:1px dashed var(--line-strong); }
+.calc-row .stp input { width:52px; height:30px; border:0; background:transparent; text-align:center; font-size:15px; font-weight:600; color:var(--text); outline:0; }
+.calc-row .sub { text-align:right; color:var(--text-2); font-size:14px; }
+.calc-total { display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-radius:12px; background:var(--ok-soft); color:var(--ok); }
+.calc-total span { font-weight:600; }
+.calc-total b { font-size:20px; font-weight:800; }
