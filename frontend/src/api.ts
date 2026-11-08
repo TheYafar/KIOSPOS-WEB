@@ -258,3 +258,7 @@ export async function adminRegistrarPago(negocioId: number, body: { monto: numbe
 }
 
 export { getTasa, setTasa };
+
+// ---------- Tasa BCV (automática, la sirve el servidor) ----------
+export interface TasaBcv { bs: number | null; fuente: string; fechaFuente: string | null; actualizado: string | null; }
+export async function tasaBcvServidor(): Promise<TasaBcv> { return parse(await fetch("/api/tasa")); }

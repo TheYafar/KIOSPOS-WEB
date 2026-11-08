@@ -30,6 +30,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/**", "/api/caja/**").permitAll()
                         .requestMatchers("/api/admin/login").permitAll()
                         .requestMatchers("/actuator/health").permitAll()
+                        // Tasa BCV del día: pública (la lee la pantalla de caja antes de iniciar sesión).
+                        .requestMatchers(HttpMethod.GET, "/api/tasa").permitAll()
                         // Panel de super admin.
                         .requestMatchers("/api/admin/**").hasRole("SUPER_ADMIN")
                         // Crear cajas/usuarios y reportar pagos: solo dueño o encargado.

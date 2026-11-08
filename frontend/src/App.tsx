@@ -1,16 +1,33 @@
 import { useCallback, useEffect, useState } from "react";
-import { renovarPermiso, sincronizar } from "./api";
-import { cerrarSesion, getSesion, type Sesion } from "./session";
+import { renovarPermiso, sincronizar, tasaBcvServidor } from "./api";
+import { cerrarSesion, getSesion, setTasa, type Sesion } from "./session";
 import { Login } from "./screens/Login";
 import { Shell } from "./screens/Shell";
 import { SuperAdmin } from "./screens/SuperAdmin";
 
 export function App() {
   const [sesion, setSesion] = useState<Sesion | null>(getSesion());
+  const [, setTick] = useState(0); // fuerza re-render al llegar la tasa nueva
 
   const salir = useCallback(() => {
     cerrarSesion();
     setSesion(null);
+  }, []);
+
+  // Tasa BCV automática: el servidor la trae del BCV; la refrescamos al abrir,
+  // cada hora y al reconectar. Si falla, se mantiene la última conocida.
+  useEffect(() => {
+    let vivo = true;
+    const sync = async () => {
+      try {
+        const t = await tasaBcvServidor();
+        if (vivo && t.bs) { setTasa(String(t.bs)); setTick((x) => x + 1); }
+      } catch { /* sin conexión: se mantiene la última tasa */ }
+    };
+    sync();
+    const id = setInterval(sync, 60 * 60 * 1000);
+    window.addEventListener("online", sync);
+    return () => { vivo = false; clearInterval(id); window.removeEventListener("online", sync); };
   }, []);
 
   // Al entrar una caja: renueva el permiso cada pocos minutos y sincroniza la cola.

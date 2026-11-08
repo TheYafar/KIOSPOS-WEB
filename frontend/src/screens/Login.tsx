@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { adminLogin, listarCajeros, loginCajero, loginDueno, type Cajero } from "../api";
+import { adminLogin, listarCajeros, loginCajero, loginDueno, tasaBcvServidor, type Cajero } from "../api";
 import { getCajaToken, getSesion, getTasa, setCajaToken, setTasa, type Sesion } from "../session";
 import { UIcono } from "../icons";
 import { TemaBtn } from "../TemaBtn";
@@ -36,6 +36,11 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
   useEffect(() => {
     const t = setInterval(() => setReloj(new Date()), 1000);
     return () => clearInterval(t);
+  }, []);
+
+  // Tasa BCV automática: prellenar con la del servidor (el cajero no la escribe).
+  useEffect(() => {
+    tasaBcvServidor().then((t) => { if (t.bs) { setTasa(String(t.bs)); setTasaLocal(String(t.bs)); } }).catch(() => { /* usa la última */ });
   }, []);
 
   // Enlace de configuración: abrir .../#caja=TOKEN en el equipo lo precarga y abre la config.
@@ -161,9 +166,10 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
             <label>Token de la caja
               <input className="inp" value={cajaTok} onChange={(e) => setCajaTok(e.target.value)} placeholder="Pegado del panel del dueño" />
             </label>
-            <label>Tasa BCV del día
+            <label>Tasa BCV del día <span style={{ color: "var(--ok)", fontWeight: 600 }}>· automática</span>
               <input className="inp" value={tasa} onChange={(e) => setTasaLocal(e.target.value)} />
             </label>
+            <p className="hint" style={{ marginTop: -6 }}>Se actualiza sola con el BCV. Solo cámbiala si no tienes internet.</p>
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={guardarConfig} disabled={!cajaTok.trim() || guardando}>{guardando ? "Verificando…" : "Guardar y continuar"}</button>
           </div>
