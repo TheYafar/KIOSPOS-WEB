@@ -217,7 +217,13 @@ export function Caja() {
           <div className="pgrid">
             {err && <p className="noresult">{err}</p>}
             {filtrados.map(tarjeta)}
-            {filtrados.length === 0 && !err && <p className="noresult">Sin productos. Cárgalos en Inventario.</p>}
+            {filtrados.length === 0 && !err && (
+              <div className="cat-empty">
+                <span className="ce-ic"><UIcono k="box" sw={1.6} /></span>
+                <b>{q ? "Sin resultados" : "Aún no hay productos"}</b>
+                <p>{q ? "Nada coincide con tu búsqueda." : "El dueño los carga en Productos, o importa un CSV."}</p>
+              </div>
+            )}
           </div>
         </div>
         <aside className="tkpanel">

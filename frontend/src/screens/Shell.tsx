@@ -8,6 +8,7 @@ import { Inventario } from "./Inventario";
 import { Reportes } from "./Reportes";
 import { Usuarios } from "./Usuarios";
 import { CierreAviso } from "./negocio";
+import { TemaBtn } from "../TemaBtn";
 
 interface Tab { id: string; n: string; icon: string; }
 
@@ -64,6 +65,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
                 <span className="dot" style={{ background: online ? "var(--ok)" : "var(--bad)" }} />
                 <b>{online ? "En línea" : "Sin conexión"}</b>
               </span>
+              <TemaBtn />
             </div>
           </header>
 

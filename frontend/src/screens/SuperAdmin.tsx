@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { adminAprobarPago, adminCrearNegocio, adminNegocios, adminPagosPendientes, adminReactivar, adminRegistrarPago, adminSuspender, type NegocioVista, type PagoPendiente } from "../api";
 import { UIcono } from "../icons";
 import { HorariosCierre } from "./negocio";
+import { TemaBtn } from "../TemaBtn";
 
 const usd = (n: number | string) => "$ " + Number(n).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pillCls: Record<string, string> = { ACTIVA: "ok", AVISO: "soon", SUSPENDIDA: "late" };
@@ -60,7 +61,7 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
         <div className="appmain">
           <header className="hdr">
             <div><h1>Administración</h1><div className="sub">Super admin · uriel</div></div>
-            <div className="hpills"><button className="btn primary press" onClick={() => setModal(true)}><UIcono k="plus" sw={2.2} />Nuevo negocio</button></div>
+            <div className="hpills"><TemaBtn /><button className="btn primary press" onClick={() => setModal(true)}><UIcono k="plus" sw={2.2} />Nuevo negocio</button></div>
           </header>
           <div className="caja">
             <div className="scroll pad">

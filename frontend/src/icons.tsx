@@ -31,7 +31,9 @@ const UI: Record<string, string> = {
   store: '<path d="M4 9.5 5.5 4h13L20 9.5"/><path d="M5.5 12v8h13v-8"/><path d="M10 20v-4.5h4V20"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   close: '<path d="M6.5 6.5l11 11M17.5 6.5l-11 11"/>',
-  alert: '<path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4.5M12 17.5v.5"/>'
+  alert: '<path d="M12 4 2.5 20h19L12 4Z"/><path d="M12 10v4.5M12 17.5v.5"/>',
+  sol: '<circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.5M12 19v2.5M4.6 4.6l1.8 1.8M17.6 17.6l1.8 1.8M2.5 12H5M19 12h2.5M4.6 19.4l1.8-1.8M17.6 6.4l1.8-1.8"/>',
+  luna: '<path d="M20 14.5A8 8 0 0 1 9.5 4 7 7 0 1 0 20 14.5Z"/>'
 };
 
 export function Icono({ k, sw = 1.7 }: { k: string; sw?: number }) {

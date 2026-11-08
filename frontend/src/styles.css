@@ -21,6 +21,8 @@
   --accent:#F4A63A; --accent-soft:#FDF0DA;
   --nav:#0E2A27; --nav-active:#1C433E; --nav-text:#8EAAA5;
 }
+/* Tokens del tema OSCURO, reutilizados por: (a) el sistema cuando prefiere oscuro y el
+   usuario no forzó claro, y (b) data-theme="dark" forzado por el botón de tema. */
 @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
   --page:#060707; --bg:#0f1012; --surface:#17181b; --surface-2:#1e1f23; --surface-3:#26272c;
   --line:#25262b; --line-strong:#35373d;
@@ -36,6 +38,21 @@
   --nav:#0a1a18; --nav-active:#163430; --nav-text:#7f9a95;
   color-scheme:dark;
 }}
+:root[data-theme="dark"] {
+  --page:#060707; --bg:#0f1012; --surface:#17181b; --surface-2:#1e1f23; --surface-3:#26272c;
+  --line:#25262b; --line-strong:#35373d;
+  --text:#eeede9; --text-2:#a9a8a1; --text-3:#76756f;
+  --ink:#eeede9; --ink-hover:#ffffff; --on-ink:#121314;
+  --brand:#f07c45; --brand-soft:#3a2114; --rail:#0a0b0c;
+  --ok:#4cc47f; --ok-soft:#112a1b; --warn:#e2a63c; --warn-soft:#2c2310; --bad:#ef6a62; --bad-soft:#331716;
+  --scrim:rgba(0,0,0,.55); --sh-1:0 1px 2px rgba(0,0,0,.35); --sh-2:0 18px 48px rgba(0,0,0,.6);
+  --c-viveres:#c98500; --c-bebidas:#3987e5; --c-charcuteria:#d55181; --c-chucherias:#9085e9;
+  --c-panaderia:#d95926; --c-limpieza:#199e70;
+  --primary:#2BA89C; --primary-hover:#35BBAE; --primary-soft:#11302C; --on-primary:#06201c;
+  --accent:#F4A63A; --accent-soft:#33260f;
+  --nav:#0a1a18; --nav-active:#163430; --nav-text:#7f9a95;
+  color-scheme:dark;
+}
 
 * { box-sizing:border-box; }
 html, body, #root { height:100%; }
@@ -83,6 +100,8 @@ svg { display:block; }
 .entrar-side .deco { position:absolute; border-radius:50%; pointer-events:none; }
 .entrar-brand { display:flex; align-items:center; gap:11px; position:relative; }
 .entrar-brand b { font-size:19px; font-weight:700; letter-spacing:-.02em; }
+.entrar-tema { position:absolute; top:22px; right:22px; z-index:3; width:40px; height:40px; background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.2); color:#eaf1ef; }
+.entrar-tema:hover { background:rgba(255,255,255,.16); color:#fff; }
 .entrar-clock { position:relative; }
 .entrar-clock .hh { font-size:64px; font-weight:300; letter-spacing:-.05em; line-height:1.05; color:#fff; }
 .entrar-clock .dd { font-size:15px; font-weight:500; color:var(--nav-text); margin-top:2px; }
@@ -406,6 +425,9 @@ svg { display:block; }
 .hpill .dot { width:8px; height:8px; border-radius:50%; flex:none; }
 .hpill.ok { background:var(--ok-soft); border-color:transparent; color:var(--ok); }
 .hpill.ok b { font-weight:600; }
+.tema-btn { width:38px; height:38px; border:1px solid var(--line); border-radius:999px; background:var(--surface); color:var(--text-2); display:inline-grid; place-items:center; flex:none; }
+.tema-btn:hover { color:var(--text); }
+.tema-btn svg { width:19px; height:19px; }
 
 /* --- pestañas móviles activas en teal (pantalla 05) --- */
 .tab[aria-current="page"] { color:var(--primary); }
@@ -473,8 +495,15 @@ svg { display:block; }
   .caja-wrap { flex:1; min-height:0; display:flex; }
   .caja.desk { flex:1; min-width:0; }
   .caja.desk .searchrow { padding:16px 24px 10px; }
+  .caja.desk .searchrow .search { max-width:620px; }
   .caja.desk .cats { padding:0 24px 14px; }
 }
+/* Estado vacío del catálogo (centrado, con ícono) */
+.cat-empty { flex:1 1 100%; margin:auto; display:flex; flex-direction:column; align-items:center; gap:10px; text-align:center; padding:48px 24px; color:var(--text-3); }
+.cat-empty .ce-ic { width:64px; height:64px; border-radius:20px; display:grid; place-items:center; background:var(--surface-2); color:var(--text-3); }
+.cat-empty .ce-ic svg { width:30px; height:30px; }
+.cat-empty b { font-size:17px; font-weight:700; color:var(--text-2); }
+.cat-empty p { font-size:13.5px; max-width:300px; }
 
 /* ========================================================================
    REDISEÑO oct-2026 — Cobro con pago dividido (pantallas 02 / 06-07)

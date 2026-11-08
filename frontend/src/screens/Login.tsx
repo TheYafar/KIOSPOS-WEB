@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { adminLogin, listarCajeros, loginCajero, loginDueno, type Cajero } from "../api";
 import { getCajaToken, getSesion, getTasa, setCajaToken, setTasa, type Sesion } from "../session";
 import { UIcono } from "../icons";
+import { TemaBtn } from "../TemaBtn";
 
 type Vista = "config" | "pin" | "dueno" | "admin";
 
@@ -134,6 +135,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
       <i className="deco" style={{ left: "60%", top: "62%", width: 260, height: 260, background: "var(--primary)", opacity: .3 }} />
       <i className="deco" style={{ left: "-70px", top: "70%", width: 180, height: 180, background: "var(--nav-active)", opacity: .7 }} />
       <div className="entrar-brand"><span className="logo">K</span><b>KioskPOS</b></div>
+      <TemaBtn className="entrar-tema" />
       <div className="entrar-clock">
         <div className="hh t">{hora}</div>
         <div className="dd">{fecha.charAt(0).toUpperCase() + fecha.slice(1)}</div>
