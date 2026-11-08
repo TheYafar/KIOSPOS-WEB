@@ -58,7 +58,7 @@ function FormUsuario({ onClose, onSaved, onErr }: { onClose: () => void; onSaved
   const [password, setPassword] = useState("");
   const [pin, setPin] = useState("");
   const esCajero = rol === "CAJERO";
-  const ok = nombre.trim() && (esCajero ? /^\d{4,6}$/.test(pin) : email.trim() && password.length >= 6);
+  const ok = nombre.trim() && (esCajero ? /^\d{4}$/.test(pin) : email.trim() && password.length >= 6);
   const guardar = async () => {
     try { await crearUsuario(esCajero ? { rol, nombreCompleto: nombre.trim(), pin } : { rol, nombreCompleto: nombre.trim(), email: email.trim(), password }); onSaved(); }
     catch (e) { onErr((e as Error).message); onClose(); }
@@ -75,7 +75,7 @@ function FormUsuario({ onClose, onSaved, onErr }: { onClose: () => void; onSaved
           </div>
           <label className="lbl">Nombre completo<input className="inp" value={nombre} onChange={(e) => setNombre(e.target.value)} /></label>
           {esCajero
-            ? <label className="lbl">PIN (4 a 6 dígitos)<input className="inp t" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 6))} /></label>
+            ? <label className="lbl">PIN (4 dígitos)<input className="inp t" inputMode="numeric" value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))} /></label>
             : <>
                 <label className="lbl">Correo<input className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
                 <label className="lbl">Contraseña (mín. 6)<input className="inp" type="password" value={password} onChange={(e) => setPassword(e.target.value)} /></label>

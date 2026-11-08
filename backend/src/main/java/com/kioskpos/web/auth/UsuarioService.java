@@ -121,8 +121,9 @@ public class UsuarioService {
     }
 
     private void exigirPin(String pin) {
-        if (pin == null || !pin.trim().matches("\\d{4,6}")) {
-            throw new IllegalArgumentException("El PIN debe ser de 4 a 6 dígitos");
+        // PIN rápido de EXACTAMENTE 4 dígitos: la pantalla de cobro lee 4 y entra sola.
+        if (pin == null || !pin.trim().matches("\\d{4}")) {
+            throw new IllegalArgumentException("El PIN debe ser de 4 dígitos");
         }
     }
 }
