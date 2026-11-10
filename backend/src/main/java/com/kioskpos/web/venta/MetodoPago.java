@@ -6,5 +6,7 @@ public enum MetodoPago {
     EFECTIVO_BS,
     PUNTO,
     PAGO_MOVIL,
-    BIOPAGO
+    BIOPAGO,
+    /** Forma de pago o moneda extra configurada por el negocio (nombre en la referencia). */
+    OTRO
 }

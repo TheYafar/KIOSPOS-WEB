@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { UIcono } from "../icons";
-import { getBcv, getConfig, setConfig, tasaEfectiva, type ConfigCaja, type MetodoId, type TasaModo } from "../config";
+import { bcvActualizada, getBcv, getConfig, setConfig, tasaEfectiva, type ConfigCaja, type MetodoExtra, type MetodoId, type TasaModo } from "../config";
 
 // Configuración (por ahora): formas de pago activas y tasa del dólar con la que se cobra.
 // Se guarda en este equipo y aplica al instante.
@@ -21,7 +21,19 @@ export function Configuracion() {
   const [ajTxt, setAjTxt] = useState(c.ajuste ? String(c.ajuste).replace(".", ",") : "");
   const [manTxt, setManTxt] = useState(c.tasaManual ? String(c.tasaManual).replace(".", ",") : "");
   const [msg, setMsg] = useState("");
+  const [nx, setNx] = useState<{ nombre: string; tipo: MetodoExtra["tipo"]; simbolo: string; tasa: string }>({ nombre: "", tipo: "USD", simbolo: "", tasa: "" });
   const bcv = getBcv();
+  const bcvAt = bcvActualizada();
+  const agregarExtra = () => {
+    const nombre = nx.nombre.trim();
+    if (!nombre) { setMsg("Escribe el nombre (ej. Zelle, Binance, Euros)"); return; }
+    if (nx.tipo === "OTRA" && (!nx.simbolo.trim() || leer(nx.tasa) <= 0)) { setMsg("Para otra moneda pon su símbolo y cuántos $ vale 1"); return; }
+    const x: MetodoExtra = { id: Date.now().toString(36), nombre, tipo: nx.tipo, simbolo: nx.simbolo.trim().slice(0, 6), tasaUsd: leer(nx.tasa), activo: true };
+    guardar({ ...c, extras: [...c.extras, x] });
+    setNx({ nombre: "", tipo: "USD", simbolo: "", tasa: "" });
+  };
+  const cambiarExtra = (id: string, cambio: Partial<MetodoExtra>) => guardar({ ...c, extras: c.extras.map((x) => (x.id === id ? { ...x, ...cambio } : x)) });
+  const borrarExtra = (id: string) => guardar({ ...c, extras: c.extras.filter((x) => x.id !== id) });
 
   const guardar = (n: ConfigCaja) => { setC(n); setConfig(n); setMsg("Guardado ✓"); window.setTimeout(() => setMsg(""), 1800); };
   const activas = METODOS.filter((m) => c.metodos[m.id]).length;
@@ -51,13 +63,48 @@ export function Configuracion() {
                 </button>
               ))}
             </div>
+
+            <h3 className="h3 cfg-sub">Otras monedas y formas de pago</h3>
+            <p className="hint">Agrega con qué más cobras: Zelle, Binance, euros, pesos… Aparecen al cobrar. Más adelante también se podrán manejar desde el panel del administrador.</p>
+            {c.extras.length > 0 && (
+              <div className="cfg-list">
+                {c.extras.map((x) => (
+                  <div key={x.id} className="cfg-row cfg-xrow" aria-checked={x.activo}>
+                    <span className="co2-ic" style={{ background: "color-mix(in srgb, var(--c-charcuteria) 15%, var(--surface))", color: "var(--c-charcuteria)" }}><UIcono k={x.tipo === "VES" ? "bills" : "cash"} sw={1.8} /></span>
+                    <span className="cfg-tx"><b>{x.nombre}</b><small>{x.tipo === "USD" ? "Se cobra en dólares" : x.tipo === "VES" ? "Se cobra en bolívares" : `Otra moneda · 1 ${x.simbolo} = $ ${money(x.tasaUsd)}`}</small></span>
+                    {x.tipo === "OTRA" && (
+                      <input className="inp t cfg-xtasa" inputMode="decimal" defaultValue={String(x.tasaUsd).replace(".", ",")} aria-label={"Tasa de " + x.nombre}
+                        onBlur={(e) => { const v = leer(e.target.value); if (v > 0) cambiarExtra(x.id, { tasaUsd: v }); }} title="Cuántos $ vale 1 unidad" />
+                    )}
+                    <button className={"sw" + (x.activo ? " on" : "")} role="switch" aria-checked={x.activo} aria-label={"Activar " + x.nombre} onClick={() => cambiarExtra(x.id, { activo: !x.activo })}><i /></button>
+                    <button className="hdel" aria-label={"Borrar " + x.nombre} onClick={() => borrarExtra(x.id)}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="cfg-add">
+              <input className="inp" placeholder="Nombre (ej. Zelle)" value={nx.nombre} onChange={(e) => setNx({ ...nx, nombre: e.target.value })} aria-label="Nombre de la forma de pago"
+                onKeyDown={(e) => { if (e.key === "Enter") agregarExtra(); }} />
+              <div className="seg cfg-tipo">
+                {([["USD", "En $"], ["VES", "En Bs"], ["OTRA", "Otra moneda"]] as const).map(([t, n]) => (
+                  <button key={t} className={nx.tipo === t ? "on" : ""} onClick={() => setNx({ ...nx, tipo: t })}>{n}</button>
+                ))}
+              </div>
+              {nx.tipo === "OTRA" && (
+                <div className="cfg-ajrow">
+                  <input className="inp" placeholder="Símbolo (ej. €, COP)" value={nx.simbolo} onChange={(e) => setNx({ ...nx, simbolo: e.target.value })} aria-label="Símbolo de la moneda" />
+                  <input className="inp t" inputMode="decimal" placeholder="1 = $ ?" value={nx.tasa} onChange={(e) => setNx({ ...nx, tasa: e.target.value.replace(/[^\d.,]/g, "") })} aria-label="Cuántos dólares vale 1 unidad" />
+                </div>
+              )}
+              <button className="btn primary press" onClick={agregarExtra}><UIcono k="plus" sw={2.2} />Agregar forma de pago</button>
+            </div>
           </section>
 
           <section className="card cfg-sec">
             <h3 className="h3">Tasa del dólar</h3>
             <div className="cfg-bcv">
-              <span>Tasa BCV de hoy <small>se actualiza sola, 24/7</small></span>
-              <b className="t">{bcv > 0 ? "Bs " + money(bcv) : "Sin conexión"}</b>
+              <span>{bcvAt ? "Tasa BCV de hoy" : "Última tasa conocida"} <small>{bcvAt ? "se actualiza sola, 24/7 · " + bcvAt.toLocaleTimeString("es-VE", { hour: "numeric", minute: "2-digit" }) : "no se pudo traer la BCV ahora; se reintenta sola"}</small></span>
+              <b className="t">{bcv > 0 ? "Bs " + money(bcv) : "—"}</b>
             </div>
             <div className="seg cfg-seg" role="tablist">
               <button className={c.tasaModo === "bcv" ? "on" : ""} onClick={() => modo("bcv")}>Usar la BCV</button>

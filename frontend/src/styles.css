@@ -1253,3 +1253,11 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
   .hpills .hpill { height:30px; padding:0 10px; font-size:12px; }
   .hpills .tema-btn { width:30px; height:30px; }
 }
+.cb3-rest { max-width:62%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.cb3-rest.ok { background:var(--ok-soft); color:var(--ok); }
+.cfg-sub { margin-top:10px; }
+.cfg-xrow { cursor:default; }
+.cfg-xrow .sw { border:0; padding:0; }
+.cfg-xtasa { width:90px; height:38px; font-size:14px; }
+.cfg-add { display:flex; flex-direction:column; gap:8px; padding:12px; border-radius:14px; border:1px dashed var(--line-strong); }
+.cfg-tipo { grid-template-columns:repeat(3,1fr); }

@@ -75,7 +75,9 @@ public class TicketService {
                     continue;
                 }
                 String simbolo = p.getMoneda() == Moneda.USD ? "USD " : "VES ";
-                sb.append(fila(p.getMetodo().name(), simbolo + numVE(p.getMontoOriginal())));
+                String nombre = p.getMetodo() == MetodoPago.OTRO && p.getReferencia() != null && !p.getReferencia().isBlank()
+                        ? p.getReferencia().trim() : p.getMetodo().name();
+                sb.append(fila(nombre, simbolo + numVE(p.getMontoOriginal())));
                 if (p.getMetodo() == MetodoPago.PAGO_MOVIL && p.getReferencia() != null
                         && !p.getReferencia().isBlank()) {
                     sb.append(fila("  Ref:", p.getReferencia().trim()));

@@ -132,7 +132,7 @@ export async function cierresDia(fecha?: string): Promise<CierreDia[]> {
 
 export interface LineaCobro { productoId?: number | null; cantidad: number; precioUsd?: number; nombre?: string; }
 export interface PagoCobro {
-  metodo: "EFECTIVO_USD" | "EFECTIVO_BS" | "PUNTO" | "PAGO_MOVIL" | "BIOPAGO";
+  metodo: "EFECTIVO_USD" | "EFECTIVO_BS" | "PUNTO" | "PAGO_MOVIL" | "BIOPAGO" | "OTRO";
   moneda: "USD" | "VES"; montoOriginal: number; referencia?: string;
 }
 

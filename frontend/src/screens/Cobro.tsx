@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { type PagoCobro } from "../api";
 import { UIcono } from "../icons";
-import { calcularCobro, restoPara, type MetodoId, type Montos } from "../cobroCalc";
-import { metodoActivo } from "../config";
+import { calcularCobro, restoPara, type Montos } from "../cobroCalc";
+import { extrasActivas, metodoActivo, type MetodoExtra } from "../config";
 
 // Cobro como el KioskPOS de escritorio (cobro-modal.fxml / CobroModalController):
 // TODAS las formas de pago visibles de una vez (sin "agregar" una por una),
 // billetes rápidos en efectivo, Enter cobra y Esc regresa. El cálculo es el mismo
 // del servidor (cobroCalc.ts), así la pantalla y el servidor siempre coinciden.
 
-interface Forma { id: MetodoId; n: string; sub: string; moneda: "USD" | "VES"; icon: string; color: string; ref?: boolean; billetes?: number[]; }
+interface Forma {
+  id: string; n: string; sub: string; moneda: "USD" | "VES"; icon: string; color: string;
+  ref?: boolean; billetes?: number[];
+  extra?: MetodoExtra;   // forma de pago / moneda agregada en Configuración
+  sim?: string;          // símbolo que se ve en la casilla (para otra moneda)
+}
 
 const FORMAS: Forma[] = [
   { id: "EFECTIVO_USD", n: "Efectivo $", sub: "Dólares", moneda: "USD", icon: "cash", color: "var(--primary)", billetes: [1, 5, 10, 20, 50, 100] },
@@ -38,17 +43,29 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   onBack: () => void;
   onConfirm: (pagos: PagoCobro[], resumen: ResumenPago) => void;
 }) {
-  const [txt, setTxt] = useState<Record<MetodoId, string>>({ EFECTIVO_USD: "", EFECTIVO_BS: "", PAGO_MOVIL: "", PUNTO: "", BIOPAGO: "" });
+  const [txt, setTxt] = useState<Record<string, string>>({});
   const [ref, setRef] = useState("");
   const [enviando, setEnviando] = useState(false);
-  const [foco, setFoco] = useState<MetodoId>("EFECTIVO_USD"); // casilla activa (para F8)
+  const [foco, setFoco] = useState<string>("EFECTIVO_USD"); // casilla activa (para F8)
   const primero = useRef<HTMLInputElement>(null);
 
   // Solo las formas de pago activas en Configuración (si apagaron todas, se muestran todas).
   const activas = FORMAS.filter((f) => metodoActivo(f.id));
-  const formas = activas.length ? activas : FORMAS;
-  const montos: Montos = Object.fromEntries(formas.map((f) => [f.id, numOf(txt[f.id])])) as Montos;
-  const e = calcularCobro(total, tasa, montos);
+  const extras: Forma[] = extrasActivas().map((x) => ({
+    id: "X:" + x.id, n: x.nombre, extra: x, color: "var(--c-charcuteria)", icon: x.tipo === "VES" ? "bills" : "cash",
+    moneda: x.tipo === "VES" ? "VES" : "USD",
+    sub: x.tipo === "OTRA" ? `1 ${x.simbolo || "u"} = $ ${money(x.tasaUsd || 0)}` : x.tipo === "USD" ? "En dólares" : "En bolívares",
+    sim: x.tipo === "OTRA" ? (x.simbolo || "u") : undefined,
+  }));
+  const formas = [...(activas.length ? activas : FORMAS), ...extras];
+  const forma = (id: string) => formas.find((f) => f.id === id);
+  const monedaDe = (id: string) => forma(id)?.moneda ?? "USD";
+  // Unidades escritas -> monto para el cálculo (otra moneda se pasa a $ con su tasa).
+  const unidades = (f: Forma) => numOf(txt[f.id] || "");
+  const aCalc = (f: Forma, u: number) => (f.extra?.tipo === "OTRA" ? Math.round(u * (f.extra.tasaUsd || 0) * 100) / 100 : u);
+  const deCalc = (f: Forma, v: number) => (f.extra?.tipo === "OTRA" ? (f.extra.tasaUsd > 0 ? Math.ceil((v / f.extra.tasaUsd) * 100 - 1e-6) / 100 : 0) : v);
+  const montos: Montos = Object.fromEntries(formas.map((f) => [f.id, aCalc(f, unidades(f))])) as Montos;
+  const e = calcularCobro(total, tasa, montos, monedaDe);
   const pmUsado = (montos.PAGO_MOVIL || 0) > 0;
   const refMala = pmUsado && !/^\d{4,6}$/.test(ref);
 
@@ -59,20 +76,39 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
     : "";
   const valido = !bloqueo && !enviando;
 
-  const set = (id: MetodoId, v: string) => setTxt((t) => ({ ...t, [id]: v }));
-  const resto = (id: MetodoId) => set(id, aTexto(restoPara(id, total, tasa, montos)));
-  const billete = (id: MetodoId, b: number) => set(id, aTexto((montos[id] || 0) + b)); // suma, como el escritorio
-  const limpiar = () => { setTxt({ EFECTIVO_USD: "", EFECTIVO_BS: "", PAGO_MOVIL: "", PUNTO: "", BIOPAGO: "" }); setRef(""); };
+  const set = (id: string, v: string) => setTxt((t) => ({ ...t, [id]: v }));
+  const billete = (id: string, b: number) => set(id, aTexto((montos[id] || 0) + b)); // suma, como el escritorio
+  const limpiar = () => { setTxt({}); setRef(""); };
+
+  // "Resto aquí": SIEMPRE hace algo visible.
+  //  - Si falta dinero con las demás formas: pone en esta lo que falta (y lo dice en el botón).
+  //  - Si las demás ya cubren todo: "Todo aquí" pasa el cobro completo a esta forma.
+  const restoDe = (f: Forma) => deCalc(f, restoPara(f.id, total, tasa, montos, monedaDe));
+  const todoDe = (f: Forma) => deCalc(f, restoPara(f.id, total, tasa, {}, monedaDe));
+  const accionResto = (id: string) => {
+    const f = forma(id); if (!f) return;
+    const r = restoDe(f);
+    if (r > 0) set(f.id, aTexto(r));
+    else { setTxt({ [f.id]: aTexto(todoDe(f)) }); if (f.id !== "PAGO_MOVIL") setRef(""); }
+  };
+  const fmtF = (f: Forma, v: number) => (f.sim ? f.sim + " " + money(v) : f.moneda === "USD" ? usd(v) : bs(v));
+  const etiquetaResto = (f: Forma) => {
+    const r = restoDe(f), cur = unidades(f);
+    if (r > 0 && Math.abs(r - cur) < 0.005) return { t: "✓ Completo", ok: true };
+    if (r > 0) return { t: "Resto aquí · " + fmtF(f, r), ok: false };
+    return { t: "Todo aquí · " + fmtF(f, todoDe(f)), ok: false };
+  };
 
   const confirmar = () => {
     if (!valido) return;
     setEnviando(true);
     const usados = formas.filter((f) => (montos[f.id] || 0) > 0);
-    const pagos: PagoCobro[] = usados.map((f) => ({
-      metodo: f.id, moneda: f.moneda, montoOriginal: Math.round((montos[f.id] || 0) * 100) / 100,
-      ...(f.id === "PAGO_MOVIL" ? { referencia: ref } : {}),
-    }));
-    const payLine = usados.map((f) => f.n + " " + (f.moneda === "USD" ? usd(montos[f.id] || 0) : bs(montos[f.id] || 0)) + (f.id === "PAGO_MOVIL" ? " ref. " + ref : "")).join(" + ");
+    const pagos: PagoCobro[] = usados.map((f) => f.extra
+      ? { metodo: "OTRO", moneda: f.moneda, montoOriginal: Math.round((montos[f.id] || 0) * 100) / 100,
+          referencia: (f.n + (f.sim ? " " + f.sim + " " + money(unidades(f)) : "")).slice(0, 100) }
+      : { metodo: f.id as PagoCobro["metodo"], moneda: f.moneda, montoOriginal: Math.round((montos[f.id] || 0) * 100) / 100,
+          ...(f.id === "PAGO_MOVIL" ? { referencia: ref } : {}) });
+    const payLine = usados.map((f) => f.n + " " + fmtF(f, unidades(f)) + (f.id === "PAGO_MOVIL" ? " ref. " + ref : "")).join(" + ");
     const change = e.vueltoUsd > 0 ? usd(e.vueltoUsd) + " (" + bs(Math.round(e.vueltoUsd * tasa * 100) / 100) + ")" : e.vueltoBs > 0 ? bs(e.vueltoBs) : "";
     onConfirm(pagos, { payLine, change, changeNote: change ? "El vuelto sale del efectivo" : "" });
   };
@@ -80,7 +116,7 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   // Teclado como el escritorio: Enter cobra, Esc regresa.
   const confirmarRef = useRef(confirmar); confirmarRef.current = confirmar;
   const backRef = useRef(onBack); backRef.current = onBack;
-  const restoRef = useRef(() => {}); restoRef.current = () => resto(foco);
+  const restoRef = useRef(() => {}); restoRef.current = () => accionResto(foco);
   useEffect(() => {
     const h = (ev: KeyboardEvent) => {
       if (ev.key === "Enter") { ev.preventDefault(); confirmarRef.current(); }
@@ -95,9 +131,9 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   // Si llega un error del servidor, se puede reintentar.
   useEffect(() => { if (err) setEnviando(false); }, [err]);
 
-  const pct = (id: MetodoId) => {
+  const pct = (id: string) => {
     const m = montos[id] || 0; if (m <= 0 || total <= 0) return 0;
-    const enUsd = MONEDA_DE(id) === "USD" ? m : m / (tasa || 1);
+    const enUsd = monedaDe(id) === "USD" ? m : m / (tasa || 1);
     return Math.min(100, (enUsd / total) * 100);
   };
 
@@ -126,21 +162,22 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
           <div className="cb3-grid">
             {formas.map((f, i) => {
               const m = montos[f.id] || 0;
+              const er = etiquetaResto(f);
               return (
                 <div key={f.id} className={"cb3-card" + (m > 0 ? " on" : "")} style={{ ["--mc" as string]: f.color }}>
                   <div className="cb3-ch">
                     <span className="co2-ic" style={{ background: `color-mix(in srgb, ${f.color} 15%, var(--surface))`, color: f.color }}><UIcono k={f.icon} sw={1.8} /></span>
                     <div className="cb3-nm"><b>{f.n}</b><span>{f.sub}</span></div>
-                    <button className="cb3-rest press" title="Resto aquí (F8 en la casilla)" onClick={() => resto(f.id)}>Resto aquí{foco === f.id && <kbd className="kb">F8</kbd>}</button>
+                    <button className={"cb3-rest press" + (er.ok ? " ok" : "")} title="Completa lo que falta en esta forma de pago (F8 en la casilla)" onClick={() => accionResto(f.id)}>{er.t}{foco === f.id && <kbd className="kb">F8</kbd>}</button>
                   </div>
                   <label className="cb3-in">
-                    <i>{f.moneda === "USD" ? "$" : "Bs"}</i>
-                    <input ref={i === 0 ? primero : undefined} className="t" inputMode="decimal" placeholder="0,00" value={txt[f.id]}
+                    <i>{f.sim || (f.moneda === "USD" ? "$" : "Bs")}</i>
+                    <input ref={i === 0 ? primero : undefined} className="t" inputMode="decimal" placeholder="0,00" value={txt[f.id] || ""}
                       onChange={(ev) => set(f.id, ev.target.value.replace(/[^\d.,]/g, ""))} onFocus={(ev) => { ev.target.select(); setFoco(f.id); }}
                       aria-label={"Monto en " + f.n} />
                     {m > 0 && <button className="cb3-clr" aria-label={"Borrar " + f.n} onClick={(ev) => { ev.preventDefault(); set(f.id, ""); }}><UIcono k="close" sw={2} /></button>}
                   </label>
-                  {m > 0 && <span className="cb3-eq t">{f.moneda === "USD" ? "= " + bs(Math.round(m * tasa * 100) / 100) : "= " + usd(Math.round((m / (tasa || 1)) * 100) / 100)}</span>}
+                  {m > 0 && <span className="cb3-eq t">{f.sim ? "= " + usd(m) + " · " + bs(Math.round(m * tasa * 100) / 100) : f.moneda === "USD" ? "= " + bs(Math.round(m * tasa * 100) / 100) : "= " + usd(Math.round((m / (tasa || 1)) * 100) / 100)}</span>}
                   {f.ref && (
                     <label className={"cb3-ref" + (refMala ? " bad" : "")}>
                       <span>Referencia</span>
@@ -159,7 +196,7 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
           </div>
           <div className="tip"><span style={{ color: "var(--warn)" }}><UIcono k="cash" /></span>
             <div><b style={{ fontSize: 13.5, fontWeight: 600 }}>El vuelto sale del efectivo de la gaveta</b>
-              <div className="t2" style={{ fontSize: 12.5, fontWeight: 500 }}>Pago móvil, punto y Biopago se cobran exactos. "Resto aquí" completa lo que falta en esa forma de pago.</div></div>
+              <div className="t2" style={{ fontSize: 12.5, fontWeight: 500 }}>Pago móvil, punto y Biopago se cobran exactos. “Resto aquí” pone en esa forma lo que falta; si ya está todo cubierto, “Todo aquí” pasa el cobro completo a esa forma.</div></div>
           </div>
         </div>
 
@@ -182,4 +219,3 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   );
 }
 
-function MONEDA_DE(id: MetodoId) { return FORMAS.find((f) => f.id === id)!.moneda; }

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { renovarPermiso, sincronizar, tasaBcvServidor } from "./api";
-import { cerrarSesion, getSesion, setTasa, type Sesion } from "./session";
+import { cerrarSesion, getSesion, getTasa, setTasa, type Sesion } from "./session";
 import { getBcv, setBcv, tasaEfectiva } from "./config";
 import { Login } from "./screens/Login";
 import { Shell } from "./screens/Shell";
@@ -19,6 +19,8 @@ export function App() {
   // cada hora y al reconectar. Si falla, se mantiene la última conocida.
   useEffect(() => {
     let vivo = true;
+    // Sin BCV del servidor todavía: la última tasa del equipo sirve de base para los ajustes.
+    if (!getBcv()) { const t = Number(getTasa()); if (t > 0) setBcv(t, false); }
     const sync = async () => {
       try {
         const t = await tasaBcvServidor();

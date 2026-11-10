@@ -29,6 +29,8 @@ const INFO: Record<string, { n: string; icon: string; color: string; donde: stri
   PAGO_MOVIL: { n: "Pago móvil", icon: "phone", color: "var(--c-bebidas)", donde: "Lo que te llegó al banco por pago móvil" },
   PUNTO: { n: "Punto de venta", icon: "card", color: "var(--warn)", donde: "El total del cierre de lote del punto" },
   BIOPAGO: { n: "Biopago", icon: "finger", color: "var(--c-chucherias)", donde: "El total que reporta Biopago" },
+  OTRO_USD: { n: "Otras en $", icon: "cash", color: "var(--c-charcuteria)", donde: "Zelle, Binance y otras formas cobradas en $" },
+  OTRO_BS: { n: "Otras en Bs", icon: "bills", color: "var(--c-charcuteria)", donde: "Otras formas de pago cobradas en Bs" },
 };
 
 function Estado({ f }: { f: FilaArqueo }) {

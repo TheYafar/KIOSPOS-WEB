@@ -154,6 +154,8 @@ function TurnoBar({ turno, onIr }: { turno: TurnoResumen | null; onIr: () => voi
   add("PAGO_MOVIL", "Pago móvil", dig("PAGO_MOVIL"), "VES");
   add("PUNTO", "Punto", dig("PUNTO"), "VES");
   add("BIOPAGO", "Biopago", dig("BIOPAGO"), "VES");
+  if (dig("OTRO_USD")) add("OTRO_USD", "Otras $", dig("OTRO_USD"), "USD");
+  if (dig("OTRO_BS")) add("OTRO_BS", "Otras Bs", dig("OTRO_BS"), "VES");
   const total = items.reduce((s, x) => s + x.usd, 0);
   return (
     <div className="turno-bar ab" role="status" aria-label="Cobrado en el turno">

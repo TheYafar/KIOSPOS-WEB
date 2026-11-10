@@ -13,7 +13,10 @@ export type MetodoId = "EFECTIVO_USD" | "EFECTIVO_BS" | "PAGO_MOVIL" | "PUNTO" |
 export const MONEDA: Record<MetodoId, "USD" | "VES"> = {
   EFECTIVO_USD: "USD", EFECTIVO_BS: "VES", PAGO_MOVIL: "VES", PUNTO: "VES", BIOPAGO: "VES",
 };
-export type Montos = Partial<Record<MetodoId, number>>;
+export type Montos = Partial<Record<string, number>>;
+/** Moneda de cada forma de pago (las extras de Configuración se resuelven aparte). */
+export type MonedaDe = (metodo: string) => "USD" | "VES";
+const monedaFija: MonedaDe = (m) => (MONEDA as Record<string, "USD" | "VES">)[m] ?? "USD";
 
 const TOLERANCIA_CENT = 5; // $0,05 (TOLERANCIA_USD del servidor)
 const cent = (n: number) => Math.round((n || 0) * 100);
@@ -30,21 +33,21 @@ export interface EstadoCobro {
   vueltoBs: number;
 }
 
-function sumas(montos: Montos, excepto?: MetodoId) {
+function sumas(montos: Montos, excepto: string | undefined, mon: MonedaDe) {
   let usdC = 0, bsC = 0;
-  (Object.keys(montos) as MetodoId[]).forEach((m) => {
+  Object.keys(montos).forEach((m) => {
     if (m === excepto) return;
     const c = cent(montos[m] || 0);
     if (c <= 0) return;
-    if (MONEDA[m] === "USD") usdC += c; else bsC += c;
+    if (mon(m) === "USD") usdC += c; else bsC += c;
   });
   return { usdC, bsC };
 }
 
-export function calcularCobro(total: number, tasa: number, montos: Montos): EstadoCobro {
+export function calcularCobro(total: number, tasa: number, montos: Montos, mon: MonedaDe = monedaFija): EstadoCobro {
   const totalC = cent(total);
   const totalBsC = Math.round(total * tasa * 100);
-  const { usdC, bsC } = sumas(montos);
+  const { usdC, bsC } = sumas(montos, undefined, mon);
   const t = tasa > 0 ? tasa : 1;
   // Igual que el servidor: pagadoUsd + (pagadoBs / tasa con 4 decimales), a 2 decimales.
   const tpuC = cent(usdC / 100 + r4(bsC / 100 / t));
@@ -70,10 +73,10 @@ export function calcularCobro(total: number, tasa: number, montos: Montos): Esta
 }
 
 /** Cuánto hay que poner en `metodo` (en SU moneda) para completar el total con lo demás. */
-export function restoPara(metodo: MetodoId, total: number, tasa: number, montos: Montos): number {
+export function restoPara(metodo: string, total: number, tasa: number, montos: Montos, mon: MonedaDe = monedaFija): number {
   const t = tasa > 0 ? tasa : 1;
-  const { usdC, bsC } = sumas(montos, metodo);
-  if (MONEDA[metodo] === "VES") {
+  const { usdC, bsC } = sumas(montos, metodo, mon);
+  if (mon(metodo) === "VES") {
     const faltaBsC = Math.round(total * t * 100) - bsC - usdC * t;
     return Math.max(0, Math.ceil(faltaBsC - 1e-6)) / 100;
   }

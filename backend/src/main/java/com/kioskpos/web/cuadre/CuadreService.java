@@ -109,6 +109,8 @@ public class CuadreService {
         BigDecimal puntoBs = BigDecimal.ZERO;
         BigDecimal pagoMovilBs = BigDecimal.ZERO;
         BigDecimal biopagoBs = BigDecimal.ZERO;
+        BigDecimal otrosUsd = BigDecimal.ZERO;   // formas/monedas extra (OTRO) cobradas en $
+        BigDecimal otrosBs = BigDecimal.ZERO;    // ... y en Bs
 
         for (Venta v : ventaRepository.findByTurnoId(turno.getId())) {
             if ("ANULADA".equals(v.getEstado())) {
@@ -124,6 +126,13 @@ public class CuadreService {
                     case PUNTO -> puntoBs = puntoBs.add(m);
                     case PAGO_MOVIL -> pagoMovilBs = pagoMovilBs.add(m);
                     case BIOPAGO -> biopagoBs = biopagoBs.add(m);
+                    case OTRO -> {
+                        if (p.getMoneda() == com.kioskpos.web.venta.Moneda.USD) {
+                            otrosUsd = otrosUsd.add(m);
+                        } else {
+                            otrosBs = otrosBs.add(m);
+                        }
+                    }
                     default -> { /* nada */ }
                 }
             }
@@ -142,6 +151,12 @@ public class CuadreService {
         metodos.add(new MetodoLinea("PUNTO", "VES", puntoBs.setScale(2, RoundingMode.HALF_UP), true));
         metodos.add(new MetodoLinea("PAGO_MOVIL", "VES", pagoMovilBs.setScale(2, RoundingMode.HALF_UP), true));
         metodos.add(new MetodoLinea("BIOPAGO", "VES", biopagoBs.setScale(2, RoundingMode.HALF_UP), true));
+        if (otrosUsd.signum() != 0) {
+            metodos.add(new MetodoLinea("OTRO_USD", "USD", otrosUsd.setScale(2, RoundingMode.HALF_UP), true));
+        }
+        if (otrosBs.signum() != 0) {
+            metodos.add(new MetodoLinea("OTRO_BS", "VES", otrosBs.setScale(2, RoundingMode.HALF_UP), true));
+        }
 
         return new Resumen(turno.getId(), turno.getEstado(), fondoUsd, fondoBs,
                 efectivoUsd.setScale(2, RoundingMode.HALF_UP), efectivoBs.setScale(2, RoundingMode.HALF_UP),
