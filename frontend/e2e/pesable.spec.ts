@@ -47,3 +47,16 @@ test("fiar desde el perfil: pestaña Fiar productos con un producto normal y uno
   await expect(page.locator(".pinmsg.ok")).toContainText("Fiado $ 3,50 a José Rojas");
   expect(st.fiado).toMatchObject({ id: 2, items: [{ productoId: 1, cantidad: 2 }, { productoId: 4, cantidad: 0.25 }] });
 });
+
+test("si el plan está vencido, Fiar avisa que no es por el cliente y no deja", async ({ page }) => {
+  await preparar(page, { turnoAbierto: false }, { "kioskpos.sesion": sesionDueno });
+  await page.route("**/api/mi-negocio/suscripcion", (r) => r.fulfill({ json: { negocioId: 1, nombre: "Bodega", plan: "BASICO", estadoEfectivo: "SUSPENDIDA", puedeCobrar: false, pagoHasta: null, diasVencido: 0, mesesPendientes: 1, deuda: 25, mensaje: "Suspendida por falta de pago" } }));
+  await ir(page);
+  await page.keyboard.press("Alt+5");
+  await page.locator(".cli-row", { hasText: "José Rojas" }).click();
+  await page.getByRole("tab", { name: "Fiar productos" }).click();
+  await page.getByLabel("Buscar producto para fiar").fill("harina");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("alert")).toContainText("No es por José Rojas");
+  await expect(page.getByRole("button", { name: /^Fiar/ })).toBeDisabled();
+});

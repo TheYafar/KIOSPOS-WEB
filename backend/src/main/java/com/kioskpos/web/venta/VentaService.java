@@ -98,8 +98,11 @@ public class VentaService {
      */
     @Transactional
     public Venta fiarDesdeLibreta(KioskPrincipal principal, Long clienteId, BigDecimal tasa, List<ItemInput> items) {
-        if (!suscripcionService.puedeCobrar(principal.negocioId())) {
-            throw new com.kioskpos.web.permiso.PermisoDenegadoException("El servicio está suspendido: no se puede fiar hasta ponerse al día");
+        var sit = suscripcionService.situacion(principal.negocioId());
+        if (!sit.puedeCobrar()) {
+            throw new com.kioskpos.web.permiso.PermisoDenegadoException("No se puede fiar: el plan de KioskPOS de este negocio "
+                    + (sit.pagoHasta() == null ? "no está activado" : "venció el " + sit.pagoHasta())
+                    + " (no es por el cliente). Reporta el pago en Más → Mi plan o pídele al administrador que lo registre.");
         }
         if (items == null || items.isEmpty()) {
             throw new IllegalArgumentException("Agrega al menos un producto");

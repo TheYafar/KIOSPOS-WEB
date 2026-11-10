@@ -31,6 +31,9 @@ public class NegocioRegistroService {
         this.usuarioService = usuarioService;
     }
 
+    /** Días de prueba gratis con los que arranca un negocio nuevo. */
+    public static final int DIAS_PRUEBA = 7;
+
     public NegocioCreado registrarNegocioConDueno(String nombreNegocio, String nombreDueno,
                                                   String email, String password) {
         if (nombreNegocio == null || nombreNegocio.trim().isEmpty()) {
@@ -39,6 +42,8 @@ public class NegocioRegistroService {
         Negocio negocio = new Negocio();
         negocio.setNombre(nombreNegocio.trim());
         negocio.setEstado("ACTIVA");
+        // Arranca con una semana de prueba: puede cobrar desde el primer día.
+        negocio.setPagoHasta(java.time.LocalDate.now().plusDays(DIAS_PRUEBA));
         negocio = negocioRepository.save(negocio);
 
         try {

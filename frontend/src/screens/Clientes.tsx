@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { abonarCliente, actualizarCliente, crearCliente, descontarSueldo, detalleCliente, fiarCliente, listarClientes, listarProductos, type ClienteFiado, type MovCliente, type Producto } from "../api";
+import { miSuscripcion, abonarCliente, actualizarCliente, crearCliente, descontarSueldo, detalleCliente, fiarCliente, listarClientes, listarProductos, type ClienteFiado, type MovCliente, type Producto } from "../api";
 import { CantidadPesable, cantTxt } from "./Pesable";
 import { getSesion, getTasa } from "../session";
 import { UIcono } from "../icons";
@@ -331,7 +331,12 @@ function FiarProductos({ cliente: c, onHecho }: { cliente: ClienteFiado; onHecho
   const [err, setErr] = useState("");
   const [enviando, setEnviando] = useState(false);
   const tasa = Number(getTasa()) || 0;
-  useEffect(() => { listarProductos().then(setProductos).catch((e) => setErr((e as Error).message)); }, []);
+  const [plan, setPlan] = useState<{ ok: boolean; msg: string } | null>(null);
+  useEffect(() => {
+    listarProductos().then(setProductos).catch((e) => setErr((e as Error).message));
+    // Si el plan de KioskPOS está vencido no se puede fiar: se avisa antes de armar la lista.
+    miSuscripcion().then((s) => setPlan({ ok: s.puedeCobrar, msg: s.mensaje })).catch(() => {});
+  }, []);
   const t = q.trim().toLowerCase();
   const res = (t ? productos.filter((p) => p.nombre.toLowerCase().includes(t) || p.codigoBarras.includes(t)) : productos).slice(0, t ? 12 : 8);
   const fijar = (p: Producto, qty: number) => { const m = new Map(carro); if (qty <= 0) m.delete(p.id); else m.set(p.id, { p, qty: Math.min(qty, p.stockActual) }); setCarro(m); };
@@ -397,10 +402,11 @@ function FiarProductos({ cliente: c, onHecho }: { cliente: ClienteFiado; onHecho
             {pasa && <small className="mg-bad">Pasa su límite de fiado: quita algo o cóbrale una parte.</small>}
           </div>
         )}
+        {plan && !plan.ok && <div className="cfg-ro" role="alert"><UIcono k="lock" sw={2} />No se puede fiar ni cobrar: el plan de KioskPOS está vencido o sin activar ({plan.msg}). No es por {c.nombre}. Reporta el pago en Más → Mi plan.</div>}
         {!c.activo && <p className="pinmsg err">A {c.nombre} no se le está fiando (desactivado).</p>}
         {err && <p className="pinmsg err">{err}</p>}
       </div>
-      <div className="modal-foot"><button className="btn primary big press" disabled={!lineas.length || pasa || enviando || !c.activo} onClick={fiar}>{enviando ? "Guardando…" : lineas.length ? "Fiar $ " + money(total) : "Agrega productos"}</button></div>
+      <div className="modal-foot"><button className="btn primary big press" disabled={!lineas.length || pasa || enviando || !c.activo || (plan != null && !plan.ok)} onClick={fiar}>{enviando ? "Guardando…" : lineas.length ? "Fiar $ " + money(total) : "Agrega productos"}</button></div>
       {pesar && <CantidadPesable producto={pesar.p} tasa={tasa} inicial={pesar.inicial} onClose={() => setPesar(null)}
         onOk={(cant) => { fijar(pesar.p, cant); setPesar(null); setQ(""); setSel(0); }} />}
     </>
