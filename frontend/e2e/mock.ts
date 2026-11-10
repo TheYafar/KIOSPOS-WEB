@@ -20,7 +20,8 @@ export const productos = [
 export interface CajaCfg { metodosPago: string | null; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number; }
 export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: any; cierre?: any; tasa?: number | null; cajaConfig?: CajaCfg; puts?: CajaCfg[];
   movs?: any[]; clientes?: any[]; abonos?: any[]; nuevoCliente?: any;
-  anulada?: any; devuelta?: any; compra?: any; descuento?: any; fiado?: any; producto?: any; categoria?: any; nomina?: any; }
+  anulada?: any; devuelta?: any; compra?: any; descuento?: any; fiado?: any; producto?: any; categoria?: any; nomina?: any;
+  ventaFalla?: string; turnoDesde?: string; nominaHist?: any[]; nominaAnulada?: any; }
 
 export const ventasDemo = [
   { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
@@ -80,7 +81,8 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     if (u.includes("/api/inventario/productos") && (m === "POST" || m === "PUT")) { st.producto = { metodo: m, ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: productos[0] }); }
     if (u.includes("/api/inventario")) return r.fulfill({ json: productos });
     if (u.includes("/api/tasa")) return r.fulfill({ json: { bs: st.tasa === undefined ? 900 : st.tasa } });
-    if (u.includes("/api/cuadre/actual")) return st.turnoAbierto ? r.fulfill({ json: resumen }) : r.fulfill({ status: 204, body: "" });
+    const res = { ...resumen, fechaApertura: st.turnoDesde ?? new Date().toISOString() };
+    if (u.includes("/api/cuadre/actual")) return st.turnoAbierto ? r.fulfill({ json: res }) : r.fulfill({ status: 204, body: "" });
     if (u.includes("/api/cuadre/abrir")) { const ya = st.turnoAbierto; st.turnoAbierto = true; return st.abrirFalla && ya ? r.fulfill({ status: 409, json: { error: "Esta caja ya tiene un turno abierto" } }) : r.fulfill({ json: resumen }); }
     if (u.includes("/cerrar")) { st.cierre = JSON.parse(r.request().postData() || "{}"); st.turnoAbierto = false; return r.fulfill({ json: { ...resumen, estado: "CERRADO", declaradoUsd: st.cierre.declaradoUsd, declaradoBs: st.cierre.declaradoBs, diferenciaUsd: st.cierre.declaradoUsd - 62, diferenciaBs: st.cierre.declaradoBs - 9000 } }); }
     if (/\/api\/cuadre\/turnos\/\d+\/movimientos/.test(u)) return r.fulfill({ json: st.movs ?? [] });
@@ -91,7 +93,7 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
       (st.movs ??= []).push(mv);
       return r.fulfill({ json: mv });
     }
-    if (u.includes("/api/cuadre/turnos/")) return r.fulfill({ json: resumen });
+    if (u.includes("/api/cuadre/turnos/")) return r.fulfill({ json: res });
     if (/\/api\/clientes\/\d+\/fiar/.test(u)) { st.fiado = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { ventaId: 70, numeroFactura: 3, totalUsd: 3.5, totalBs: 3150 } }); }
     if (/\/api\/clientes\/\d+\/descuento-sueldo/.test(u)) { st.descuento = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { id: 98, tipo: "ABONO" } }); }
     if (/\/api\/clientes\/\d+\/abonos/.test(u)) { const b = JSON.parse(r.request().postData() || "{}"); (st.abonos ??= []).push(b); return r.fulfill({ json: { id: 99, tipo: "ABONO", ...b } }); }
@@ -105,18 +107,25 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     if (/\/api\/ventas\/\d+\/anular/.test(u)) { st.anulada = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { id: 11, estado: "ANULADA" } }); }
     if (/\/api\/ventas\/\d+\/devolver/.test(u)) { st.devuelta = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { id: 2 } }); }
     if (u.includes("/api/ventas") && m === "GET") return r.fulfill({ json: ventasDemo });
+    if (/\/api\/nomina\/pagos\/\d+\/anular/.test(u)) {
+      st.nominaAnulada = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") };
+      const h = st.nominaHist?.find((x) => x.pago.id === st.nominaAnulada.id);
+      if (h) { h.pago = { ...h.pago, estado: "ANULADO", motivoAnulacion: st.nominaAnulada.motivo }; }
+      return r.fulfill({ json: h ?? {} });
+    }
     if (u.includes("/api/nomina/pagos") && m === "POST") {
       const b = JSON.parse(r.request().postData() || "{}"); st.nomina = b;
       const neto = Math.round((b.sueldoUsd + b.bonosUsd - b.otrosDescuentosUsd - b.fiadoDescontadoUsd) * 100) / 100;
       return r.fulfill({ json: { trabajador: "Luis (empleado)", pago: { id: 5, trabajadorId: b.trabajadorId, periodo: b.periodo, sueldoUsd: b.sueldoUsd, bonosUsd: b.bonosUsd, otrosDescuentosUsd: b.otrosDescuentosUsd,
         conceptoDescuentos: b.conceptoDescuentos ?? null, fiadoDescontadoUsd: b.fiadoDescontadoUsd, netoUsd: neto, metodo: b.metodo, moneda: b.tasa ? "VES" : "USD", montoPagado: b.tasa ? neto * b.tasa : neto, tasa: b.tasa ?? null, referencia: b.referencia ?? null, nota: null, createdAt: "2026-11-10T15:00:00Z" } } });
     }
-    if (u.includes("/api/nomina/pagos")) return r.fulfill({ json: [] });
+    if (u.includes("/api/nomina/pagos")) return r.fulfill({ json: st.nominaHist ?? [] });
     if (u.includes("/api/nomina")) return r.fulfill({ json: { totalSueldosUsd: 15, totalFiadoUsd: 12, pagadoEsteMesUsd: 0,
       trabajadores: [{ id: 3, nombre: "Luis (empleado)", telefono: null, activo: true, sueldoUsd: 15, debeFiadoUsd: 12, netoSugeridoUsd: 3, ultimoPago: null, ultimoPeriodo: null, pagadoEsteMesUsd: 0 }] } });
     if (u.includes("/api/proveedores")) return r.fulfill({ json: [{ id: 3, nombre: "Distribuidora Polar", rif: "J-1", telefono: null, contacto: null, activo: true, porPagarUsd: 40, compras: 2 }] });
     if (u.includes("/api/compras") && m === "POST") { st.compra = JSON.parse(r.request().postData() || "{}"); return r.fulfill({ json: { compra: { id: 9 }, proveedor: null, detalles: [] } }); }
     if (u.includes("/api/compras")) return r.fulfill({ json: [{ compra: { id: 8, proveedorId: 3, numeroFactura: "A-77", fecha: "2026-11-09", totalUsd: 40, tasa: 900, pagada: false, estado: "REGISTRADA", nota: null }, proveedor: "Distribuidora Polar", detalles: [] }] });
+    if (u.includes("/api/ventas") && m === "POST" && st.ventaFalla) return r.fulfill({ status: 409, json: { error: st.ventaFalla } });
     if (u.includes("/api/ventas") && m === "POST") { st.venta = JSON.parse(r.request().postData() || "{}"); return r.fulfill({ json: { id: 99, numeroFactura: 1 } }); }
     if (u.includes("/api/mi-negocio/caja-config")) {
       if (m === "PUT") { st.cajaConfig = JSON.parse(r.request().postData() || "{}"); (st.puts ??= []).push(st.cajaConfig!); }

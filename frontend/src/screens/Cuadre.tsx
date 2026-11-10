@@ -7,6 +7,14 @@ import { conectorDisponible, imprimirTicket } from "../conector";
 import { metodoActivo } from "../config";
 import { MovimientosCaja } from "./MovimientosCaja";
 
+/** Días (calendario de Venezuela) que lleva abierto un turno: 0 = abierto hoy. */
+export function diasAbierto(iso?: string): number {
+  if (!iso) return 0;
+  const dia = (d: Date) => d.toLocaleDateString("en-CA", { timeZone: "America/Caracas" });
+  const a = Date.parse(dia(new Date(iso))), b = Date.parse(dia(new Date()));
+  return Math.max(0, Math.round((b - a) / 86400000));
+}
+
 /** Avisa al resto de la app (barra de montos, indicador) que el turno cambió. */
 const avisarTurno = () => window.dispatchEvent(new Event("kp-turno"));
 
@@ -255,6 +263,11 @@ export function Cuadre() {
         <span className="cz-sp" />
         <button className="btn2 press cz-ref" onClick={refrescar}>Actualizar</button>
       </div>
+      {diasAbierto(turno.fechaApertura) > 0 && (
+        <div className="plan-aviso cz-viejo" role="alert">
+          <span><b>Este turno está abierto desde {new Date(turno.fechaApertura!).toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" })}.</b> Cuenta la gaveta y ciérralo, y abre uno nuevo para hoy: así cada día cuadra por separado.</span>
+        </div>
+      )}
 
       <div className="cz-kpis">
         <div className="cz-kpi"><span className="k">Fondo inicial</span><b className="t">{usd(turno.fondoUsd)}</b><span className="d t">{bs(turno.fondoBs)}</span></div>

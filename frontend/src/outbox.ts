@@ -17,6 +17,8 @@ export interface VentaEnCola {
   intentos: number;
   estado: EstadoEnvio;
   ultimoError?: string;
+  /** Para mostrarla en la lista de "sin enviar": total y productos. */
+  resumen?: { totalUsd: number; productos: string };
 }
 
 interface KioskDB extends DBSchema {
@@ -41,7 +43,7 @@ function db() {
   return dbPromise;
 }
 
-export async function encolar(codigoUnico: string, payload: unknown): Promise<void> {
+export async function encolar(codigoUnico: string, payload: unknown, resumen?: VentaEnCola["resumen"]): Promise<void> {
   const d = await db();
   const existente = await d.get("ventas_outbox", codigoUnico);
   if (existente) {
@@ -52,7 +54,8 @@ export async function encolar(codigoUnico: string, payload: unknown): Promise<vo
     payload,
     creadoAt: Date.now(),
     intentos: 0,
-    estado: "pendiente"
+    estado: "pendiente",
+    ...(resumen ? { resumen } : {})
   });
 }
 

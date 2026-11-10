@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { historialNomina, pagarNomina, resumenNomina, type PagoNomina, type ResumenNomina, type TrabajadorNomina } from "../api";
+import { anularPagoNomina, historialNomina, pagarNomina, resumenNomina, type PagoNomina, type ResumenNomina, type TrabajadorNomina } from "../api";
 import { getTasa } from "../session";
 import { UIcono } from "../icons";
 import { leerMonto } from "../arqueo";
@@ -79,9 +79,9 @@ export function Nomina({ onIrFiado }: { onIrFiado: () => void }) {
         ) : (
           <div className="vt-list">
             {hist.map(({ pago: p, trabajador }) => (
-              <button key={p.id} className="card vt-row press" onClick={() => setRecibo({ pago: p, trabajador })}>
+              <button key={p.id} className={"card vt-row press" + (p.estado === "ANULADO" ? " anulada" : "")} onClick={() => setRecibo({ pago: p, trabajador })}>
                 <span className="vt-n t">{fecha(p.createdAt)}</span>
-                <span className="vt-tx"><b>{trabajador} · {p.periodo}</b><small>{nombreMetodo(p.metodo)}{p.fiadoDescontadoUsd > 0 ? " · fiado descontado " + usd(p.fiadoDescontadoUsd) : ""}</small></span>
+                <span className="vt-tx"><b>{trabajador} · {p.periodo}{p.estado === "ANULADO" && <span className="pill bad vt-pill">Anulado</span>}</b><small>{nombreMetodo(p.metodo)}{p.fiadoDescontadoUsd > 0 ? " · fiado descontado " + usd(p.fiadoDescontadoUsd) : ""}</small></span>
                 <span className="vt-m"><b className="t">{usd(p.netoUsd)}</b>{p.moneda === "VES" && <small className="t">{bs(p.montoPagado)}</small>}</span>
               </button>
             ))}
@@ -90,7 +90,7 @@ export function Nomina({ onIrFiado }: { onIrFiado: () => void }) {
         )}
       </div>
       {pagando && <FormPagoNomina t={pagando} onClose={() => setPagando(null)} onPagado={(x) => { setPagando(null); setRecibo(x); cargar(); }} />}
-      {recibo && <Recibo r={recibo} onClose={() => setRecibo(null)} />}
+      {recibo && <Recibo r={recibo} onClose={() => setRecibo(null)} onAnulado={(x) => { setRecibo(x); cargar(); }} />}
       {nuevo && <FormCliente trabajador onClose={() => setNuevo(false)} onSaved={() => { setNuevo(false); cargar(); }} />}
     </div>
   );
@@ -170,9 +170,17 @@ function FormPagoNomina({ t, onClose, onPagado }: { t: TrabajadorNomina; onClose
 }
 
 /** Recibo del pago de nómina (40 columnas para imprimir con el Conector). */
-function Recibo({ r, onClose }: { r: { pago: PagoNomina; trabajador: string }; onClose: () => void }) {
+function Recibo({ r, onClose, onAnulado }: { r: { pago: PagoNomina; trabajador: string }; onClose: () => void; onAnulado?: (x: { pago: PagoNomina; trabajador: string }) => void }) {
   const p = r.pago;
   const [aviso, setAviso] = useState("");
+  const [anulando, setAnulando] = useState(false);
+  const [motivo, setMotivo] = useState("");
+  const anulado = p.estado === "ANULADO";
+  const anular = async () => {
+    if (!motivo.trim()) { setAviso("Escribe por qué lo anulas."); return; }
+    try { const x = await anularPagoNomina(p.id, motivo.trim()); setAnulando(false); setAviso(""); onAnulado?.(x); }
+    catch (e) { setAviso((e as Error).message); }
+  };
   const w = 40, pad = (l: string, d: string) => (l.length + d.length >= w ? (l + " " + d).slice(0, w) : l + " ".repeat(w - l.length - d.length) + d);
   const cen = (s: string) => " ".repeat(Math.max(0, Math.floor((w - s.length) / 2))) + s;
   const lineas = [cen("RECIBO DE PAGO DE NOMINA"), cen(fecha(p.createdAt)), "-".repeat(w), "Trabajador: " + r.trabajador, "Periodo: " + p.periodo, "-".repeat(w),
@@ -189,14 +197,27 @@ function Recibo({ r, onClose }: { r: { pago: PagoNomina; trabajador: string }; o
   return (
     <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card">
-        <div className="modal-head"><h2>Pago registrado ✓</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="modal-head"><h2>{anulado ? "Pago anulado" : "Pago registrado ✓"}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
         <div className="modal-body">
-          <pre className="nom-recibo t" aria-label="Recibo">{texto}</pre>
+          {anulado && <p className="pinmsg">Este pago se anuló{p.motivoAnulacion ? ": " + p.motivoAnulacion : ""}. {p.fiadoDescontadoUsd > 0 ? "El fiado que se había descontado volvió a su cuenta." : ""}</p>}
+          <pre className={"nom-recibo t" + (anulado ? " anulado" : "")} aria-label="Recibo">{texto}</pre>
+          {anulando && (
+            <label className="fld">Motivo de la anulación
+              <input autoFocus value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej.: monto equivocado" onKeyDown={(e) => { if (e.key === "Enter") anular(); }} />
+              <span className="hint">{p.fiadoDescontadoUsd > 0 ? "El fiado descontado (" + usd(p.fiadoDescontadoUsd) + ") vuelve a la cuenta del trabajador." : "El pago deja de contar en la nómina."}</span>
+            </label>
+          )}
           {aviso && <p className="pinmsg">{aviso}</p>}
         </div>
         <div className="modal-foot two-btn">
-          <button className="btn2 big press" onClick={imprimir}><UIcono k="print" />Imprimir recibo</button>
-          <button className="btn primary big press" onClick={onClose}>Listo</button>
+          {anulando ? <>
+            <button className="btn2 big press" onClick={() => { setAnulando(false); setAviso(""); }}>Volver</button>
+            <button className="btn danger big press" onClick={anular}>Anular pago</button>
+          </> : <>
+            {!anulado && onAnulado && <button className="btn2 big press nom-anular" onClick={() => setAnulando(true)}>Anular</button>}
+            {!anulado && <button className="btn2 big press" onClick={imprimir}><UIcono k="print" />Imprimir recibo</button>}
+            <button className="btn primary big press" onClick={onClose}>Listo</button>
+          </>}
         </div>
       </div>
     </div>

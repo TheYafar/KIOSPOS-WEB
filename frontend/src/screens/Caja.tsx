@@ -41,7 +41,29 @@ export function Caja() {
   const tasa = Number(getTasa()) || 1;
   const isDesktop = useIsDesktop();
 
-  useEffect(() => { listarProductos().then(setProductos).catch((e) => setErr((e as Error).message)); }, []);
+  // Catálogo siempre fresco: al entrar, cada 2 minutos, al volver a la ventana y al
+  // reconectar. Así la caja cobra con los precios que tiene el servidor.
+  useEffect(() => {
+    const cargar = () => listarProductos().then(setProductos).catch(() => { /* sin conexión: se queda el último */ });
+    listarProductos().then(setProductos).catch((e) => setErr((e as Error).message));
+    const id = setInterval(cargar, 2 * 60 * 1000);
+    const alVolver = () => { if (document.visibilityState === "visible") cargar(); };
+    window.addEventListener("online", cargar);
+    document.addEventListener("visibilitychange", alVolver);
+    return () => { clearInterval(id); window.removeEventListener("online", cargar); document.removeEventListener("visibilitychange", alVolver); };
+  }, []);
+  // Si cambió un precio mientras había productos en el ticket, el ticket se actualiza.
+  useEffect(() => {
+    setCarrito((c) => {
+      let cambio = false;
+      const n = new Map(c);
+      for (const [id, it] of c) {
+        const p = productos.find((x) => x.id === id);
+        if (p && (p.precioUsd !== it.producto.precioUsd || p.stockActual !== it.producto.stockActual)) { n.set(id, { ...it, producto: p }); cambio = true; }
+      }
+      return cambio ? n : c;
+    });
+  }, [productos]);
 
   const cats = useMemo(() => {
     const map = new Map<string, number>();
@@ -133,8 +155,10 @@ export function Caja() {
 
   const confirmar = async (pagos: PagoCobro[], resumen: ResumenPago, clienteId?: number | null) => {
     try {
-      const its = [...carrito.values()].map((i) => ({ productoId: i.producto.id, cantidad: i.qty }));
-      await cobrar(its, pagos, clienteId);
+      // Se manda también el precio con que se cobró: si la venta se queda en la cola sin
+      // internet y el catálogo cambia mientras tanto, el servidor respeta lo que se cobró.
+      const its = [...carrito.values()].map((i) => ({ productoId: i.producto.id, cantidad: i.qty, precioUsd: i.producto.precioUsd }));
+      await cobrar(its, pagos, clienteId, { totalUsd: total, productos: [...carrito.values()].map((i) => i.producto.nombre).join(", ").slice(0, 120) });
       window.dispatchEvent(new Event("kp-turno"));
       setDone({ total, totalBs, payLine: resumen.payLine, change: resumen.change, changeNote: resumen.changeNote, receipt: recibo(resumen.payLine, resumen.change) });
       setView("done");

@@ -25,7 +25,7 @@ test("vender por peso: escribe los kilos y el sistema calcula el precio", async 
   await page.getByLabel("Monto en Efectivo $").fill("2");
   await page.keyboard.press("Enter");
   await expect(page.getByText("Nueva venta")).toBeVisible();
-  expect(st.venta.items).toEqual([{ productoId: 4, cantidad: 0.333 }]);
+  expect(st.venta.items).toEqual([{ productoId: 4, cantidad: 0.333, precioUsd: 6 }]); // el precio que vio la caja (lo usa el servidor si llega de la cola)
 });
 
 test("fiar desde el perfil: pestaña Fiar productos con un producto normal y uno por peso", async ({ page }) => {

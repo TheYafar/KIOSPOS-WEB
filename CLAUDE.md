@@ -477,3 +477,21 @@ el alta/venta/login (try/catch + log).
 - Backend: V19 `pagos_nomina` (RLS), `nomina/NominaService` (`GET /api/nomina`, `GET|POST /api/nomina/pagos`,
   solo dueño/encargado). El fiado descontado se registra en la cuenta del trabajador como abono `NOMINA`
   (`ClienteService.descontarDelSueldo`). No toca la caja. Atajos dueño: Nómina Alt+6, Config Alt+7, Más Alt+8.
+
+## 24. Arreglos de lógica ("naranja" de la auditoría)
+
+- **Ganancia histórica:** V20 `detalle_ventas.costo_unitario_usd` (costo al vender); reportes usan
+  `COALESCE(d.costo, p.costo)`. Las devoluciones restan lo devuelto y su costo de la ganancia.
+- **Ventas de la cola sin internet** (`creadoAt` > 10 min, ya cobradas): se registran con el precio que vio la
+  caja (`items[].precioUsd`) y aunque falte stock (queda negativo). En vivo sigue estricto. La PWA refresca el
+  catálogo cada 2 min / al volver / al reconectar y actualiza el carrito.
+- **Ventas sin enviar visibles** (`screens/ColaVentas.tsx`): pastilla en el encabezado ("N sin enviar" ámbar /
+  "N con error" rojo, evento `kp-cola`) → ventana con motivo del servidor, **Reintentar** y **Descartar**.
+- **Turno de otro día:** `TurnoResumen.fechaApertura`; aviso en la barra del turno y en Cierre (`diasAbierto`).
+- **Anulaciones:** anular compra devuelve el costo promedio; anular pago de nómina (`POST /api/nomina/pagos/{id}/
+  anular {motivo}`) lo deja ANULADO y el fiado descontado vuelve a la cuenta (botón "Anular" en el recibo).
+- **Límites:** no más cajas que `cajas_contratadas`; fiado bloquea la fila del cliente (sin pasar el límite con dos
+  ventas a la vez); devolver "como pagó" en partes cierra exacto (sin céntimos sueltos).
+- Pruebas: `CompraDevolucionTest` (backend) y `e2e/naranja.spec.ts`.
+- **Pendiente (rojo/amarillo de la auditoría):** dueño de turno/movimiento al cerrar/anular, token de usuario
+  desactivado, acceso del cajero a reportes por API; Sección 6 (planes).

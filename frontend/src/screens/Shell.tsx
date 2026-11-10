@@ -12,13 +12,14 @@ import { Nomina } from "./Nomina";
 import { UIcono } from "../icons";
 import { Caja } from "./Caja";
 import { Contabilidad } from "./Contabilidad";
-import { Cuadre } from "./Cuadre";
+import { Cuadre, diasAbierto } from "./Cuadre";
 import { Inventario } from "./Inventario";
 import { Reportes } from "./Reportes";
 import { Usuarios } from "./Usuarios";
 import { CierreAviso } from "./negocio";
 import { TemaBtn } from "../TemaBtn";
 import { Atajos } from "../Atajos";
+import { ColaModal, ColaPill, useCola } from "./ColaVentas";
 
 interface Tab { id: string; n: string; icon: string; }
 
@@ -38,6 +39,9 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
   const [tab, setTab] = useState(tabs[0].id);
   const [online, setOnline] = useState(navigator.onLine);
   const [ayuda, setAyuda] = useState(false);
+  // Ventas cobradas que aún no llegan al servidor (sin internet o rechazadas).
+  const cola = useCola();
+  const [verCola, setVerCola] = useState(false);
   // Turno de la caja según el SERVIDOR: undefined = cargando, null = caja cerrada.
   const [turno, setTurno] = useState<TurnoResumen | null | undefined>(undefined);
   useEffect(() => {
@@ -115,6 +119,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
                   <span className="dot" /><b>{turno ? "Caja abierta" : "Caja cerrada"}</b>{turno && <span className="t3">#{turno.turnoId}</span>}
                 </button>
               )}
+              <ColaPill cola={cola} onClick={() => setVerCola(true)} />
               <span className="hpill" title={getBcv() && String(getBcv()) !== getTasa() ? "BCV Bs " + getBcv() + " (con ajuste en Config.)" : "Tasa BCV automática"}><span className="t3">{getBcv() && String(getBcv()) !== getTasa() ? "Tasa" : "Tasa BCV"}</span><b className="t">Bs {getTasa()}</b></span>
               <span className={"hpill" + (online ? " ok" : "")}>
                 <span className="dot" style={{ background: online ? "var(--ok)" : "var(--bad)" }} />
@@ -145,6 +150,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
       </div>
 
       {ayuda && <Atajos onClose={() => setAyuda(false)} />}
+      {verCola && <ColaModal cola={cola} onClose={() => setVerCola(false)} />}
       {verSusp && plan && !plan.puedeCobrar && <SuspendidoModal plan={plan} esCaja={esCaja} onPagar={irAPagar}
         onClose={() => { setVerSusp(false); try { sessionStorage.setItem("kp_susp_visto", "1"); } catch { /* */ } }} />}
       <nav className="tabbar" aria-label="Menú">
@@ -190,9 +196,11 @@ function TurnoBar({ turno, onIr }: { turno: TurnoResumen | null; onIr: () => voi
   if (dig("OTRO_USD")) add("OTRO_USD", "Otras $", dig("OTRO_USD"), "USD");
   if (dig("OTRO_BS")) add("OTRO_BS", "Otras Bs", dig("OTRO_BS"), "VES");
   const total = items.reduce((s, x) => s + x.usd, 0);
+  const viejo = diasAbierto(turno.fechaApertura);
   return (
     <div className="turno-bar ab" role="status" aria-label="Cobrado en el turno">
       <button className="tb-st press" onClick={onIr} title="Ir al cierre"><i />Turno #{turno.turnoId}</button>
+      {viejo > 0 && <button className="tb-viejo press" onClick={onIr} title="Este turno quedó abierto de otro día: ciérralo">Abierto desde {viejo === 1 ? "ayer" : "hace " + viejo + " días"} · Cerrar</button>}
       <div className="tb-items">
         {items.map((x) => <span key={x.id} className="tb-it"><small>{x.n}</small><b className="t">{x.v}</b></span>)}
       </div>

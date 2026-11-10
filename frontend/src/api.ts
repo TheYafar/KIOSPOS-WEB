@@ -158,6 +158,7 @@ export async function cierresDia(fecha?: string): Promise<CierreDia[]> {
 // ---------- Cobro (con cola offline) ----------
 
 export interface LineaCobro { productoId?: number | null; cantidad: number; precioUsd?: number; nombre?: string; }
+export { listar as ventasEnCola, quitar as descartarDeCola, marcar as marcarEnCola } from "./outbox";
 export interface PagoCobro {
   metodo: "EFECTIVO_USD" | "EFECTIVO_BS" | "PUNTO" | "PAGO_MOVIL" | "BIOPAGO" | "OTRO" | "FIADO";
   moneda: "USD" | "VES"; montoOriginal: number; referencia?: string;
@@ -169,9 +170,9 @@ function nuevoCodigo(): string {
 }
 
 /** Registra una venta: la encola (durable) y trata de enviarla ya. */
-export async function cobrar(items: LineaCobro[], pagos: PagoCobro[], clienteId?: number | null): Promise<string> {
+export async function cobrar(items: LineaCobro[], pagos: PagoCobro[], clienteId?: number | null, resumen?: { totalUsd: number; productos: string }): Promise<string> {
   const codigoUnico = nuevoCodigo();
-  await encolar(codigoUnico, { codigoUnico, tasaBcv: Number(getTasa()) || 1, items, pagos, ...(clienteId ? { clienteId } : {}) });
+  await encolar(codigoUnico, { codigoUnico, tasaBcv: Number(getTasa()) || 1, items, pagos, ...(clienteId ? { clienteId } : {}) }, resumen);
   await sincronizar();
   return codigoUnico;
 }
@@ -197,13 +198,17 @@ export async function sincronizar(): Promise<ResultadoSync> {
         await marcar(venta.codigoUnico, { intentos: venta.intentos + 1, ultimoError: "Sin permiso/sesión" });
       } else {
         const txt = await resp.text().catch(() => "");
-        await marcar(venta.codigoUnico, { estado: "error", intentos: venta.intentos + 1, ultimoError: "HTTP " + resp.status + " " + txt.slice(0, 120) });
+        let motivo = txt.slice(0, 160);
+        try { motivo = JSON.parse(txt)?.error || motivo; } catch { /* no es JSON */ }
+        await marcar(venta.codigoUnico, { estado: "error", intentos: venta.intentos + 1, ultimoError: motivo || "Error " + resp.status });
         errores++;
       }
     } catch {
       await marcar(venta.codigoUnico, { intentos: venta.intentos + 1, ultimoError: "Sin conexión" });
     }
   }
+  // Avisa a la pantalla (indicador de "ventas sin enviar").
+  window.dispatchEvent(new Event("kp-cola"));
   return { enviadas, pendientes: (await listar()).length, errores };
 }
 
@@ -222,6 +227,8 @@ export interface TurnoResumen {
   movimientos?: MovLinea[];
   fiadoUsd?: number;
   comisionAvancesBs?: number;
+  /** Cuándo se abrió el turno (ISO). Sirve para avisar si quedó abierto de otro día. */
+  fechaApertura?: string;
 }
 export interface MovLinea { tipo: "GASTO" | "RETIRO" | "INGRESO" | "AVANCE" | "ABONO" | "DEVOLUCION"; moneda: "USD" | "VES"; total: number; cantidad: number; }
 
@@ -287,7 +294,11 @@ export interface TrabajadorNomina { id: number; nombre: string; telefono: string
   netoSugeridoUsd: number; ultimoPago: string | null; ultimoPeriodo: string | null; pagadoEsteMesUsd: number; }
 export interface ResumenNomina { trabajadores: TrabajadorNomina[]; totalSueldosUsd: number; totalFiadoUsd: number; pagadoEsteMesUsd: number; }
 export interface PagoNomina { id: number; trabajadorId: number; periodo: string; sueldoUsd: number; bonosUsd: number; otrosDescuentosUsd: number; conceptoDescuentos: string | null;
-  fiadoDescontadoUsd: number; netoUsd: number; metodo: string; moneda: "USD" | "VES"; montoPagado: number; tasa: number | null; referencia: string | null; nota: string | null; createdAt: string; }
+  fiadoDescontadoUsd: number; netoUsd: number; metodo: string; moneda: "USD" | "VES"; montoPagado: number; tasa: number | null; referencia: string | null; nota: string | null; createdAt: string;
+  estado?: "PAGADO" | "ANULADO"; motivoAnulacion?: string | null; }
+export async function anularPagoNomina(id: number, motivo: string): Promise<{ pago: PagoNomina; trabajador: string }> {
+  return parse(await fetch(`/api/nomina/pagos/${id}/anular`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ motivo }) }));
+}
 export async function resumenNomina(): Promise<ResumenNomina> { return parse(await fetch("/api/nomina", { headers: auth() })); }
 export async function historialNomina(trabajadorId?: number): Promise<{ pago: PagoNomina; trabajador: string }[]> {
   return parse(await fetch("/api/nomina/pagos" + (trabajadorId ? "?trabajadorId=" + trabajadorId : ""), { headers: auth() }));
