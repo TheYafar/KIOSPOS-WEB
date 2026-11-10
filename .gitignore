@@ -29,3 +29,4 @@ Thumbs.db
 # Pruebas e2e
 frontend/test-results/
 frontend/playwright-report/
+frontend/*.png
