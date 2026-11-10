@@ -38,16 +38,25 @@ public class ClienteService {
     }
 
     public record ClienteVista(Long id, String nombre, String cedula, String telefono, BigDecimal limiteUsd,
-                               boolean activo, BigDecimal saldoUsd, Instant ultimoMovimiento) {
+                               boolean activo, BigDecimal saldoUsd, Instant ultimoMovimiento, String tipo, BigDecimal sueldoUsd) {
     }
 
     public record Detalle(ClienteVista cliente, List<MovimientoCliente> movimientos) {
     }
 
-    public record Datos(String nombre, String cedula, String telefono, BigDecimal limiteUsd, Boolean activo) {
+    public record Datos(String nombre, String cedula, String telefono, BigDecimal limiteUsd, Boolean activo,
+                        String tipo, BigDecimal sueldoUsd) {
+        public Datos(String nombre, String cedula, String telefono, BigDecimal limiteUsd, Boolean activo) {
+            this(nombre, cedula, telefono, limiteUsd, activo, null, null);
+        }
     }
 
     public record Abono(String metodo, BigDecimal monto, BigDecimal tasa, String referencia, String nota) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<ClienteVista> listar(String q, String tipo) {
+        return listar(q).stream().filter(v -> tipo == null || tipo.isBlank() || tipo.equals(v.tipo())).toList();
     }
 
     @Transactional(readOnly = true)
@@ -107,6 +116,11 @@ public class ClienteService {
             throw new IllegalArgumentException("A " + c.getNombre() + " no se le está fiando (cliente desactivado)");
         }
         BigDecimal limite = c.getLimiteCreditoUsd();
+        // Un trabajador sin límite propio no puede deber más que su sueldo.
+        if ("TRABAJADOR".equals(c.getTipo()) && (limite == null || limite.signum() <= 0)
+                && c.getSueldoUsd() != null && c.getSueldoUsd().signum() > 0) {
+            limite = c.getSueldoUsd();
+        }
         if (limite != null && limite.signum() > 0) {
             BigDecimal saldo = saldo(clienteId);
             if (saldo.add(montoUsd).compareTo(limite) > 0) {
@@ -186,6 +200,40 @@ public class ClienteService {
     }
 
     /**
+     * El dueño descuenta del sueldo de un trabajador lo que debe (todo o una parte).
+     * No entra dinero a ninguna caja: queda como abono con método NOMINA.
+     */
+    @Transactional
+    public MovimientoCliente descontarDelSueldo(KioskPrincipal principal, Long clienteId, BigDecimal montoUsd, String nota) {
+        Cliente c = buscar(clienteId);
+        if (!"TRABAJADOR".equals(c.getTipo())) {
+            throw new IllegalArgumentException(c.getNombre() + " no está anotado como trabajador");
+        }
+        BigDecimal saldo = saldo(clienteId);
+        if (saldo.signum() <= 0) {
+            throw new IllegalArgumentException(c.getNombre() + " no debe nada");
+        }
+        BigDecimal monto = montoUsd == null ? saldo : montoUsd.setScale(2, RoundingMode.HALF_UP);
+        if (monto.signum() <= 0) {
+            throw new IllegalArgumentException("El monto debe ser mayor a 0");
+        }
+        if (monto.compareTo(saldo) > 0) {
+            throw new IllegalArgumentException("Debe $" + saldo.setScale(2, RoundingMode.HALF_UP).toPlainString() + "; no se puede descontar más");
+        }
+        MovimientoCliente m = new MovimientoCliente();
+        m.setNegocioId(NegocioContext.require());
+        m.setClienteId(clienteId);
+        m.setTipo(MovimientoCliente.Tipo.ABONO.name());
+        m.setMontoUsd(monto);
+        m.setUsuarioId(principal == null ? null : principal.usuarioId());
+        m.setMetodo("NOMINA");
+        m.setMoneda("USD");
+        m.setMontoOriginal(monto);
+        m.setNota(recortar(nota == null || nota.isBlank() ? "Descontado del sueldo" : nota, 200));
+        return movimientos.save(m);
+    }
+
+    /**
      * Baja la deuda por una venta anulada o devuelta (no entra dinero a ninguna caja).
      * Nunca deja saldo a favor: abona como mucho lo que debe. Devuelve lo abonado.
      */
@@ -235,6 +283,18 @@ public class ClienteService {
             throw new IllegalArgumentException("El límite no puede ser negativo");
         }
         c.setLimiteCreditoUsd(lim.setScale(2, RoundingMode.HALF_UP));
+        if (d.tipo() != null) {
+            if (!"CLIENTE".equals(d.tipo()) && !"TRABAJADOR".equals(d.tipo())) {
+                throw new IllegalArgumentException("Tipo inválido");
+            }
+            c.setTipo(d.tipo());
+        }
+        if (d.sueldoUsd() != null) {
+            if (d.sueldoUsd().signum() < 0) {
+                throw new IllegalArgumentException("El sueldo no puede ser negativo");
+            }
+            c.setSueldoUsd(d.sueldoUsd().setScale(2, RoundingMode.HALF_UP));
+        }
     }
 
     private ClienteVista guardar(Cliente c, BigDecimal saldo) {
@@ -251,7 +311,7 @@ public class ClienteService {
 
     private static ClienteVista vista(Cliente c, BigDecimal saldo, Instant ultimo) {
         return new ClienteVista(c.getId(), c.getNombre(), c.getCedula(), c.getTelefono(), c.getLimiteCreditoUsd(),
-                c.isActivo(), saldo.setScale(2, RoundingMode.HALF_UP), ultimo);
+                c.isActivo(), saldo.setScale(2, RoundingMode.HALF_UP), ultimo, c.getTipo(), c.getSueldoUsd());
     }
 
     private static String recortar(String s, int max) {

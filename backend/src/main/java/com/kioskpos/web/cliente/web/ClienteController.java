@@ -29,8 +29,9 @@ public class ClienteController {
     }
 
     @GetMapping
-    public List<ClienteService.ClienteVista> listar(@RequestParam(required = false) String q) {
-        return service.listar(q);
+    public List<ClienteService.ClienteVista> listar(@RequestParam(required = false) String q,
+                                                    @RequestParam(required = false) String tipo) {
+        return service.listar(q, tipo);
     }
 
     @GetMapping("/{id}")
@@ -42,7 +43,18 @@ public class ClienteController {
     public ClienteService.ClienteVista crear(@AuthenticationPrincipal KioskPrincipal p, @RequestBody ClienteService.Datos d) {
         // El cajero puede anotar un cliente nuevo, pero el límite lo pone el dueño.
         boolean jefe = p != null && (p.rol().name().equals("DUENO") || p.rol().name().equals("ENCARGADO"));
-        return service.crear(jefe ? d : new ClienteService.Datos(d.nombre(), d.cedula(), d.telefono(), null, null));
+        // ...y a los trabajadores (con su sueldo) también los anota el dueño.
+        return service.crear(jefe ? d : new ClienteService.Datos(d.nombre(), d.cedula(), d.telefono(), null, null, "CLIENTE", null));
+    }
+
+    /** El dueño descuenta del sueldo de un trabajador lo que debe (SecurityConfig: solo dueño/encargado). */
+    @PostMapping("/{id}/descuento-sueldo")
+    public MovimientoCliente descontarDelSueldo(@AuthenticationPrincipal KioskPrincipal p, @PathVariable Long id,
+                                                @RequestBody DescuentoRequest req) {
+        return service.descontarDelSueldo(p, id, req.montoUsd(), req.nota());
+    }
+
+    public record DescuentoRequest(java.math.BigDecimal montoUsd, String nota) {
     }
 
     @PutMapping("/{id}")

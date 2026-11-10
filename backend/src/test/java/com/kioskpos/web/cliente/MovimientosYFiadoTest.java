@@ -197,4 +197,29 @@ class MovimientosYFiadoTest extends PostgresRlsTestBase {
         assertThatThrownBy(() -> en(b.negocioId(), () -> clienteService.detalle(cli.id())))
                 .isInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    void fiadoDeTrabajadorBajaStockNoPasaDelSueldoYSeDescuentaDeLaNomina() {
+        M m = montar("trabajador@ejemplo.com");
+        var pedro = en(m.negocioId(), () -> clienteService.crear(new ClienteService.Datos("Pedro (empleado)", null, null, null, null,
+                "TRABAJADOR", new BigDecimal("10"))));
+        assertThat(pedro.tipo()).isEqualTo("TRABAJADOR");
+
+        var esperadoAntes = resumen(m).esperadoUsd();
+        vender(m, "T-1", 3, pedro.id(), pago(MetodoPago.FIADO, Moneda.USD, "6.00")); // 3 × $2
+        // No puede deber más que su sueldo ($10).
+        assertThatThrownBy(() -> vender(m, "T-2", 3, pedro.id(), pago(MetodoPago.FIADO, Moneda.USD, "6.00")))
+                .isInstanceOf(IllegalArgumentException.class).hasMessageContaining("límite");
+
+        // El dueño se lo descuenta del sueldo: la deuda queda en 0 y la caja no cambia.
+        en(m.negocioId(), () -> clienteService.descontarDelSueldo(null, pedro.id(), null, null));
+        assertThat(en(m.negocioId(), () -> clienteService.detalle(pedro.id())).cliente().saldoUsd()).isEqualByComparingTo("0");
+        assertThat(resumen(m).esperadoUsd()).isEqualByComparingTo(esperadoAntes);
+        assertThat(en(m.negocioId(), () -> clienteService.listar(null, "TRABAJADOR"))).hasSize(1);
+        assertThat(en(m.negocioId(), () -> clienteService.listar(null, "CLIENTE"))).isEmpty();
+        // A un cliente normal no se le "descuenta del sueldo".
+        var ana = en(m.negocioId(), () -> clienteService.crear(new ClienteService.Datos("Ana", null, null, null, null)));
+        assertThatThrownBy(() -> en(m.negocioId(), () -> clienteService.descontarDelSueldo(null, ana.id(), BigDecimal.ONE, null)))
+                .isInstanceOf(IllegalArgumentException.class);
+    }
 }

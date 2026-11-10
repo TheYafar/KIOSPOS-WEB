@@ -43,6 +43,14 @@ public class Cliente {
     @Column(nullable = false)
     private boolean activo = true;
 
+    /** CLIENTE o TRABAJADOR (empleado del local: su fiado se descuenta del sueldo). */
+    @Column(nullable = false, length = 12)
+    private String tipo = "CLIENTE";
+
+    /** Sueldo del trabajador (USD). Un trabajador no puede deber más que su sueldo. */
+    @Column(name = "sueldo_usd", nullable = false, precision = 12, scale = 2)
+    private BigDecimal sueldoUsd = BigDecimal.ZERO;
+
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
 }
