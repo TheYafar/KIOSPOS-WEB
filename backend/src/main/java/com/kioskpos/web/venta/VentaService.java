@@ -39,6 +39,7 @@ public class VentaService {
     private final NegocioRepository negocioRepository;
     private final TasaNegocioService tasaNegocioService;
     private final ClienteService clienteService;
+    private final com.kioskpos.web.suscripcion.SuscripcionService suscripcionService;
 
     public VentaService(VentaRepository ventaRepository,
                         ProductoRepository productoRepository,
@@ -46,7 +47,9 @@ public class VentaService {
                         TurnoRepository turnoRepository,
                         NegocioRepository negocioRepository,
                         TasaNegocioService tasaNegocioService,
-                        ClienteService clienteService) {
+                        ClienteService clienteService,
+                        com.kioskpos.web.suscripcion.SuscripcionService suscripcionService) {
+        this.suscripcionService = suscripcionService;
         this.ventaRepository = ventaRepository;
         this.productoRepository = productoRepository;
         this.permisoService = permisoService;
@@ -84,6 +87,39 @@ public class VentaService {
     public Venta registrar(KioskPrincipal principal, String permisoToken, VentaInput input) {
         // 1. Kill switch: sin permiso vigente no se cobra.
         permisoService.exigirPermisoVigente(permisoToken, principal.negocioId(), principal.cajaId());
+        return registrarValidada(principal, input);
+    }
+
+    /**
+     * Fiar productos desde la libreta (perfil del cliente o trabajador), sin pasar por la
+     * pantalla de cobro: el servidor calcula el total con SUS precios y lo anota todo como
+     * FIADO. Baja el stock igual que una venta. Si quien fía está en una caja, la venta queda
+     * en esa caja; si no (dueño desde el teléfono), queda sin caja.
+     */
+    @Transactional
+    public Venta fiarDesdeLibreta(KioskPrincipal principal, Long clienteId, BigDecimal tasa, List<ItemInput> items) {
+        if (!suscripcionService.puedeCobrar(principal.negocioId())) {
+            throw new com.kioskpos.web.permiso.PermisoDenegadoException("El servicio está suspendido: no se puede fiar hasta ponerse al día");
+        }
+        if (items == null || items.isEmpty()) {
+            throw new IllegalArgumentException("Agrega al menos un producto");
+        }
+        BigDecimal total = BigDecimal.ZERO;
+        for (ItemInput it : items) {
+            if (it.productoId() == null || it.cantidad() == null || it.cantidad().signum() <= 0) {
+                throw new IllegalArgumentException("Cantidad inválida");
+            }
+            Producto p = productoRepository.findById(it.productoId())
+                    .orElseThrow(() -> new IllegalArgumentException("Producto no encontrado"));
+            total = total.add(p.getPrecioUsd().multiply(it.cantidad()).setScale(2, RoundingMode.HALF_UP));
+        }
+        total = total.setScale(2, RoundingMode.HALF_UP);
+        List<ItemInput> lineas = items.stream().map(it -> new ItemInput(it.productoId(), it.cantidad(), null, null)).toList();
+        return registrarValidada(principal, new VentaInput(java.util.UUID.randomUUID().toString(), tasa, lineas,
+                List.of(new PagoInput(MetodoPago.FIADO, Moneda.USD, total, null)), null, clienteId));
+    }
+
+    private Venta registrarValidada(KioskPrincipal principal, VentaInput input) {
 
         // 2. Idempotencia: un reenvío con el mismo código no cobra dos veces.
         if (input.codigoUnico() != null && !input.codigoUnico().isBlank()) {
@@ -119,8 +155,10 @@ public class VentaService {
         venta.setCajaId(principal.cajaId());
         venta.setUsuarioId(principal.usuarioId());
         // Se ata al turno abierto de la caja (si hay), para que el cuadre la sume.
-        turnoRepository.findFirstByCajaIdAndEstado(principal.cajaId(), Turno.Estado.ABIERTO.name())
-                .ifPresent(t -> venta.setTurnoId(t.getId()));
+        if (principal.cajaId() != null) {
+            turnoRepository.findFirstByCajaIdAndEstado(principal.cajaId(), Turno.Estado.ABIERTO.name())
+                    .ifPresent(t -> venta.setTurnoId(t.getId()));
+        }
         venta.setCodigoUnico(input.codigoUnico());
         venta.setTasaBcv(tasa);
 
@@ -220,7 +258,8 @@ public class VentaService {
         }
 
         // 5. Número de factura correlativo POR CAJA.
-        venta.setNumeroFactura(ventaRepository.maxNumeroFacturaDeCaja(principal.cajaId()) + 1);
+        venta.setNumeroFactura((principal.cajaId() == null ? ventaRepository.maxNumeroFacturaSinCaja()
+                : ventaRepository.maxNumeroFacturaDeCaja(principal.cajaId())) + 1);
 
         Venta guardada = ventaRepository.save(venta);
         if (clienteFiado != null) {

@@ -23,6 +23,10 @@ public interface VentaRepository extends JpaRepository<Venta, Long> {
     @Query("SELECT COALESCE(MAX(v.numeroFactura), 0) FROM Venta v WHERE v.cajaId = :cajaId")
     int maxNumeroFacturaDeCaja(@Param("cajaId") Long cajaId);
 
+    /** Correlativo de las ventas sin caja (fiado desde la libreta). Del negocio por RLS. */
+    @Query("SELECT COALESCE(MAX(v.numeroFactura), 0) FROM Venta v WHERE v.cajaId IS NULL")
+    int maxNumeroFacturaSinCaja();
+
     /** [total_usd, total_bs, cantidad] de las ventas COMPLETADAS del rango (del negocio, por RLS). */
     @Query("SELECT COALESCE(SUM(v.totalUsd), 0), COALESCE(SUM(v.totalBs), 0), COUNT(v) "
             + "FROM Venta v WHERE v.estado = 'COMPLETADA' AND v.fechaHora >= :desde AND v.fechaHora < :hasta")

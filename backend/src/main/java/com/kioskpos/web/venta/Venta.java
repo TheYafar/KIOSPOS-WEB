@@ -30,7 +30,8 @@ public class Venta {
     @Column(name = "negocio_id", nullable = false)
     private Long negocioId;
 
-    @Column(name = "caja_id", nullable = false)
+    /** Caja donde se cobró; null si se fió desde la libreta (perfil del cliente) sin caja. */
+    @Column(name = "caja_id")
     private Long cajaId;
 
     @Column(name = "usuario_id", nullable = false)

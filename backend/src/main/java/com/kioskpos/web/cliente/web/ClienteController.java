@@ -23,9 +23,29 @@ import org.springframework.web.bind.annotation.RestController;
 public class ClienteController {
 
     private final ClienteService service;
+    private final com.kioskpos.web.venta.VentaService ventaService;
 
-    public ClienteController(ClienteService service) {
+    public ClienteController(ClienteService service, com.kioskpos.web.venta.VentaService ventaService) {
         this.service = service;
+        this.ventaService = ventaService;
+    }
+
+    /** Fiar productos directo desde el perfil del cliente/trabajador (baja stock; queda en su cuenta). */
+    @PostMapping("/{id}/fiar")
+    public FiadoHecho fiar(@AuthenticationPrincipal KioskPrincipal p, @PathVariable Long id, @RequestBody FiarRequest req) {
+        var v = ventaService.fiarDesdeLibreta(p, id, req.tasa(),
+                req.items() == null ? List.of() : req.items().stream()
+                        .map(i -> new com.kioskpos.web.venta.VentaService.ItemInput(i.productoId(), i.cantidad(), null, null)).toList());
+        return new FiadoHecho(v.getId(), v.getNumeroFactura(), v.getTotalUsd(), v.getTotalBs());
+    }
+
+    public record ItemFiar(Long productoId, java.math.BigDecimal cantidad) {
+    }
+
+    public record FiarRequest(java.math.BigDecimal tasa, List<ItemFiar> items) {
+    }
+
+    public record FiadoHecho(Long ventaId, Integer numeroFactura, java.math.BigDecimal totalUsd, java.math.BigDecimal totalBs) {
     }
 
     @GetMapping

@@ -224,4 +224,28 @@ class CompraDevolucionTest extends PostgresRlsTestBase {
         assertThat(producto(m).getStockActual()).isEqualByComparingTo("10"); // todo volvió
         assertThat(en(m.negocioId(), () -> devolucionService.detalle(v.getId())).devoluciones().get(0).reembolsos()).hasSize(2);
     }
+
+    @Test
+    void fiarDesdeElPerfilSinCajaBajaStockYCuentaPorPeso() {
+        M m = montar("libreta@ejemplo.com");
+        var cli = en(m.negocioId(), () -> clienteService.crear(new ClienteService.Datos("Luis", null, null, null, null,
+                "TRABAJADOR", new BigDecimal("50"))));
+        // El dueño (sin caja) le fía 1,5 unidades (como si fuera por peso) del producto de $2.
+        Venta v = en(m.negocioId(), () -> ventaService.fiarDesdeLibreta(m.dueno(), cli.id(), new BigDecimal("40"),
+                List.of(new VentaService.ItemInput(m.productoId(), new BigDecimal("1.5"), null, null))));
+        assertThat(v.getCajaId()).isNull();
+        assertThat(v.getTotalUsd()).isEqualByComparingTo("3.00");
+        assertThat(v.getNumeroFactura()).isEqualTo(1);
+        assertThat(producto(m).getStockActual()).isEqualByComparingTo("8.5");
+        assertThat(en(m.negocioId(), () -> clienteService.saldoDe(cli.id()))).isEqualByComparingTo("3.00");
+        // El siguiente fiado sin caja sigue el correlativo; el cuadre de la caja no cambia.
+        Venta v2 = en(m.negocioId(), () -> ventaService.fiarDesdeLibreta(m.dueno(), cli.id(), new BigDecimal("40"),
+                List.of(new VentaService.ItemInput(m.productoId(), BigDecimal.ONE, null, null))));
+        assertThat(v2.getNumeroFactura()).isEqualTo(2);
+        assertThat(en(m.negocioId(), () -> cuadreService.resumen(m.turnoId())).esperadoUsd()).isEqualByComparingTo("20.00");
+        // Sin stock suficiente no se fía.
+        assertThatThrownBy(() -> en(m.negocioId(), () -> ventaService.fiarDesdeLibreta(m.dueno(), cli.id(), new BigDecimal("40"),
+                List.of(new VentaService.ItemInput(m.productoId(), new BigDecimal("100"), null, null)))))
+                .isInstanceOf(IllegalStateException.class);
+    }
 }
