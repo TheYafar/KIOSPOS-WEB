@@ -454,3 +454,16 @@ el alta/venta/login (try/catch + log).
   (lista = creadas + las que usan los productos, con conteo; renombrar cambia sus productos; borrar los pasa a
   "General"). Inventario: botón **Categorías**, filtro por categoría, y el formulario de producto (nuevo y
   **Editar datos**) elige la categoría de una lista o crea una nueva, y marca peso/medida con su unidad.
+
+## 22. Cajero limitado, servicio suspendido visible, tamaño grande
+
+- **Cajero** solo ve **Vender, Cierre y Ventas** (Fiado, Config., Productos y lo demás son del dueño). En móvil
+  tiene un botón "Salir" arriba (no hay pestaña Más).
+- **Servicio suspendido** (`frontend/src/plan.ts` + `AvisoPlan`/`SuspendidoModal` en `Shell.tsx`): ventana grande
+  al entrar y barra roja fija con lo que debe; la caja no abre el cobro (solo consulta). AVISO = barra ámbar.
+  Negocio nuevo = 7 días de prueba (`NegocioRegistroService.DIAS_PRUEBA`, V18 para los que no tenían pago).
+- **Historial**: `GET /api/ventas?fecha=` necesitaba `@DateTimeFormat(ISO.DATE)`; prueba por HTTP
+  `HistorialVentasWebTest`.
+- **Tamaño de letra** (botón "A+", `tamano.ts`/`TamBtn.tsx`): Normal / Grande / Muy grande con `zoom` en `body`
+  (menos en móvil), guardado por equipo (`kp_tam`). Cada pantalla se desplaza por dentro (`.appmain > div`), y la
+  prueba responsive verifica que nada se desborde ni a lo ancho ni hacia abajo.

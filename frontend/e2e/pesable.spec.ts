@@ -52,11 +52,12 @@ test("si el plan está vencido, Fiar avisa que no es por el cliente y no deja", 
   await preparar(page, { turnoAbierto: false }, { "kioskpos.sesion": sesionDueno });
   await page.route("**/api/mi-negocio/suscripcion", (r) => r.fulfill({ json: { negocioId: 1, nombre: "Bodega", plan: "BASICO", estadoEfectivo: "SUSPENDIDA", puedeCobrar: false, pagoHasta: null, diasVencido: 0, mesesPendientes: 1, deuda: 25, mensaje: "Suspendida por falta de pago" } }));
   await ir(page);
+  await page.getByRole("button", { name: "Entendido" }).click();
   await page.keyboard.press("Alt+5");
   await page.locator(".cli-row", { hasText: "José Rojas" }).click();
   await page.getByRole("tab", { name: "Fiar productos" }).click();
   await page.getByLabel("Buscar producto para fiar").fill("harina");
   await page.keyboard.press("Enter");
-  await expect(page.getByRole("alert")).toContainText("No es por José Rojas");
+  await expect(page.locator(".cfg-ro")).toContainText("No es por José Rojas");
   await expect(page.getByRole("button", { name: /^Fiar/ })).toBeDisabled();
 });

@@ -3,6 +3,7 @@ import { admin2fa, adminAprobarPago, adminCrearNegocio, adminEnlaceClave, adminN
 import { UIcono } from "../icons";
 import { HorariosCierre } from "./negocio";
 import { TemaBtn } from "../TemaBtn";
+import { TamBtn } from "../TamBtn";
 import { Seguridad2fa } from "./Seguridad2fa";
 
 const usd = (n: number | string) => "$ " + Number(n).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -70,7 +71,7 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
         <div className="appmain">
           <header className="hdr">
             <div><h1>Administración</h1><div className="sub">Super admin · uriel</div></div>
-            <div className="hpills"><TemaBtn />
+            <div className="hpills"><TamBtn /><TemaBtn />
               <button className={"btn press " + (con2fa === false ? "warn-btn" : "ghost")} onClick={() => setSeg(true)}><UIcono k="lock" sw={2} />Seguridad</button>
               <button className="btn primary press" onClick={() => setModal(true)}><UIcono k="plus" sw={2.2} />Nuevo negocio</button></div>
           </header>

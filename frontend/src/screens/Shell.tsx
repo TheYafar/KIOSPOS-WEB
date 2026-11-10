@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import { getTasa, type Sesion } from "../session";
-import { turnoActual, type TurnoResumen } from "../api";
+import { turnoActual, type Situacion, type TurnoResumen } from "../api";
+import { cargarPlan, getPlan } from "../plan";
+import { TamBtn } from "../TamBtn";
 import { getBcv, metodoActivo } from "../config";
 import { Configuracion } from "./Configuracion";
 import { Clientes } from "./Clientes";
@@ -28,7 +30,9 @@ function saludo(): string {
 export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void }) {
   const esCaja = sesion.cajaId != null;
   const tabs: Tab[] = esCaja
-    ? [{ id: "caja", n: "Vender", icon: "cart" }, { id: "cuadre", n: "Cierre", icon: "cash" }, { id: "ventas", n: "Ventas", icon: "recibo" }, { id: "fiado", n: "Fiado", icon: "user" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }]
+    // El cajero solo ve lo de su caja: vender, cerrar y el historial para devoluciones.
+    // Fiado, configuración, productos y lo demás es del dueño.
+    ? [{ id: "caja", n: "Vender", icon: "cart" }, { id: "cuadre", n: "Cierre", icon: "cash" }, { id: "ventas", n: "Ventas", icon: "recibo" }]
     : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "ventas", n: "Ventas", icon: "recibo" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "contabilidad", n: "Cuentas", icon: "cash" }, { id: "fiado", n: "Fiado", icon: "user" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }];
   const [tab, setTab] = useState(tabs[0].id);
   const [online, setOnline] = useState(navigator.onLine);
@@ -44,6 +48,19 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
     window.addEventListener("kp-turno", cargar);
     return () => { vivo = false; clearInterval(id); window.removeEventListener("kp-turno", cargar); };
   }, [esCaja]);
+
+  // Plan de KioskPOS (al día / aviso / suspendido): al entrar, cada 5 min y al reconectar.
+  const [plan, setPlan] = useState<Situacion | null>(getPlan());
+  const [verSusp, setVerSusp] = useState(false);
+  useEffect(() => {
+    const leer = () => setPlan(getPlan());
+    cargarPlan().then((p) => { if (p && !p.puedeCobrar) { try { if (!sessionStorage.getItem("kp_susp_visto")) setVerSusp(true); } catch { setVerSusp(true); } } });
+    const id = setInterval(cargarPlan, 5 * 60 * 1000);
+    window.addEventListener("kp-plan", leer);
+    window.addEventListener("online", cargarPlan);
+    return () => { clearInterval(id); window.removeEventListener("kp-plan", leer); window.removeEventListener("online", cargarPlan); };
+  }, []);
+  const irAPagar = () => { setVerSusp(false); try { sessionStorage.setItem("kp_susp_visto", "1"); } catch { /* */ } setTab("mas"); };
 
   // Teclado global: Alt+1..n cambia de pestaña, F1 muestra los atajos.
   useEffect(() => {
@@ -103,10 +120,13 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
                 <b>{online ? "En línea" : "Sin conexión"}</b>
               </span>
               <button className="tema-btn press atajos-btn" title="Atajos de teclado (F1)" aria-label="Atajos de teclado" onClick={() => setAyuda(true)}><UIcono k="teclado" sw={1.9} /></button>
+              <TamBtn />
               <TemaBtn />
+              <button className="tema-btn press hdr-salir" aria-label="Salir" title="Salir" onClick={onSalir}><UIcono k="back" sw={2} /></button>
             </div>
           </header>
 
+          {plan && <AvisoPlan plan={plan} esCaja={esCaja} onPagar={irAPagar} />}
           {tab === "caja" && esCaja && <Caja />}
           {tab === "cuadre" && esCaja && <Cuadre />}
           {tab === "reportes" && <Reportes onIr={setTab} />}
@@ -123,6 +143,8 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
       </div>
 
       {ayuda && <Atajos onClose={() => setAyuda(false)} />}
+      {verSusp && plan && !plan.puedeCobrar && <SuspendidoModal plan={plan} esCaja={esCaja} onPagar={irAPagar}
+        onClose={() => { setVerSusp(false); try { sessionStorage.setItem("kp_susp_visto", "1"); } catch { /* */ } }} />}
       <nav className="tabbar" aria-label="Menú">
         {tabs.map((t) => (
           <button key={t.id} className="tab" aria-current={tab === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>
@@ -190,6 +212,55 @@ function ProductosYCompras() {
         </div>
       </div>
       {v === "inv" ? <Inventario /> : <Compras />}
+    </div>
+  );
+}
+
+const fechaLarga = (iso: string | null) => (iso ? new Date(iso + "T12:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" }) : "");
+const usd2 = (n: number) => "$ " + Number(n || 0).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Barra arriba de todo: roja y grande si el servicio está suspendido; ámbar si está por cortarse. */
+function AvisoPlan({ plan, esCaja, onPagar }: { plan: Situacion; esCaja: boolean; onPagar: () => void }) {
+  if (plan.puedeCobrar && plan.estadoEfectivo !== "AVISO") return null;
+  if (!plan.puedeCobrar) {
+    return (
+      <div className="plan-susp" role="alert">
+        <span className="plan-susp-ic"><UIcono k="lock" sw={2.2} /></span>
+        <div className="plan-susp-tx">
+          <b>Servicio suspendido</b>
+          <span>{plan.pagoHasta ? "El plan de KioskPOS venció el " + fechaLarga(plan.pagoHasta) + "." : "El plan de KioskPOS no está activado."} {plan.deuda > 0 ? "Debes " + usd2(plan.deuda) + (plan.mesesPendientes > 1 ? " (" + plan.mesesPendientes + " meses)" : "") + "." : ""} Mientras tanto no se puede cobrar ni fiar; solo consultar.</span>
+        </div>
+        {esCaja ? <span className="plan-susp-cta">Avísale al dueño para que pague</span> : <button className="btn big press plan-susp-btn" onClick={onPagar}>Pagar y reactivar</button>}
+      </div>
+    );
+  }
+  return (
+    <div className="plan-aviso" role="status">
+      <UIcono k="alert" sw={2} />
+      <span><b>Tu plan venció hace {plan.diasVencido} día(s).</b> Paga {plan.deuda > 0 ? usd2(plan.deuda) + " " : ""}para no perder el servicio{esCaja ? " (avísale al dueño)" : ""}.</span>
+      {!esCaja && <button className="btn2 press" onClick={onPagar}>Reportar pago</button>}
+    </div>
+  );
+}
+
+/** Ventana grande al entrar si el servicio está suspendido. */
+function SuspendidoModal({ plan, esCaja, onPagar, onClose }: { plan: Situacion; esCaja: boolean; onPagar: () => void; onClose: () => void }) {
+  return (
+    <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-card susp-card" role="alertdialog" aria-label="Servicio suspendido">
+        <div className="modal-body susp-body">
+          <span className="susp-ic"><UIcono k="lock" sw={2} /></span>
+          <h2>Servicio suspendido</h2>
+          <p>{plan.pagoHasta ? "Tu plan de KioskPOS venció el " + fechaLarga(plan.pagoHasta) + "." : "Tu plan de KioskPOS no está activado."}</p>
+          {plan.deuda > 0 && <div className="susp-deuda"><span>Debes</span><b className="t">{usd2(plan.deuda)}</b>{plan.mesesPendientes > 0 && <small>{plan.mesesPendientes} mes(es) de mensualidad</small>}</div>}
+          <p className="susp-tx">Mientras no pagues, la caja <b>no puede cobrar ni fiar</b>. Tus datos están guardados y puedes consultarlos.
+            {esCaja ? " Avísale al dueño del negocio para que pague." : " Paga por pago móvil, transferencia o Zelle y repórtalo: apenas se apruebe, todo vuelve a funcionar."}</p>
+        </div>
+        <div className="modal-foot two-btn">
+          <button className="btn2 big press" onClick={onClose}>Entendido</button>
+          {!esCaja && <button className="btn primary big press" onClick={onPagar}>Reportar mi pago</button>}
+        </div>
+      </div>
     </div>
   );
 }

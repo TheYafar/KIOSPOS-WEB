@@ -862,7 +862,7 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
 }
 
 /* ===== Primeros pasos (guía de alta) ===== */
-.pp { background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--sh-1); padding:16px 18px; margin-bottom:14px;
+.pp.pasos { background:var(--surface); border-radius:var(--r-lg); box-shadow:var(--sh-1); padding:16px 18px; margin-bottom:14px;
   border:1px solid color-mix(in srgb, var(--primary) 32%, transparent); }
 .pp-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin-bottom:12px; }
 .pp-head b { font-size:15px; font-weight:700; display:block; }
@@ -1455,3 +1455,44 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
   .caja > .toolbar { flex-wrap:wrap; }
   .caja > .toolbar > .search { flex:1 1 100% !important; }
 }
+
+/* ---- Servicio suspendido / aviso de pago ---- */
+.plan-susp { display:flex; align-items:center; gap:16px; margin:0 16px 12px; padding:18px 20px; border-radius:16px; background:var(--bad); color:#fff; box-shadow:0 8px 24px color-mix(in srgb, var(--bad) 35%, transparent); flex-wrap:wrap; flex:none; }
+.plan-susp-ic { width:52px; height:52px; border-radius:14px; display:grid; place-items:center; background:rgba(255,255,255,.18); flex:none; }
+.plan-susp-ic svg { width:28px; height:28px; }
+.plan-susp-tx { flex:1 1 280px; display:flex; flex-direction:column; gap:4px; min-width:0; }
+.plan-susp-tx b { font-size:24px; letter-spacing:-.02em; } .plan-susp-tx span { font-size:14.5px; opacity:.95; }
+.plan-susp-btn { background:#fff; color:var(--bad); font-weight:800; }
+.plan-susp-cta { font-weight:700; font-size:14px; padding:10px 14px; border-radius:10px; background:rgba(255,255,255,.18); }
+.plan-aviso { display:flex; align-items:center; gap:10px; margin:0 16px 12px; padding:12px 14px; border-radius:12px; flex-wrap:wrap; flex:none;
+  background:color-mix(in srgb, var(--warn) 14%, var(--surface)); border:1px solid color-mix(in srgb, var(--warn) 40%, transparent); font-size:14px; }
+.plan-aviso svg { width:20px; height:20px; color:var(--warn); flex:none; } .plan-aviso span { flex:1 1 220px; }
+.susp-card { max-width:460px; width:100%; }
+.susp-body { align-items:center; text-align:center; padding-top:24px; }
+.susp-ic { width:72px; height:72px; border-radius:20px; display:grid; place-items:center; background:var(--bad-soft); color:var(--bad); }
+.susp-ic svg { width:38px; height:38px; }
+.susp-body h2 { margin:4px 0 0; font-size:28px; color:var(--bad); letter-spacing:-.02em; }
+.susp-body p { margin:0; color:var(--text-2); }
+.susp-deuda { display:flex; flex-direction:column; align-items:center; padding:12px 24px; border-radius:14px; background:var(--bad-soft); }
+.susp-deuda span { font-size:13px; color:var(--text-2); } .susp-deuda b { font-size:34px; color:var(--bad); } .susp-deuda small { color:var(--text-2); }
+.susp-tx { font-size:14px; }
+@media (max-width:560px) { .plan-susp { margin:0 12px 10px; padding:14px; } .plan-susp-tx b { font-size:20px; } .plan-susp-btn, .plan-susp-cta { width:100%; text-align:center; justify-content:center; } }
+/* Cada pantalla se desplaza DENTRO de la app (no la página entera): así el menú lateral
+   y la barra del turno quedan siempre completos. */
+.appmain > div:not(.hdr):not(.turno-bar):not(.plan-susp):not(.plan-aviso) { flex:1 1 auto; min-height:0; overflow-y:auto; }
+
+/* ---- Tamaño grande (botón A+): agranda letras y botones de toda la app ---- */
+html[data-tam="grande"] body { zoom:1.15; }
+html[data-tam="muy-grande"] body { zoom:1.3; }
+@media (max-width:760px) {
+  html[data-tam="grande"] body { zoom:1.08; }
+  html[data-tam="muy-grande"] body { zoom:1.15; }
+}
+.tam-btn span { font-weight:800; font-size:15px; letter-spacing:-.02em; line-height:1; }
+.tam-btn small { font-size:11px; font-weight:800; }
+/* Salir en móvil (el menú lateral no se ve) */
+.hdr-salir { display:none; }
+@media (max-width:759px) { .hdr-salir { display:grid; } }
+.entrar-btns { display:flex; gap:8px; }
+.entrar-btns { width:auto; height:auto; background:none !important; border:0; }
+.entrar-btns .tema-btn { background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.2); color:#eaf1ef; }

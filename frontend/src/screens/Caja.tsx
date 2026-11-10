@@ -4,6 +4,7 @@ import { conectorDisponible, imprimirTicket } from "../conector";
 import { Icono, UIcono, catInfo } from "../icons";
 import { Cobro, type ResumenPago } from "./Cobro";
 import { CantidadPesable, cantTxt } from "./Pesable";
+import { planSuspendido } from "../plan";
 
 interface Item { producto: Producto; qty: number; }
 
@@ -79,7 +80,11 @@ export function Caja() {
 
   const vaciar = () => setCarrito(new Map());
 
-  const abrirCobro = () => { setErr(""); setView("checkout"); };
+  // Con el servicio suspendido la caja queda en solo consulta: no cobra (CLAUDE.md §3).
+  const abrirCobro = () => {
+    if (planSuspendido()) { setErr("Servicio suspendido: no se puede cobrar hasta pagar la mensualidad de KioskPOS."); return; }
+    setErr(""); setView("checkout");
+  };
 
   // ---------- Teclado (como el POS de escritorio) ----------
   // Escribir en cualquier lado busca (sirve con lector de código de barras), Enter agrega,

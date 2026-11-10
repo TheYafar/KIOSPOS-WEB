@@ -79,7 +79,6 @@ test("la caja cobra con la tasa del negocio y el cajero no puede cambiarla", asy
   await abrirCobro(page);
   await expect(page.locator(".co-tot small")).toHaveText("Bs 2.524,50"); // 2,75 × 918
   await page.keyboard.press("Escape");
-  await page.keyboard.press("Alt+5");
-  await expect(page.locator(".cfg-ro")).toBeVisible();
-  await expect(page.getByRole("button", { name: "Usar la BCV" })).toBeDisabled();
+  // El cajero solo ve Vender, Cierre y Ventas (Configuración y lo demás es del dueño).
+  await expect(page.locator(".rail .rail-item[title]")).toHaveText(["Vender", "Cierre", "Ventas"]);
 });
