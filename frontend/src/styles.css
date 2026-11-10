@@ -1131,3 +1131,62 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
 .toolbar .search { min-width:0; }
 .toolbar .btn { flex:none; white-space:nowrap; }
 @media (max-width:759px) { .toolbar .btn { height:44px; padding:0 12px; font-size:14px; } .toolbar .btn svg { margin-right:2px; } }
+
+/* ========================================================================
+   Arqueo del cierre: cada forma de pago con Debe haber / Contaste / Estado
+   ======================================================================== */
+.kbtip { display:inline-block; margin-left:6px; color:var(--text-3); font-size:11.5px; font-weight:600; }
+@media (hover:none), (max-width:1023px) { .kbtip { display:none; } }
+.arq { display:flex; flex-direction:column; gap:12px; }
+.arq-head { display:flex; justify-content:space-between; align-items:flex-end; gap:16px; flex-wrap:wrap; }
+.arq-head .h3 { font-size:15px; color:var(--text); margin-bottom:2px; }
+.arq-prog { display:flex; flex-direction:column; gap:6px; min-width:180px; font-size:12.5px; font-weight:600; color:var(--text-2); }
+.arq-prog .progress { height:8px; }
+.arq-tot { font-size:13px; color:var(--text-2); } .arq-tot b { color:var(--text); font-size:15px; margin-left:4px; }
+.arq-table { display:flex; flex-direction:column; }
+.arq-row { display:grid; grid-template-columns:minmax(0,1.35fr) minmax(0,1fr) minmax(0,1.25fr) minmax(130px,auto); gap:14px; align-items:center; padding:12px 6px; border-bottom:1px solid var(--line); }
+.arq-th { padding:6px; font-size:11.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-3); }
+.arq-nm { display:flex; align-items:center; gap:10px; min-width:0; }
+.arq-nm b { display:block; font-size:14.5px; font-weight:700; }
+.arq-nm small, .arq-esp small { display:block; font-size:12px; color:var(--text-3); line-height:1.3; }
+.arq-esp b { font-size:16px; font-weight:700; }
+.arq-in { display:flex; gap:8px; align-items:center; min-width:0; }
+.arq-in .inpw { flex:1; min-width:0; }
+.arq-in .inp { height:46px; font-size:17px; font-weight:700; }
+.arq-in .btn2 { height:46px; font-size:13px; padding:0 12px; flex:none; }
+.arq-st { display:flex; justify-content:flex-end; }
+.arq-falta { background:color-mix(in srgb, var(--bad) 6%, transparent); }
+.arq-sobra { background:color-mix(in srgb, var(--c-bebidas) 6%, transparent); }
+.arq-cuadra .arq-esp b { color:var(--ok); }
+.arq-sin-movimiento { opacity:.75; }
+.arq-foot { border-bottom:0; background:var(--surface-2); border-radius:12px; margin-top:8px; font-size:14px; }
+.arq-foot b { font-size:15.5px; }
+.arq-alerta { display:flex; gap:12px; align-items:flex-start; padding:12px 14px; border-radius:12px; background:var(--bad-soft); color:var(--bad); }
+.arq-alerta svg { width:20px; height:20px; flex:none; margin-top:1px; }
+.arq-alerta b { display:block; font-size:14px; } .arq-alerta span { font-size:13px; }
+.arq-obs { height:auto; min-height:64px; padding:10px 14px; resize:vertical; font:inherit; }
+.cta.cz-cerrar.warn { background:var(--warn); }
+.cta .kb { opacity:.7; }
+.czhero.warn { border:1px solid var(--bad); }
+.pill:not(.ok):not(.late):not(.info):not(.soon):not(.warn):not(.brand):not(.danger) { background:var(--surface-3); color:var(--text-2); }
+/* Móvil/tablet chico: cada forma de pago como tarjeta */
+@media (max-width:899px) {
+  .arq-th { display:none; }
+  .arq-row { grid-template-columns:1fr auto; grid-template-areas:"nm st" "esp esp" "in in"; gap:8px 10px; padding:12px 8px; border-radius:12px; }
+  .arq-nm { grid-area:nm; } .arq-st { grid-area:st; } .arq-esp { grid-area:esp; } .arq-in { grid-area:in; }
+  .arq-esp::before, .arq-in::before { content:attr(data-k); display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--text-3); margin-bottom:2px; }
+  .arq-in::before { display:none; }
+  .arq-foot { grid-template-areas:"nm st" "esp in"; }
+  .arq-foot > span:nth-child(1) { grid-area:nm; } .arq-foot > span:nth-child(2) { grid-area:esp; } .arq-foot > span:nth-child(3) { grid-area:in; } .arq-foot > span:nth-child(4) { grid-area:st; }
+  .arq-in .btn2 .lbl { display:none; }
+}
+/* Atajos de teclado */
+.kbsel { outline:3px solid var(--primary); outline-offset:2px; }
+@media (hover:none), (max-width:1023px) { .atajos-btn { display:none; } }
+.atajos-card { max-width:860px !important; }
+.atajos-card h2 { display:flex; align-items:center; gap:8px; } .atajos-card h2 svg { width:22px; height:22px; }
+.atajos-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(260px, 1fr)); gap:18px 24px; }
+.atajos-grid .h3 { font-size:13.5px; color:var(--text); margin-bottom:6px; }
+.atajo { display:flex; align-items:center; gap:10px; padding:5px 0; font-size:13.5px; color:var(--text-2); }
+.atajo kbd { flex:none; min-width:96px; padding:3px 8px; border-radius:7px; border:1px solid var(--line-strong); background:var(--surface-2); font:600 12px/1.4 var(--ui); color:var(--text); text-align:center; }
+.cz-kpi b { font-size:clamp(17px, 1.7vw, 22px); }

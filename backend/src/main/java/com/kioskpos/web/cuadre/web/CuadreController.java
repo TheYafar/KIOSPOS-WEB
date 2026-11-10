@@ -44,7 +44,8 @@ public class CuadreController {
     /** Cierre simple: se cuenta el efectivo y se compara con lo esperado. */
     @PostMapping("/turnos/{id}/cerrar")
     public CuadreService.Resumen cerrar(@PathVariable Long id, @RequestBody CerrarRequest req) {
-        return cuadreService.cerrarSimple(id, req.declaradoUsd(), req.declaradoBs());
+        return cuadreService.cerrarSimple(id, req.declaradoUsd(), req.declaradoBs(),
+                req.arqueoDetalle(), req.observaciones());
     }
 
     private void exigirCaja(KioskPrincipal principal) {
@@ -56,6 +57,7 @@ public class CuadreController {
     public record AbrirRequest(@NotNull BigDecimal fondoUsd, @NotNull BigDecimal fondoBs) {
     }
 
-    public record CerrarRequest(@NotNull BigDecimal declaradoUsd, @NotNull BigDecimal declaradoBs) {
+    public record CerrarRequest(@NotNull BigDecimal declaradoUsd, @NotNull BigDecimal declaradoBs,
+                                String arqueoDetalle, String observaciones) {
     }
 }

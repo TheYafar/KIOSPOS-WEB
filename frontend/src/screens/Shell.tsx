@@ -9,6 +9,7 @@ import { Reportes } from "./Reportes";
 import { Usuarios } from "./Usuarios";
 import { CierreAviso } from "./negocio";
 import { TemaBtn } from "../TemaBtn";
+import { Atajos } from "../Atajos";
 
 interface Tab { id: string; n: string; icon: string; }
 
@@ -25,6 +26,20 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
     : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "contabilidad", n: "Cuentas", icon: "cash" }, { id: "mas", n: "Más", icon: "more" }];
   const [tab, setTab] = useState(tabs[0].id);
   const [online, setOnline] = useState(navigator.onLine);
+  const [ayuda, setAyuda] = useState(false);
+
+  // Teclado global: Alt+1..n cambia de pestaña, F1 muestra los atajos.
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      if (e.key === "F1") { e.preventDefault(); setAyuda((v) => !v); return; }
+      if (e.altKey && !e.ctrlKey && !e.metaKey && /^[1-9]$/.test(e.key)) {
+        const t = tabs[Number(e.key) - 1];
+        if (t) { e.preventDefault(); setTab(t.id); }
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  });
 
   useEffect(() => {
     const on = () => setOnline(true), off = () => setOnline(false);
@@ -44,8 +59,8 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
       <div className="shell">
         <nav className="rail" aria-label="Menú">
           <span className="logo">K</span>
-          {tabs.map((t) => (
-            <button key={t.id} className="rail-item" aria-current={tab === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>
+          {tabs.map((t, i) => (
+            <button key={t.id} className="rail-item" title={t.n + " (Alt+" + (i + 1) + ")"} aria-current={tab === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>
               <UIcono k={t.icon} />{t.n}
             </button>
           ))}
@@ -65,6 +80,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
                 <span className="dot" style={{ background: online ? "var(--ok)" : "var(--bad)" }} />
                 <b>{online ? "En línea" : "Sin conexión"}</b>
               </span>
+              <button className="tema-btn press atajos-btn" title="Atajos de teclado (F1)" aria-label="Atajos de teclado" onClick={() => setAyuda(true)}><UIcono k="teclado" sw={1.9} /></button>
               <TemaBtn />
             </div>
           </header>
@@ -80,6 +96,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
         </div>
       </div>
 
+      {ayuda && <Atajos onClose={() => setAyuda(false)} />}
       <nav className="tabbar" aria-label="Menú">
         {tabs.map((t) => (
           <button key={t.id} className="tab" aria-current={tab === t.id ? "page" : undefined} onClick={() => setTab(t.id)}>

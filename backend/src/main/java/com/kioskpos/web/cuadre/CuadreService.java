@@ -58,10 +58,22 @@ public class CuadreService {
     /** Cierre simple: compara lo contado contra lo esperado y guarda la diferencia. */
     @Transactional
     public Resumen cerrarSimple(Long turnoId, BigDecimal declaradoUsd, BigDecimal declaradoBs) {
+        return cerrarSimple(turnoId, declaradoUsd, declaradoBs, null, null);
+    }
+
+    /**
+     * Cierre con arqueo detallado: además del efectivo (que define la diferencia
+     * oficial de la gaveta), guarda lo contado en cada forma de pago y observaciones.
+     */
+    @Transactional
+    public Resumen cerrarSimple(Long turnoId, BigDecimal declaradoUsd, BigDecimal declaradoBs,
+                                String arqueoDetalle, String observaciones) {
         Turno turno = cargar(turnoId);
         if (!Turno.Estado.ABIERTO.name().equals(turno.getEstado())) {
             throw new IllegalStateException("El turno ya está cerrado");
         }
+        turno.setArqueoDetalle(recortar(arqueoDetalle, 8000));
+        turno.setObservaciones(recortar(observaciones, 500));
         Resumen r = calcular(turno);
         BigDecimal dUsd = noNeg(declaradoUsd);
         BigDecimal dBs = noNeg(declaradoBs);
@@ -134,6 +146,14 @@ public class CuadreService {
     private Turno cargar(Long id) {
         return turnoRepository.findById(id)
                 .orElseThrow(() -> new IllegalArgumentException("Turno no encontrado"));
+    }
+
+    private static String recortar(String s, int max) {
+        if (s == null || s.isBlank()) {
+            return null;
+        }
+        String t = s.trim();
+        return t.length() > max ? t.substring(0, max) : t;
     }
 
     private static BigDecimal noNeg(BigDecimal v) {

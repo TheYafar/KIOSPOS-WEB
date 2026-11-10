@@ -113,6 +113,32 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
     }
   };
 
+  // Teclado en la pantalla de PIN: números escriben el PIN (si no hay nadie elegido,
+  // se elige el primer cajero), ←/→ cambian de cajero, Retroceso borra, Esc limpia.
+  useEffect(() => {
+    if (vista !== "pin") return;
+    const h = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) return;
+      if (/^[0-9]$/.test(e.key)) {
+        e.preventDefault();
+        if (!sel) { if (cajeros.length) { setSel(cajeros[0]); setPin(e.key); setPinErr(""); } return; }
+        tecla(e.key);
+      } else if (e.key === "Backspace") { e.preventDefault(); tecla("del"); }
+      else if (e.key === "Escape") { e.preventDefault(); if (pin) tecla("clr"); else setSel(null); }
+      else if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        if (!cajeros.length) return;
+        e.preventDefault();
+        const i = sel ? cajeros.findIndex((c) => c.id === sel.id) : -1;
+        const n = e.key === "ArrowRight" ? (i + 1) % cajeros.length : (i <= 0 ? cajeros.length - 1 : i - 1);
+        setSel(cajeros[n]); setPin(""); setPinErr("");
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  });
+
   const entrarDueno = async () => {
     try {
       onLogin(await loginDueno(email.trim(), pass));
@@ -164,10 +190,10 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
             </div>
             <p className="hint">Pega el <b>enlace</b> o el <b>token</b> que te dio el dueño en su panel, y la tasa del dólar de hoy.</p>
             <label>Token de la caja
-              <input className="inp" value={cajaTok} onChange={(e) => setCajaTok(e.target.value)} placeholder="Pegado del panel del dueño" />
+              <input className="inp" value={cajaTok} onChange={(e) => setCajaTok(e.target.value)} placeholder="Pegado del panel del dueño" onKeyDown={(e) => { if (e.key === "Enter" && cajaTok.trim()) guardarConfig(); }} />
             </label>
             <label>Tasa BCV del día <span style={{ color: "var(--ok)", fontWeight: 600 }}>· automática</span>
-              <input className="inp" value={tasa} onChange={(e) => setTasaLocal(e.target.value)} />
+              <input className="inp" value={tasa} onChange={(e) => setTasaLocal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && cajaTok.trim()) guardarConfig(); }} />
             </label>
             <p className="hint" style={{ marginTop: -6 }}>Se actualiza sola con el BCV. Solo cámbiala si no tienes internet.</p>
             {err && <p className="pinmsg err">{err}</p>}
@@ -192,7 +218,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
               <input className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
             </label>
             <label>Contraseña
-              <input className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="current-password" />
+              <input className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="current-password" onKeyDown={(e) => { if (e.key === "Enter" && email && pass) entrarDueno(); }} />
             </label>
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={entrarDueno} disabled={!email || !pass}>Entrar</button>
@@ -211,7 +237,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
           <div className="entrar-head"><h1>Panel de administración</h1><p>Acceso de super admin</p></div>
           <div className="owner">
             <label>Correo<input className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-            <label>Contraseña<input className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)} /></label>
+            <label>Contraseña<input className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && email && pass) entrarAdmin(); }} /></label>
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={entrarAdmin} disabled={!email || !pass}>Entrar</button>
             <button className="link" onClick={() => { setErr(""); setVista("dueno"); }}>Volver</button>
@@ -224,7 +250,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
   return (
     <div className="app"><div className="entrar">{side}
       <main className="entrar-main">
-        <div className="entrar-head"><h1>¿Quién va a cobrar?</h1><p>Toca tu nombre y escribe tu PIN de 4 dígitos</p></div>
+        <div className="entrar-head"><h1>¿Quién va a cobrar?</h1><p>Toca tu nombre y escribe tu PIN de 4 dígitos<span className="kbtip">← → elige · teclea el PIN</span></p></div>
         {err && <p className="pinmsg err">{err}</p>}
         <div className="personas">
           {cajeros.map((c, i) => (

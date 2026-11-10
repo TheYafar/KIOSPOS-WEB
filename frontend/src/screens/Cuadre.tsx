@@ -1,34 +1,56 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { abrirTurno, cerrarTurno, resumenTurno, type TurnoResumen } from "../api";
 import { getTasa, getTurnoId, setTurnoId } from "../session";
 import { UIcono } from "../icons";
+import { calcularArqueo, leerMonto, type FilaArqueo } from "../arqueo";
+import { conectorDisponible, imprimirTicket } from "../conector";
 
-// Cierre de caja en UNA sola pantalla, como el KioskPOS de escritorio
-// (CashRegisterController): números del turno arriba, desglose efectivo vs. digital
-// al medio, y abajo lo contado con la diferencia en vivo + calculadora de billetes.
+// Cierre de caja: el cajero CUENTA cada forma de pago (efectivo $, efectivo Bs, pago
+// móvil, punto, Biopago) y la app le dice fila por fila si cuadra, falta o sobra.
+// Se maneja con teclado: Enter pasa a la siguiente casilla, F8 abre la calculadora de
+// billetes y Ctrl+Enter cierra el turno.
 
 const money = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const usd = (n: number) => "$ " + money(n);
 const bs = (n: number) => "Bs " + money(n);
-const r2 = (n: number) => Math.round(n * 100) / 100;
-/** "1.234,50" o "1234.50" o "50,5" -> número. Con coma: los puntos son miles. */
-const numOf = (s: string) => {
-  const t = (s || "").trim();
-  if (!t) return 0;
-  const norm = t.includes(",") ? t.replace(/\./g, "").replace(",", ".") : t;
-  return parseFloat(norm) || 0;
-};
+const fmt = (moneda: string, n: number) => (moneda === "USD" ? usd(n) : bs(n));
+const numOf = (s: string) => leerMonto(s) ?? 0;
 
 const DEN_USD = [100, 50, 20, 10, 5, 2, 1];
 const DEN_BS = [500, 200, 100, 50, 20, 10, 5];
 
-/** Estado de la diferencia, igual que el escritorio: exacto / sobrante / faltante. */
-function Badge({ diff, isBs }: { diff: number; isBs: boolean }) {
-  const d = r2(diff);
-  const f = isBs ? bs : usd;
-  if (d === 0) return <span className="pill ok"><i />Cuadre exacto</span>;
-  if (d > 0) return <span className="pill info"><i />Sobrante {f(d)}</span>;
-  return <span className="pill late"><i />Faltante {f(Math.abs(d))}</span>;
+const INFO: Record<string, { n: string; icon: string; color: string; donde: string }> = {
+  EFECTIVO_USD: { n: "Efectivo $", icon: "cash", color: "var(--primary)", donde: "Cuenta los billetes en dólares de la gaveta" },
+  EFECTIVO_BS: { n: "Efectivo Bs", icon: "bills", color: "var(--c-limpieza)", donde: "Cuenta los billetes en bolívares de la gaveta" },
+  PAGO_MOVIL: { n: "Pago móvil", icon: "phone", color: "var(--c-bebidas)", donde: "Lo que te llegó al banco por pago móvil" },
+  PUNTO: { n: "Punto de venta", icon: "card", color: "var(--warn)", donde: "El total del cierre de lote del punto" },
+  BIOPAGO: { n: "Biopago", icon: "finger", color: "var(--c-chucherias)", donde: "El total que reporta Biopago" },
+};
+
+function Estado({ f }: { f: FilaArqueo }) {
+  if (f.estado === "sin-contar") return <span className="pill">Sin contar</span>;
+  if (f.estado === "sin-movimiento") return <span className="pill">Sin ventas</span>;
+  if (f.estado === "cuadra") return <span className="pill ok"><i />Cuadra</span>;
+  if (f.estado === "sobra") return <span className="pill info"><i />Sobra {fmt(f.moneda, f.diferencia)}</span>;
+  return <span className="pill late"><i />Falta {fmt(f.moneda, Math.abs(f.diferencia))}</span>;
+}
+
+/** Texto de 40 columnas para imprimir el cierre (tipo "Ticket Z" del escritorio). */
+function textoCierre(turnoId: number, filas: FilaArqueo[], difUsd: number, obs: string): string {
+  const w = 40, pad = (l: string, r: string) => (l.length + r.length >= w ? (l + " " + r).slice(0, w) : l + " ".repeat(w - l.length - r.length) + r);
+  const center = (s: string) => " ".repeat(Math.max(0, Math.floor((w - s.length) / 2))) + s;
+  const now = new Date();
+  const L = [center("CIERRE DE CAJA"), center("Turno #" + turnoId), center(now.toLocaleString("es-VE")), "-".repeat(w)];
+  filas.forEach((f) => {
+    L.push((INFO[f.metodo]?.n || f.metodo).toUpperCase());
+    L.push(pad("  Debe haber", fmt(f.moneda, f.esperado)));
+    L.push(pad("  Contado", f.contado == null ? "(sin contar)" : fmt(f.moneda, f.contado)));
+    if (f.contado != null && f.diferencia !== 0) L.push(pad(f.diferencia < 0 ? "  FALTA" : "  SOBRA", fmt(f.moneda, Math.abs(f.diferencia))));
+  });
+  L.push("-".repeat(w), pad("DIFERENCIA TOTAL (en $)", usd(difUsd)));
+  if (obs.trim()) { L.push("-".repeat(w), "Obs: " + obs.trim().slice(0, 200)); }
+  L.push("-".repeat(w), "", "Firma cajero: ______________________", "", "Firma recibe: ______________________");
+  return L.join("\n");
 }
 
 export function Cuadre() {
@@ -36,18 +58,30 @@ export function Cuadre() {
   const [cargando, setCargando] = useState(true);
   const [fUsd, setFUsd] = useState("20");
   const [fBs, setFBs] = useState("0");
-  const [cUsd, setCUsd] = useState("");
-  const [cBs, setCBs] = useState("");
-  const [calc, setCalc] = useState<null | "USD" | "VES">(null);
-  const [cerrado, setCerrado] = useState<TurnoResumen | null>(null);
+  const [cont, setCont] = useState<Record<string, string>>({});
+  const [obs, setObs] = useState("");
+  const [calc, setCalc] = useState<null | { moneda: "USD" | "VES"; destino: "fondo" | "arqueo" }>(null);
+  const [cerrado, setCerrado] = useState<null | { turnoId: number; filas: FilaArqueo[]; difUsd: number; obs: string }>(null);
   const [err, setErr] = useState("");
   const [cerrando, setCerrando] = useState(false);
+  const [confirmar, setConfirmar] = useState(false);
+  const [aviso, setAviso] = useState("");
+  const inputs = useRef<(HTMLInputElement | null)[]>([]);
+  const obsRef = useRef<HTMLTextAreaElement>(null);
+  const fondoRef = useRef<HTMLInputElement>(null);
+  const tasa = Number(getTasa()) || 0;
 
   useEffect(() => {
     const id = getTurnoId();
     if (id) resumenTurno(id).then((t) => { setTurno(t); setCargando(false); }).catch(() => { setTurnoId(null); setCargando(false); });
     else setCargando(false);
   }, []);
+
+  // En PC, el cursor arranca en la primera casilla (abrir: fondo; cerrar: efectivo $).
+  useEffect(() => {
+    if (cargando || !window.matchMedia("(min-width:1024px)").matches) return;
+    if (!turno) fondoRef.current?.focus(); else inputs.current[0]?.focus();
+  }, [cargando, turno?.turnoId]);
 
   const abrir = async () => {
     try {
@@ -61,38 +95,48 @@ export function Cuadre() {
     try { setTurno(await resumenTurno(turno.turnoId)); setErr(""); } catch (e) { setErr((e as Error).message); }
   };
 
-  const cerrar = async () => {
-    if (!turno) return;
-    setCerrando(true);
-    try {
-      const r = await cerrarTurno(turno.turnoId, numOf(cUsd), numOf(cBs));
-      setTurnoId(null); setCerrado(r); setErr("");
-    } catch (e) { setErr((e as Error).message); }
-    finally { setCerrando(false); }
-  };
-
-  const nuevo = () => { setCerrado(null); setTurno(null); setCUsd(""); setCBs(""); };
+  const nuevo = () => { setCerrado(null); setTurno(null); setCont({}); setObs(""); setConfirmar(false); setAviso(""); };
 
   if (cargando) return <div className="stub">Cargando…</div>;
 
-  // ----- Resultado del cierre -----
+  // ----- Resultado del cierre (detallado) -----
   if (cerrado) {
-    const dU = cerrado.diferenciaUsd ?? 0, dB = cerrado.diferenciaBs ?? 0;
+    const imprimir = async () => {
+      if (!(await conectorDisponible())) { setAviso("El Conector de impresión no está abierto en esta PC."); return; }
+      try { await imprimirTicket(textoCierre(cerrado.turnoId, cerrado.filas, cerrado.difUsd, cerrado.obs), false); setAviso("Cierre enviado a la impresora."); }
+      catch (e) { setAviso((e as Error).message); }
+    };
+    const malas = cerrado.filas.filter((f) => f.estado === "falta" || f.estado === "sobra");
     return (
       <div className="czwrap wide">
-        <div className="card czhero"><span className="ibox" style={{ background: "var(--ok-soft)", color: "var(--ok)" }}><UIcono k="check" sw={2.4} /></span><div><b>Turno #{cerrado.turnoId} cerrado</b><span>Así quedó el cuadre de la gaveta.</span></div></div>
-        <div className="cz-diffs">
-          <div className="cz-diff"><span className="k">Dólares</span><b className="t">{usd(cerrado.declaradoUsd ?? 0)}</b><span className="d t">Debía haber {usd(cerrado.esperadoUsd)}</span><Badge diff={dU} isBs={false} /></div>
-          <div className="cz-diff"><span className="k">Bolívares</span><b className="t">{bs(cerrado.declaradoBs ?? 0)}</b><span className="d t">Debía haber {bs(cerrado.esperadoBs)}</span><Badge diff={dB} isBs /></div>
+        <div className={"card czhero" + (malas.length ? " warn" : "")}>
+          <span className="ibox" style={{ background: malas.length ? "var(--bad-soft)" : "var(--ok-soft)", color: malas.length ? "var(--bad)" : "var(--ok)" }}><UIcono k={malas.length ? "alert" : "check"} sw={2.2} /></span>
+          <div><b>Turno #{cerrado.turnoId} cerrado {malas.length ? "con diferencias" : "— todo cuadró"}</b>
+            <span>{malas.length ? malas.map((f) => (f.estado === "falta" ? "Falta " : "Sobra ") + fmt(f.moneda, Math.abs(f.diferencia)) + " en " + (INFO[f.metodo]?.n || f.metodo)).join(" · ") : "Cada forma de pago coincide con lo que registró el sistema."}</span></div>
         </div>
-        <button className="cta center press" onClick={nuevo}>Listo</button>
+        <div className="card arq">
+          <div className="arq-head"><h3 className="h3">Detalle del cierre</h3><span className="arq-tot">Diferencia total <b className="t">{usd(cerrado.difUsd)}</b></span></div>
+          <div className="arq-table">
+            <div className="arq-row arq-th"><span>Forma de pago</span><span>Debe haber</span><span>Contado</span><span>Estado</span></div>
+            {cerrado.filas.map((f) => (
+              <div className="arq-row" key={f.metodo}>
+                <span className="arq-nm"><b>{INFO[f.metodo]?.n || f.metodo}</b></span>
+                <span className="t" data-k="Debe haber">{fmt(f.moneda, f.esperado)}</span>
+                <span className="t" data-k="Contado">{f.contado == null ? "—" : fmt(f.moneda, f.contado)}</span>
+                <span><Estado f={f} /></span>
+              </div>
+            ))}
+          </div>
+          {cerrado.obs.trim() && <p className="hint">Observaciones: {cerrado.obs}</p>}
+        </div>
+        {aviso && <p className="pinmsg">{aviso}</p>}
+        <div className="two"><button className="btn2 press" onClick={imprimir}><UIcono k="print" />Imprimir cierre</button><button className="cta center press" onClick={nuevo}>Listo</button></div>
       </div>
     );
   }
 
   // ----- Caja sin abrir -----
   if (!turno) {
-    const tasaHoy = Number(getTasa()) || 0;
     return (
       <div className="czwrap wide">
         <div className="cz-open">
@@ -104,19 +148,21 @@ export function Cuadre() {
                 <div className="cz-field">
                   <span className="k">Fondo en dólares</span>
                   <div className="cz-in">
-                    <div className="inpw"><i>$</i><input className="inp pre t" value={fUsd} onChange={(e) => setFUsd(e.target.value)} inputMode="decimal" aria-label="Fondo en dólares" /></div>
-                    <button className="btn2 press" onClick={() => setCalc("USD")}><UIcono k="bills" />Contar billetes</button>
+                    <div className="inpw"><i>$</i><input ref={fondoRef} className="inp pre t" value={fUsd} onChange={(e) => setFUsd(e.target.value)} inputMode="decimal" aria-label="Fondo en dólares"
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (document.querySelector("[aria-label='Fondo en bolívares']") as HTMLInputElement | null)?.focus(); } else if (e.key === "F8") { e.preventDefault(); setCalc({ moneda: "USD", destino: "fondo" }); } }} /></div>
+                    <button className="btn2 press" onClick={() => setCalc({ moneda: "USD", destino: "fondo" })}><UIcono k="bills" />Contar billetes</button>
                   </div>
                 </div>
                 <div className="cz-field">
                   <span className="k">Fondo en bolívares</span>
                   <div className="cz-in">
-                    <div className="inpw"><i>Bs</i><input className="inp t" style={{ paddingLeft: 40 }} value={fBs} onChange={(e) => setFBs(e.target.value)} inputMode="decimal" aria-label="Fondo en bolívares" /></div>
-                    <button className="btn2 press" onClick={() => setCalc("VES")}><UIcono k="bills" />Contar billetes</button>
+                    <div className="inpw"><i>Bs</i><input className="inp t" style={{ paddingLeft: 40 }} value={fBs} onChange={(e) => setFBs(e.target.value)} inputMode="decimal" aria-label="Fondo en bolívares"
+                      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); abrir(); } else if (e.key === "F8") { e.preventDefault(); setCalc({ moneda: "VES", destino: "fondo" }); } }} /></div>
+                    <button className="btn2 press" onClick={() => setCalc({ moneda: "VES", destino: "fondo" })}><UIcono k="bills" />Contar billetes</button>
                   </div>
                 </div>
               </div>
-              <span className="hint">El fondo es el sencillo para dar vuelto. Se suma una sola vez al cuadre.</span>
+              <span className="hint">El fondo es el sencillo para dar vuelto. Se suma una sola vez al cuadre. <span className="kbtip">Enter avanza · F8 cuenta billetes</span></span>
               {err && <p className="pinmsg err">{err}</p>}
               <button className="cta center press cz-cerrar" onClick={abrir}><UIcono k="check" sw={2.2} />Abrir caja</button>
             </div>
@@ -126,26 +172,59 @@ export function Cuadre() {
             <ol className="cz-steps-list">
               <li><b>1</b><div><strong>Abre con el fondo</strong><span>Cuenta el sencillo que dejas en la gaveta para dar vuelto.</span></div></li>
               <li><b>2</b><div><strong>Vende</strong><span>Cada venta se suma sola al turno: efectivo, pago móvil, punto y Biopago.</span></div></li>
-              <li><b>3</b><div><strong>Cuenta y cierra</strong><span>Al final cuentas la gaveta y la app te dice si cuadra, sobra o falta.</span></div></li>
+              <li><b>3</b><div><strong>Cuenta cada forma de pago y cierra</strong><span>La app te dice en cuál cuadra, en cuál falta y en cuál sobra.</span></div></li>
             </ol>
-            {tasaHoy > 0 && <div className="cz-total"><span>Tasa BCV de hoy</span><div><b className="t">Bs {money(tasaHoy)}</b></div></div>}
+            {tasa > 0 && <div className="cz-total"><span>Tasa BCV de hoy</span><div><b className="t">Bs {money(tasa)}</b></div></div>}
           </aside>
         </div>
-        {calc && (
-          <CalcBilletes moneda={calc} onClose={() => setCalc(null)}
-            onUsar={(total) => { (calc === "USD" ? setFUsd : setFBs)(money(total)); setCalc(null); }} />
-        )}
+        {calc && <CalcBilletes moneda={calc.moneda} onClose={() => setCalc(null)}
+          onUsar={(t) => { (calc.moneda === "USD" ? setFUsd : setFBs)(money(t)); setCalc(null); }} />}
       </div>
     );
   }
 
-  // ----- Turno abierto: todo en una pantalla -----
-  const dig = (m: string) => turno.metodos?.find((x) => x.metodo === m)?.esperado ?? 0;
-  const pagoMovil = dig("PAGO_MOVIL"), punto = dig("PUNTO"), biopago = dig("BIOPAGO");
-  const digital = r2(pagoMovil + punto + biopago);
-  const diffUsd = r2(numOf(cUsd) - turno.esperadoUsd);
-  const diffBs = r2(numOf(cBs) - turno.esperadoBs);
-  const tasa = Number(getTasa()) || 0;
+  // ----- Turno abierto: arqueo por forma de pago -----
+  const metodos = turno.metodos?.length ? turno.metodos : [
+    { metodo: "EFECTIVO_USD", moneda: "USD", esperado: turno.esperadoUsd, digital: false },
+    { metodo: "EFECTIVO_BS", moneda: "VES", esperado: turno.esperadoBs, digital: false },
+  ];
+  const a = calcularArqueo(metodos, cont, tasa);
+  const digital = metodos.filter((m) => m.digital).reduce((s, m) => s + m.esperado, 0);
+  const detalle = (m: string) =>
+    m === "EFECTIVO_USD" ? `Fondo ${usd(turno.fondoUsd)} + ventas ${usd(turno.efectivoUsd)} − vuelto ${usd(turno.vueltoUsd)}`
+    : m === "EFECTIVO_BS" ? `Fondo ${bs(turno.fondoBs)} + ventas ${bs(turno.efectivoBs)} − vuelto ${bs(turno.vueltoBs)}`
+    : "Lo cobrado en el turno";
+
+  const siguiente = (i: number) => {
+    const nx = inputs.current[i + 1];
+    if (nx) nx.focus(); else obsRef.current?.focus();
+  };
+
+  const cerrar = async () => {
+    if (cerrando) return;
+    if (!a.listo && !confirmar) {
+      setConfirmar(true);
+      setAviso("Te falta contar: " + a.filas.filter((f) => f.estado === "sin-contar").map((f) => INFO[f.metodo]?.n || f.metodo).join(", ") + ". Cuéntalas o pulsa “Cerrar igual”.");
+      return;
+    }
+    setCerrando(true); setErr("");
+    try {
+      const efUsd = a.filas.find((f) => f.metodo === "EFECTIVO_USD")?.contado ?? 0;
+      const efBs = a.filas.find((f) => f.metodo === "EFECTIVO_BS")?.contado ?? 0;
+      const det = JSON.stringify(a.filas.map((f) => ({ metodo: f.metodo, moneda: f.moneda, esperado: f.esperado, contado: f.contado, diferencia: f.diferencia })));
+      await cerrarTurno(turno.turnoId, efUsd, efBs, det, obs);
+      setTurnoId(null);
+      setCerrado({ turnoId: turno.turnoId, filas: a.filas, difUsd: a.diferenciaUsd, obs });
+      setAviso(""); setConfirmar(false);
+    } catch (e) { setErr((e as Error).message); }
+    finally { setCerrando(false); }
+  };
+
+  const onKey = (i: number, f: FilaArqueo) => (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); cerrar(); }
+    else if (e.key === "Enter") { e.preventDefault(); siguiente(i); }
+    else if (e.key === "F8" && !f.digital) { e.preventDefault(); setCalc({ moneda: f.moneda, destino: "arqueo" }); }
+  };
 
   return (
     <div className="czwrap wide">
@@ -156,7 +235,6 @@ export function Cuadre() {
         <button className="btn2 press cz-ref" onClick={refrescar}>Actualizar</button>
       </div>
 
-      {/* KPIs del turno */}
       <div className="cz-kpis">
         <div className="cz-kpi"><span className="k">Fondo inicial</span><b className="t">{usd(turno.fondoUsd)}</b><span className="d t">{bs(turno.fondoBs)}</span></div>
         <div className="cz-kpi"><span className="k">Ventas en efectivo</span><b className="t">{usd(turno.efectivoUsd)}</b><span className="d t">{bs(turno.efectivoBs)}</span></div>
@@ -164,86 +242,98 @@ export function Cuadre() {
         <div className="cz-kpi hl"><span className="k">Esperado en gaveta</span><b className="t">{usd(turno.esperadoUsd)}</b><span className="d t">{bs(turno.esperadoBs)}</span></div>
       </div>
 
-      {/* Desglose: efectivo físico vs. cobros digitales */}
-      <div className="cz-cols">
-        <div className="card cz-block">
-          <h3 className="h3">Efectivo físico en gaveta</h3>
-          <div className="cz-row"><span>Fondo inicial</span><b className="t">{usd(turno.fondoUsd)}{turno.fondoBs > 0 && <small> · {bs(turno.fondoBs)}</small>}</b></div>
-          <div className="cz-row"><span>(+) Ventas efectivo $</span><b className="t">{usd(turno.efectivoUsd)}</b></div>
-          <div className="cz-row"><span>(+) Ventas efectivo Bs</span><b className="t">{bs(turno.efectivoBs)}</b></div>
-          <div className="cz-row"><span>(−) Vuelto entregado</span><b className="t neg">{usd(turno.vueltoUsd)}{turno.vueltoBs > 0 && <small> · {bs(turno.vueltoBs)}</small>}</b></div>
-          <div className="cz-total"><span>Debe haber en gaveta</span><div><b className="t">{usd(turno.esperadoUsd)}</b><b className="t">{bs(turno.esperadoBs)}</b></div></div>
+      <div className="card arq">
+        <div className="arq-head">
+          <div><h3 className="h3">Cuenta cada forma de pago</h3><span className="hint">Escribe lo que tienes en la mano. La app te dice si cuadra. <span className="kbtip">Enter: siguiente · F8: contar billetes · Ctrl+Enter: cerrar</span></span></div>
+          <div className="arq-prog"><span>{a.contadas} de {a.requeridas} contadas</span><div className="progress"><i style={{ width: (a.requeridas ? (a.contadas / a.requeridas) * 100 : 0) + "%", background: "var(--primary)" }} /></div></div>
         </div>
-        <div className="card cz-block">
-          <h3 className="h3">Cobros digitales <small>(en cuenta bancaria)</small></h3>
-          <div className="cz-row"><span>Pago móvil</span><b className="t">{bs(pagoMovil)}</b></div>
-          <div className="cz-row"><span>Punto de venta</span><b className="t">{bs(punto)}</b></div>
-          <div className="cz-row"><span>Biopago</span><b className="t">{bs(biopago)}</b></div>
-          <div className="cz-total"><span>Total digital</span><div><b className="t">{bs(digital)}</b>{tasa > 0 && <small className="t">≈ {usd(digital / tasa)}</small>}</div></div>
-          <span className="hint">No entra a la gaveta: compáralo con el cierre del punto y tu banco.</span>
+        <div className="arq-table">
+          <div className="arq-row arq-th"><span>Forma de pago</span><span>Debe haber</span><span>Contaste</span><span>Estado</span></div>
+          {a.filas.map((f, i) => {
+            const inf = INFO[f.metodo] || { n: f.metodo, icon: "cash", color: "var(--text-3)", donde: "" };
+            return (
+              <div className={"arq-row arq-" + f.estado} key={f.metodo}>
+                <span className="arq-nm">
+                  <span className="co2-ic" style={{ background: `color-mix(in srgb, ${inf.color} 15%, var(--surface))`, color: inf.color }}><UIcono k={inf.icon} sw={1.8} /></span>
+                  <span><b>{inf.n}</b><small>{inf.donde}</small></span>
+                </span>
+                <span className="arq-esp" data-k="Debe haber"><b className="t">{fmt(f.moneda, f.esperado)}</b><small>{detalle(f.metodo)}</small></span>
+                <span className="arq-in" data-k="Contaste">
+                  <span className="inpw"><i>{f.moneda === "USD" ? "$" : "Bs"}</i>
+                    <input ref={(el) => { inputs.current[i] = el; }} className="inp t" style={{ paddingLeft: f.moneda === "USD" ? 30 : 40 }} inputMode="decimal" placeholder="0,00"
+                      value={cont[f.metodo] ?? ""} onChange={(e) => setCont({ ...cont, [f.metodo]: e.target.value.replace(/[^\d.,]/g, "") })}
+                      onFocus={(e) => e.target.select()} onKeyDown={onKey(i, f)} aria-label={"Contado en " + inf.n} /></span>
+                  {!f.digital && <button className="btn2 press" title="Contar billetes (F8)" onClick={() => setCalc({ moneda: f.moneda, destino: "arqueo" })}><UIcono k="bills" /><span className="lbl">Billetes</span></button>}
+                </span>
+                <span className="arq-st"><Estado f={f} /></span>
+              </div>
+            );
+          })}
+          <div className="arq-row arq-foot">
+            <span><b>Total (todo en $)</b></span>
+            <span className="t" data-k="Debe haber"><b>{usd(a.esperadoUsd)}</b></span>
+            <span className="t" data-k="Contaste"><b>{usd(a.contadoUsd)}</b></span>
+            <span>{a.contadas === 0 ? <span className="pill">Sin contar</span> : !a.listo ? <span className="pill soon"><i />Faltan {a.porContar} por contar</span> : a.diferenciaUsd === 0 ? <span className="pill ok"><i />Cuadra</span> : a.diferenciaUsd < 0 ? <span className="pill late"><i />Falta {usd(-a.diferenciaUsd)}</span> : <span className="pill info"><i />Sobra {usd(a.diferenciaUsd)}</span>}</span>
+          </div>
         </div>
+        {a.faltantes.length > 0 && (
+          <div className="arq-alerta"><UIcono k="alert" sw={2} /><div><b>Revisa antes de cerrar</b>
+            <span>{a.faltantes.map((f) => "Falta " + fmt(f.moneda, Math.abs(f.diferencia)) + " en " + (INFO[f.metodo]?.n || f.metodo)).join(" · ")}</span></div></div>
+        )}
       </div>
 
-      {/* Contar y cerrar */}
       <div className="card cz-count">
-        <h3 className="h3">Cuenta el dinero de la gaveta y cierra el turno</h3>
-        <div className="cz-fields">
-          <div className="cz-field">
-            <span className="k">Efectivo en dólares</span>
-            <div className="cz-in">
-              <div className="inpw"><i>$</i><input className="inp pre t" value={cUsd} onChange={(e) => setCUsd(e.target.value)} placeholder="0,00" inputMode="decimal" aria-label="Efectivo contado en dólares" /></div>
-              <button className="btn2 press" onClick={() => setCalc("USD")}><UIcono k="bills" />Contar billetes</button>
-            </div>
-            <div className="cz-dline"><span>Diferencia <b className="t">{usd(diffUsd)}</b></span><Badge diff={diffUsd} isBs={false} /></div>
-          </div>
-          <div className="cz-field">
-            <span className="k">Efectivo en bolívares</span>
-            <div className="cz-in">
-              <div className="inpw"><i>Bs</i><input className="inp t" style={{ paddingLeft: 40 }} value={cBs} onChange={(e) => setCBs(e.target.value)} placeholder="0,00" inputMode="decimal" aria-label="Efectivo contado en bolívares" /></div>
-              <button className="btn2 press" onClick={() => setCalc("VES")}><UIcono k="bills" />Contar billetes</button>
-            </div>
-            <div className="cz-dline"><span>Diferencia <b className="t">{bs(diffBs)}</b></span><Badge diff={diffBs} isBs /></div>
-          </div>
-        </div>
+        <label className="lbl">Observaciones del cierre <span className="opt">(opcional)</span>
+          <textarea ref={obsRef} className="inp arq-obs" rows={2} maxLength={500} value={obs} placeholder="Ej: entregado al supervisor, sin novedades…" onChange={(e) => setObs(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); cerrar(); } }} />
+        </label>
+        {aviso && <p className="pinmsg err">{aviso}</p>}
         {err && <p className="pinmsg err">{err}</p>}
-        <button className="cta center press cz-cerrar" disabled={cerrando} onClick={cerrar}><UIcono k="check" sw={2.2} />{cerrando ? "Cerrando…" : "Cerrar turno"}</button>
+        <button className={"cta center press cz-cerrar" + (confirmar && !a.listo ? " warn" : "")} disabled={cerrando} onClick={cerrar}>
+          <UIcono k="check" sw={2.2} />{cerrando ? "Cerrando…" : confirmar && !a.listo ? "Cerrar igual" : "Cerrar turno"} <kbd className="kb">Ctrl+Enter</kbd>
+        </button>
       </div>
 
-      {calc && (
-        <CalcBilletes moneda={calc} onClose={() => setCalc(null)}
-          onUsar={(total) => { (calc === "USD" ? setCUsd : setCBs)(money(total)); setCalc(null); }} />
-      )}
+      {calc && <CalcBilletes moneda={calc.moneda} onClose={() => setCalc(null)}
+        onUsar={(t) => { const k = calc.moneda === "USD" ? "EFECTIVO_USD" : "EFECTIVO_BS"; setCont({ ...cont, [k]: money(t) }); setCalc(null); setTimeout(() => inputs.current[a.filas.findIndex((f) => f.metodo === k)]?.focus(), 0); }} />}
     </div>
   );
 }
 
-/** Calculadora de billetes por denominación (como el escritorio): cantidad × billete = total. */
+/** Calculadora de billetes: cantidad × billete. Teclado: Enter usa el total, Esc cierra. */
 function CalcBilletes({ moneda, onClose, onUsar }: { moneda: "USD" | "VES"; onClose: () => void; onUsar: (total: number) => void }) {
   const den = moneda === "USD" ? DEN_USD : DEN_BS;
-  const fmt = moneda === "USD" ? usd : bs;
+  const f = moneda === "USD" ? usd : bs;
   const [cant, setCant] = useState<Record<number, string>>({});
+  const primero = useRef<HTMLInputElement>(null);
   const n = (d: number) => parseInt(cant[d] || "0", 10) || 0;
-  const total = r2(den.reduce((s, d) => s + d * n(d), 0));
+  const total = Math.round(den.reduce((s, d) => s + d * n(d), 0) * 100) / 100;
   const paso = (d: number, inc: number) => setCant({ ...cant, [d]: String(Math.max(0, n(d) + inc)) });
+  useEffect(() => { primero.current?.focus(); }, []);
   return (
-    <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onKeyDown={(e) => { if (e.key === "Escape") { e.preventDefault(); onClose(); } else if (e.key === "Enter") { e.preventDefault(); onUsar(total); } }}>
       <div className="modal-card">
         <div className="modal-head"><h2>Contar billetes {moneda === "USD" ? "($)" : "(Bs)"}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
         <div className="modal-body">
+          <span className="hint">Escribe cuántos billetes hay de cada uno. <span className="kbtip">Tab: siguiente · ↑↓: sumar/restar · Enter: usar total · Esc: cerrar</span></span>
           <div className="calc-rows">
-            {den.map((d) => (
+            {den.map((d, i) => (
               <div className="calc-row" key={d}>
                 <span className="bn t">{moneda === "USD" ? "$" : "Bs"} {d}</span>
-                <div className="stp"><button onClick={() => paso(d, -1)} aria-label="Menos">−</button>
-                  <input className="t" inputMode="numeric" value={cant[d] ?? ""} placeholder="0" onChange={(e) => setCant({ ...cant, [d]: e.target.value.replace(/\D/g, "") })} aria-label={"Billetes de " + d} />
-                  <button onClick={() => paso(d, 1)} aria-label="Más">+</button></div>
-                <span className="t sub">{n(d) ? fmt(d * n(d)) : "—"}</span>
+                <div className="stp"><button tabIndex={-1} onClick={() => paso(d, -1)} aria-label="Menos">−</button>
+                  <input ref={i === 0 ? primero : undefined} className="t" inputMode="numeric" value={cant[d] ?? ""} placeholder="0"
+                    onChange={(e) => setCant({ ...cant, [d]: e.target.value.replace(/\D/g, "") })}
+                    onKeyDown={(e) => { if (e.key === "ArrowUp") { e.preventDefault(); paso(d, 1); } else if (e.key === "ArrowDown") { e.preventDefault(); paso(d, -1); } }}
+                    aria-label={"Billetes de " + d} />
+                  <button tabIndex={-1} onClick={() => paso(d, 1)} aria-label="Más">+</button></div>
+                <span className="t sub">{n(d) ? f(d * n(d)) : "—"}</span>
               </div>
             ))}
           </div>
-          <div className="calc-total"><span>Total contado</span><b className="t">{fmt(total)}</b></div>
+          <div className="calc-total"><span>Total contado</span><b className="t">{f(total)}</b></div>
         </div>
-        <div className="modal-foot"><button className="cta center press" onClick={() => onUsar(total)}>Usar este total</button></div>
+        <div className="modal-foot"><button className="cta center press" onClick={() => onUsar(total)}>Usar este total <kbd className="kb">Enter</kbd></button></div>
       </div>
     </div>
   );

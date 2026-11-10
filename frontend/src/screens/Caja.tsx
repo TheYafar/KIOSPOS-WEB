@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { cobrar, getTasa, listarProductos, type PagoCobro, type Producto } from "../api";
 import { conectorDisponible, imprimirTicket } from "../conector";
 import { Icono, UIcono, catInfo } from "../icons";
@@ -33,6 +33,8 @@ export function Caja() {
   const [view, setView] = useState<"caja" | "ticket" | "checkout" | "done">("caja");
   const [done, setDone] = useState<Done | null>(null);
   const [err, setErr] = useState("");
+  const [selIdx, setSelIdx] = useState(0); // producto resaltado con ↑↓ al buscar
+  const buscarRef = useRef<HTMLInputElement>(null);
 
   const tasa = Number(getTasa()) || 1;
   const isDesktop = useIsDesktop();
@@ -68,6 +70,51 @@ export function Caja() {
   const vaciar = () => setCarrito(new Map());
 
   const abrirCobro = () => { setErr(""); setView("checkout"); };
+
+  // ---------- Teclado (como el POS de escritorio) ----------
+  // Escribir en cualquier lado busca (sirve con lector de código de barras), Enter agrega,
+  // ↑↓ eligen, +/− cambian la cantidad del último, Supr lo quita, F9 o Ctrl+Enter cobra.
+  const ultimo = () => { const ks = [...carrito.keys()]; return ks.length ? ks[ks.length - 1] : null; };
+  const agregarDesdeBusqueda = () => {
+    const t = q.trim();
+    const exacto = t ? productos.find((p) => p.codigoBarras === t) : undefined;
+    const p = exacto || filtrados[Math.min(selIdx, filtrados.length - 1)];
+    if (p && p.stockActual > 0) { add(p); setQ(""); setSelIdx(0); }
+  };
+  useEffect(() => { setSelIdx(0); }, [q, cat]);
+  useEffect(() => {
+    if (view !== "caja" && view !== "ticket") return;
+    const h = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement;
+      const escribiendo = el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable);
+      const enBuscar = el === buscarRef.current;
+      if (document.querySelector(".modal, .overlay, .atajos")) return;
+      if (e.key === "F9" || (e.key === "Enter" && (e.ctrlKey || e.metaKey))) {
+        e.preventDefault(); if (carrito.size > 0) abrirCobro(); return;
+      }
+      if (e.key === "F2") { e.preventDefault(); buscarRef.current?.focus(); buscarRef.current?.select(); return; }
+      if (escribiendo && !enBuscar) return;
+      const sinTexto = !enBuscar || q === "";
+      if ((e.key === "+" || e.key === "-") && sinTexto && !e.ctrlKey && !e.metaKey) {
+        const id = ultimo(); if (id != null) { e.preventDefault(); paso(id, e.key === "+" ? 1 : -1); } return;
+      }
+      if (e.key === "Delete" && sinTexto) { const id = ultimo(); if (id != null) { e.preventDefault(); const c = new Map(carrito); c.delete(id); setCarrito(c); } return; }
+      if (!escribiendo && e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        e.preventDefault(); setQ((x) => x + e.key); buscarRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  });
+  // Venta terminada: Enter empieza la siguiente.
+  useEffect(() => {
+    if (view !== "done") return;
+    const h = (e: KeyboardEvent) => { if (e.key === "Enter") { e.preventDefault(); nuevaVenta(); } };
+    window.addEventListener("keydown", h);
+    return () => window.removeEventListener("keydown", h);
+  });
+  // En PC el buscador arranca con el cursor puesto.
+  useEffect(() => { if (view === "caja" && window.matchMedia("(min-width:1024px)").matches) buscarRef.current?.focus(); }, [view]);
 
   const confirmar = async (pagos: PagoCobro[], resumen: ResumenPago) => {
     try {
@@ -124,7 +171,7 @@ export function Caja() {
           {err && <p className="pinmsg err">{err}</p>}
           <div className="done-acts">
             <button className="btn2 press" onClick={imprimir}><UIcono k="print" />Imprimir</button>
-            <button className="cta center press" onClick={nuevaVenta}>Nueva venta</button>
+            <button className="cta center press" onClick={nuevaVenta}>Nueva venta <kbd className="kb">Enter</kbd></button>
           </div>
         </div>
       </div>
@@ -145,7 +192,13 @@ export function Caja() {
 
   const searchrow = (
     <div className="searchrow">
-      <div className="search"><UIcono k="search" /><input placeholder="Buscar producto o código…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
+      <div className="search"><UIcono k="search" /><input ref={buscarRef} placeholder="Buscar producto o código…  (F2)" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Buscar producto"
+        onKeyDown={(e) => {
+          if (e.key === "Enter" && !e.ctrlKey && !e.metaKey) { e.preventDefault(); agregarDesdeBusqueda(); }
+          else if (e.key === "ArrowDown") { e.preventDefault(); setSelIdx((i) => Math.min(i + 1, Math.max(0, filtrados.length - 1))); }
+          else if (e.key === "ArrowUp") { e.preventDefault(); setSelIdx((i) => Math.max(0, i - 1)); }
+          else if (e.key === "Escape") { e.preventDefault(); setQ(""); }
+        }} /></div>
     </div>
   );
   const chips = (
@@ -162,7 +215,7 @@ export function Caja() {
   const tarjeta = (p: Producto) => {
     const info = catInfo(p.categoria); const qn = carrito.get(p.id)?.qty ?? 0; const out = p.stockActual <= 0;
     return (
-      <button key={p.id} className={"pcard press" + (qn > 0 ? " in-ticket" : "") + (out ? " soldout" : "")} style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }} onClick={() => add(p)} disabled={out}>
+      <button key={p.id} className={"pcard press" + (qn > 0 ? " in-ticket" : "") + (out ? " soldout" : "") + (q && filtrados[selIdx]?.id === p.id ? " kbsel" : "")} style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }} onClick={() => add(p)} disabled={out}>
         <div className="pc-top"><span className="tile"><Icono k={info.icon} /></span>{qn > 0 && <span className="pc-badge t">×{qn}</span>}</div>
         <div className="pc-name">{p.nombre}</div>
         <div className="pc-price"><strong className="t">{usd(p.precioUsd)}</strong>{out ? <span className="pill danger">Agotado</span> : <span className="bs t">{bs(r2(p.precioUsd * tasa))}</span>}</div>
@@ -174,7 +227,7 @@ export function Caja() {
   const fila = (p: Producto) => {
     const info = catInfo(p.categoria); const qn = carrito.get(p.id)?.qty ?? 0; const out = p.stockActual <= 0;
     return (
-      <button key={p.id} className={"prod press" + (out ? " out" : "")} style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }} onClick={() => add(p)} disabled={out}>
+      <button key={p.id} className={"prod press" + (out ? " out" : "") + (q && filtrados[selIdx]?.id === p.id ? " kbsel" : "")} style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }} onClick={() => add(p)} disabled={out}>
         <span className="pi"><Icono k={info.icon} />{qn > 0 && <span className="badge t">{qn}</span>}</span>
         <span className="pn">{p.nombre}</span>
         <span className="pp t"><b>{usd(p.precioUsd)}</b><small>{out ? "Agotado" : bs(r2(p.precioUsd * tasa))}</small></span>
@@ -240,7 +293,7 @@ export function Caja() {
                   <div className="tkp-sub"><span>Subtotal</span><span className="t">{usd(total)}</span></div>
                   <div className="tkp-sub"><span>En bolívares · BCV {tasa}</span><span className="t">{bs(totalBs)}</span></div>
                   <div className="tkp-total"><span>Total</span><b className="t">{usd(total)}</b></div>
-                  <button className="btn primary big press" onClick={abrirCobro}>Cobrar {usd(total)}</button>
+                  <button className="btn primary big press" onClick={abrirCobro}>Cobrar {usd(total)} <kbd className="kb">F9</kbd></button>
                 </div>
               </>
             )}

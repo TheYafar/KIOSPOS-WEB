@@ -61,4 +61,11 @@ public class Turno {
 
     @Column(name = "diferencia_bs", precision = 14, scale = 2)
     private BigDecimal diferenciaBs;
+
+    /** Arqueo por forma de pago (JSON en texto) que mandó la caja al cerrar. */
+    @Column(name = "arqueo_detalle", columnDefinition = "TEXT")
+    private String arqueoDetalle;
+
+    @Column(length = 500)
+    private String observaciones;
 }

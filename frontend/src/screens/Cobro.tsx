@@ -40,6 +40,7 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   const [txt, setTxt] = useState<Record<MetodoId, string>>({ EFECTIVO_USD: "", EFECTIVO_BS: "", PAGO_MOVIL: "", PUNTO: "", BIOPAGO: "" });
   const [ref, setRef] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [foco, setFoco] = useState<MetodoId>("EFECTIVO_USD"); // casilla activa (para F8)
   const primero = useRef<HTMLInputElement>(null);
 
   const montos: Montos = Object.fromEntries(FORMAS.map((f) => [f.id, numOf(txt[f.id])])) as Montos;
@@ -75,10 +76,12 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   // Teclado como el escritorio: Enter cobra, Esc regresa.
   const confirmarRef = useRef(confirmar); confirmarRef.current = confirmar;
   const backRef = useRef(onBack); backRef.current = onBack;
+  const restoRef = useRef(() => {}); restoRef.current = () => resto(foco);
   useEffect(() => {
     const h = (ev: KeyboardEvent) => {
       if (ev.key === "Enter") { ev.preventDefault(); confirmarRef.current(); }
       else if (ev.key === "Escape") { ev.preventDefault(); backRef.current(); }
+      else if (ev.key === "F8") { ev.preventDefault(); restoRef.current(); }
     };
     window.addEventListener("keydown", h);
     return () => window.removeEventListener("keydown", h);
@@ -124,12 +127,12 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
                   <div className="cb3-ch">
                     <span className="co2-ic" style={{ background: `color-mix(in srgb, ${f.color} 15%, var(--surface))`, color: f.color }}><UIcono k={f.icon} sw={1.8} /></span>
                     <div className="cb3-nm"><b>{f.n}</b><span>{f.sub}</span></div>
-                    <button className="cb3-rest press" onClick={() => resto(f.id)}>Resto aquí</button>
+                    <button className="cb3-rest press" title="Resto aquí (F8 en la casilla)" onClick={() => resto(f.id)}>Resto aquí{foco === f.id && <kbd className="kb">F8</kbd>}</button>
                   </div>
                   <label className="cb3-in">
                     <i>{f.moneda === "USD" ? "$" : "Bs"}</i>
                     <input ref={i === 0 ? primero : undefined} className="t" inputMode="decimal" placeholder="0,00" value={txt[f.id]}
-                      onChange={(ev) => set(f.id, ev.target.value.replace(/[^\d.,]/g, ""))} onFocus={(ev) => ev.target.select()}
+                      onChange={(ev) => set(f.id, ev.target.value.replace(/[^\d.,]/g, ""))} onFocus={(ev) => { ev.target.select(); setFoco(f.id); }}
                       aria-label={"Monto en " + f.n} />
                     {m > 0 && <button className="cb3-clr" aria-label={"Borrar " + f.n} onClick={(ev) => { ev.preventDefault(); set(f.id, ""); }}><UIcono k="close" sw={2} /></button>}
                   </label>

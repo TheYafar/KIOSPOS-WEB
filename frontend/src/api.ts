@@ -199,8 +199,8 @@ export async function abrirTurno(fondoUsd: number, fondoBs: number): Promise<Tur
 export async function resumenTurno(id: number): Promise<TurnoResumen> {
   return parse(await fetch("/api/cuadre/turnos/" + id, { headers: auth() }));
 }
-export async function cerrarTurno(id: number, declaradoUsd: number, declaradoBs: number): Promise<TurnoResumen> {
-  const resp = await fetch("/api/cuadre/turnos/" + id + "/cerrar", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ declaradoUsd, declaradoBs }) });
+export async function cerrarTurno(id: number, declaradoUsd: number, declaradoBs: number, arqueoDetalle?: string, observaciones?: string): Promise<TurnoResumen> {
+  const resp = await fetch("/api/cuadre/turnos/" + id + "/cerrar", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ declaradoUsd, declaradoBs, arqueoDetalle, observaciones }) });
   return parse(resp);
 }
 
