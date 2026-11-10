@@ -230,7 +230,7 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
                   value={desc} onChange={(e) => setDesc(e.target.value.replace(/[^\d.,]/g, ""))} aria-label="Monto a descontar del sueldo" /></div>
                 <button className="btn primary press" disabled={enviando} onClick={descontar}>Descontar {usd(leerMonto(desc) ?? c.saldoUsd)}</button>
               </div>
-              <span className="hint">No toca la caja: queda anotado como descuento de nómina. Vacío = todo lo que debe.</span>
+              <span className="hint">No toca la caja: queda anotado como descuento de nómina. Vacío = todo lo que debe. Para pagarle el sueldo completo (con bonos y recibo) usa la pestaña <b>Nómina</b>.</span>
             </div>
           )}
           {c.saldoUsd > 0 && (

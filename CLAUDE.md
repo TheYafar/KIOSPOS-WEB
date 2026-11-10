@@ -467,3 +467,13 @@ el alta/venta/login (try/catch + log).
 - **Tamaño de letra** (botón "A+", `tamano.ts`/`TamBtn.tsx`): Normal / Grande / Muy grande con `zoom` en `body`
   (menos en móvil), guardado por equipo (`kp_tam`). Cada pantalla se desplaza por dentro (`.appmain > div`), y la
   prueba responsive verifica que nada se desborde ni a lo ancho ni hacia abajo.
+
+## 23. Nómina (menú del dueño)
+
+- Pestaña **Nómina** (`screens/Nomina.tsx`, ícono "equipo") entre Fiado y Config. Cada trabajador muestra sueldo,
+  lo que debe de fiado y lo que recibiría. **Pagar nómina**: período (sugerencias quincena/semana/mes), sueldo,
+  bonos, adelantos/otros descuentos, fiado a descontar (por defecto todo lo posible), forma de pago (efectivo
+  $/Bs, pago móvil, transferencia, Zelle, Binance) → recibo de 40 columnas imprimible. Historial "Pagos hechos".
+- Backend: V19 `pagos_nomina` (RLS), `nomina/NominaService` (`GET /api/nomina`, `GET|POST /api/nomina/pagos`,
+  solo dueño/encargado). El fiado descontado se registra en la cuenta del trabajador como abono `NOMINA`
+  (`ClienteService.descontarDelSueldo`). No toca la caja. Atajos dueño: Nómina Alt+6, Config Alt+7, Más Alt+8.

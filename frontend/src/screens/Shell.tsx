@@ -8,6 +8,7 @@ import { Configuracion } from "./Configuracion";
 import { Clientes } from "./Clientes";
 import { Ventas } from "./Ventas";
 import { Compras } from "./Compras";
+import { Nomina } from "./Nomina";
 import { UIcono } from "../icons";
 import { Caja } from "./Caja";
 import { Contabilidad } from "./Contabilidad";
@@ -33,7 +34,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
     // El cajero solo ve lo de su caja: vender, cerrar y el historial para devoluciones.
     // Fiado, configuración, productos y lo demás es del dueño.
     ? [{ id: "caja", n: "Vender", icon: "cart" }, { id: "cuadre", n: "Cierre", icon: "cash" }, { id: "ventas", n: "Ventas", icon: "recibo" }]
-    : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "ventas", n: "Ventas", icon: "recibo" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "contabilidad", n: "Cuentas", icon: "cash" }, { id: "fiado", n: "Fiado", icon: "user" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }];
+    : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "ventas", n: "Ventas", icon: "recibo" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "contabilidad", n: "Cuentas", icon: "cash" }, { id: "fiado", n: "Fiado", icon: "user" }, { id: "nomina", n: "Nómina", icon: "equipo" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }];
   const [tab, setTab] = useState(tabs[0].id);
   const [online, setOnline] = useState(navigator.onLine);
   const [ayuda, setAyuda] = useState(false);
@@ -135,6 +136,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
           {tab === "contabilidad" && <Contabilidad />}
           {tab === "config" && <Configuracion />}
           {tab === "fiado" && <Clientes />}
+          {tab === "nomina" && <Nomina onIrFiado={() => setTab("fiado")} />}
           {tab === "mas" && (esCaja
             ? <div className="stub"><b>Más</b><p>El manejo de usuarios y cajas lo hace el dueño desde su panel.</p><button className="btn ghost" onClick={onSalir}>Cerrar sesión</button></div>
             : <Usuarios onSalir={onSalir} />)}

@@ -1496,3 +1496,29 @@ html[data-tam="muy-grande"] body { zoom:1.3; }
 .entrar-btns { display:flex; gap:8px; }
 .entrar-btns { width:auto; height:auto; background:none !important; border:0; }
 .entrar-btns .tema-btn { background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.2); color:#eaf1ef; }
+
+/* ---- Nómina ---- */
+.nom-stats { grid-template-columns:repeat(auto-fit, minmax(min(100%, 220px), 1fr)); }
+.nom-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap:12px; }
+.nom-card { display:flex; flex-direction:column; gap:12px; padding:16px; }
+.nom-card.off { opacity:.6; }
+.nom-top { display:flex; align-items:center; gap:12px; } .nom-top .d { font-size:12.5px; color:var(--text-3); }
+.nom-cuenta { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
+.nom-cuenta > div { display:flex; flex-direction:column; gap:2px; padding:10px; border-radius:10px; background:var(--surface-2); min-width:0; }
+.nom-cuenta span { font-size:12px; color:var(--text-2); } .nom-cuenta b { font-size:16px; }
+.nom-cuenta .bad b { color:var(--bad); } .nom-cuenta .neto { background:var(--ok-soft); } .nom-cuenta .neto b { color:var(--ok); font-size:18px; }
+.nom-acc { display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+.nom-pago { max-width:620px; width:100%; }
+.nom-fiado { display:flex; align-items:center; gap:12px; padding:12px; border-radius:12px; background:var(--bad-soft); flex-wrap:wrap; }
+.nom-fiado > div:first-child { flex:1 1 200px; display:flex; flex-direction:column; } .nom-fiado small { color:var(--text-2); font-size:12.5px; }
+.nom-fiado .inpw { flex:0 0 150px; }
+.nom-calc { display:flex; flex-direction:column; gap:4px; padding:12px 14px; border-radius:12px; border:1px solid var(--line); }
+.nom-calc > div { display:flex; justify-content:space-between; align-items:baseline; gap:8px; flex-wrap:wrap; font-size:14.5px; }
+.nom-calc .bad b { color:var(--bad); }
+.nom-calc .neto { border-top:1px dashed var(--line); padding-top:8px; margin-top:4px; font-size:16px; }
+.nom-calc .neto b { font-size:24px; color:var(--ok); } .nom-calc .neto.bad b { color:var(--bad); } .nom-calc .neto small { width:100%; text-align:right; color:var(--text-2); }
+.nom-recibo { margin:0; padding:14px; border-radius:12px; background:var(--surface-2); font-size:12.5px; line-height:1.45; white-space:pre; overflow-x:auto; }
+@media (max-width:480px) { .nom-cuenta { grid-template-columns:1fr 1fr; } .nom-cuenta .neto { grid-column:1 / -1; } }
+.nom-acc .btn2, .nom-acc .btn { height:44px; padding:0 16px; font-size:15px; }
+.nom-stats .v { white-space:nowrap; }
+@media (max-width:480px) { .nom-stats .v { font-size:22px; } }

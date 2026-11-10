@@ -282,6 +282,21 @@ export async function registrarCompra(body: { proveedorId: number | null; numero
 export async function compraPagada(id: number, valor: boolean): Promise<void> { await parse(await fetch(`/api/compras/${id}/pagada?valor=${valor}`, { method: "POST", headers: auth() })); }
 export async function anularCompra(id: number): Promise<void> { await parse(await fetch(`/api/compras/${id}/anular`, { method: "POST", headers: auth() })); }
 
+// ---------- Nómina (dueño/encargado) ----------
+export interface TrabajadorNomina { id: number; nombre: string; telefono: string | null; activo: boolean; sueldoUsd: number; debeFiadoUsd: number;
+  netoSugeridoUsd: number; ultimoPago: string | null; ultimoPeriodo: string | null; pagadoEsteMesUsd: number; }
+export interface ResumenNomina { trabajadores: TrabajadorNomina[]; totalSueldosUsd: number; totalFiadoUsd: number; pagadoEsteMesUsd: number; }
+export interface PagoNomina { id: number; trabajadorId: number; periodo: string; sueldoUsd: number; bonosUsd: number; otrosDescuentosUsd: number; conceptoDescuentos: string | null;
+  fiadoDescontadoUsd: number; netoUsd: number; metodo: string; moneda: "USD" | "VES"; montoPagado: number; tasa: number | null; referencia: string | null; nota: string | null; createdAt: string; }
+export async function resumenNomina(): Promise<ResumenNomina> { return parse(await fetch("/api/nomina", { headers: auth() })); }
+export async function historialNomina(trabajadorId?: number): Promise<{ pago: PagoNomina; trabajador: string }[]> {
+  return parse(await fetch("/api/nomina/pagos" + (trabajadorId ? "?trabajadorId=" + trabajadorId : ""), { headers: auth() }));
+}
+export async function pagarNomina(body: { trabajadorId: number; periodo: string; sueldoUsd: number; bonosUsd: number; otrosDescuentosUsd: number; conceptoDescuentos?: string;
+  fiadoDescontadoUsd: number; metodo: string; tasa?: number; referencia?: string; nota?: string }): Promise<{ pago: PagoNomina; trabajador: string }> {
+  return parse(await fetch("/api/nomina/pagos", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+
 // ---------- Fiado (clientes) ----------
 export interface ClienteFiado { id: number; nombre: string; cedula: string | null; telefono: string | null; limiteUsd: number; activo: boolean; saldoUsd: number; ultimoMovimiento: string | null;
   tipo?: "CLIENTE" | "TRABAJADOR"; sueldoUsd?: number; }
