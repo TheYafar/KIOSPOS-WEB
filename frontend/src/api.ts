@@ -126,7 +126,7 @@ export async function importarCsv(csv: string): Promise<{ creados: number; actua
 
 export interface DesglosePago { metodo: string; moneda: string; montoOriginal: number; equivalenteUsd: number; }
 export interface ReporteDia { fecha: string; cantidadVentas: number; totalUsd: number; totalBs: number; costoUsd: number; gananciaUsd: number; pagos: DesglosePago[];
-  movimientos?: { tipo: string; moneda: string; total: number; cantidad: number }[]; comisionAvancesBs?: number; abonosFiadoUsd?: number; }
+  movimientos?: { tipo: string; moneda: string; total: number; cantidad: number }[]; comisionAvancesBs?: number; abonosFiadoUsd?: number; devolucionesUsd?: number; }
 export async function reporteDia(fecha?: string): Promise<ReporteDia> {
   return parse(await fetch("/api/reportes/dia" + (fecha ? "?fecha=" + fecha : ""), { headers: auth() }));
 }
@@ -208,7 +208,7 @@ export interface TurnoResumen {
   fiadoUsd?: number;
   comisionAvancesBs?: number;
 }
-export interface MovLinea { tipo: "GASTO" | "RETIRO" | "INGRESO" | "AVANCE" | "ABONO"; moneda: "USD" | "VES"; total: number; cantidad: number; }
+export interface MovLinea { tipo: "GASTO" | "RETIRO" | "INGRESO" | "AVANCE" | "ABONO" | "DEVOLUCION"; moneda: "USD" | "VES"; total: number; cantidad: number; }
 
 // ---------- Movimientos de caja (gastos, retiros, ingresos, avances) ----------
 export type TipoMov = "GASTO" | "RETIRO" | "INGRESO" | "AVANCE";
@@ -225,6 +225,44 @@ export async function movimientosTurno(turnoId: number): Promise<MovimientoCaja[
 export async function anularMovimiento(id: number): Promise<MovimientoCaja> {
   return parse(await fetch(`/api/cuadre/movimientos/${id}/anular`, { method: "POST", headers: auth() }));
 }
+
+// ---------- Ventas del día: anular y devolver ----------
+export interface VentaFila { id: number; numeroFactura: number; fechaHora: string; cajaId: number; totalUsd: number; totalBs: number; estado: "COMPLETADA" | "ANULADA"; clienteId: number | null; pagos: string; items: number; devueltoUsd: number; }
+export interface LineaVentaDet { detalleId: number; productoId: number | null; nombre: string; cantidad: number; precioUsd: number; subtotalUsd: number; devuelto: number; }
+export interface DevolucionReg { id: number; totalUsd: number; metodoReembolso: string; montoReembolso: number; motivo: string | null; createdAt: string; }
+export interface VentaDetalle {
+  id: number; numeroFactura: number; fechaHora: string; estado: "COMPLETADA" | "ANULADA"; cajaId: number; turnoId: number | null; turnoAbierto: boolean;
+  tasa: number; totalUsd: number; totalBs: number; vueltoUsd: number; vueltoBs: number; clienteId: number | null; motivoAnulacion: string | null;
+  lineas: LineaVentaDet[]; pagos: { metodo: string; moneda: string; monto: number; referencia: string | null }[]; devoluciones: DevolucionReg[]; devueltoUsd: number;
+}
+export async function ventasDelDia(fecha?: string): Promise<VentaFila[]> {
+  return parse(await fetch("/api/ventas" + (fecha ? "?fecha=" + fecha : ""), { headers: auth() }));
+}
+export async function detalleVenta(id: number): Promise<VentaDetalle> { return parse(await fetch(`/api/ventas/${id}/detalle`, { headers: auth() })); }
+export async function anularVenta(id: number, motivo: string): Promise<void> {
+  await parse(await fetch(`/api/ventas/${id}/anular`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ motivo }) }));
+}
+export async function devolverVenta(id: number, body: { items: { detalleId: number; cantidad: number }[]; metodoReembolso: string; motivo?: string }): Promise<DevolucionReg> {
+  return parse(await fetch(`/api/ventas/${id}/devolver`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+
+// ---------- Compras y proveedores (dueño/encargado) ----------
+export interface ProveedorV { id: number; nombre: string; rif: string | null; telefono: string | null; contacto: string | null; activo: boolean; porPagarUsd: number; compras: number; }
+export interface CompraV { id: number; proveedorId: number | null; numeroFactura: string | null; fecha: string; totalUsd: number; tasa: number | null; pagada: boolean; estado: "REGISTRADA" | "ANULADA"; nota: string | null; }
+export interface CompraLinea { id: number; productoId: number | null; nombre: string; cantidad: number; costoUnitarioUsd: number; subtotalUsd: number; }
+export interface CompraVista { compra: CompraV; proveedor: string | null; detalles: CompraLinea[]; }
+export async function listarProveedores(): Promise<ProveedorV[]> { return parse(await fetch("/api/proveedores", { headers: auth() })); }
+export async function guardarProveedor(id: number | null, body: { nombre: string; rif?: string; telefono?: string; contacto?: string; activo?: boolean }): Promise<ProveedorV> {
+  return parse(await fetch("/api/proveedores" + (id ? "/" + id : ""), { method: id ? "PUT" : "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+export async function listarCompras(): Promise<CompraVista[]> { return parse(await fetch("/api/compras", { headers: auth() })); }
+export async function detalleCompra(id: number): Promise<CompraVista> { return parse(await fetch(`/api/compras/${id}`, { headers: auth() })); }
+export async function registrarCompra(body: { proveedorId: number | null; numeroFactura?: string; fecha?: string; tasa?: number; pagada: boolean; nota?: string;
+  items: { productoId: number; cantidad: number; costoUsd: number; precioVentaUsd?: number }[] }): Promise<CompraVista> {
+  return parse(await fetch("/api/compras", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+export async function compraPagada(id: number, valor: boolean): Promise<void> { await parse(await fetch(`/api/compras/${id}/pagada?valor=${valor}`, { method: "POST", headers: auth() })); }
+export async function anularCompra(id: number): Promise<void> { await parse(await fetch(`/api/compras/${id}/anular`, { method: "POST", headers: auth() })); }
 
 // ---------- Fiado (clientes) ----------
 export interface ClienteFiado { id: number; nombre: string; cedula: string | null; telefono: string | null; limiteUsd: number; activo: boolean; saldoUsd: number; ultimoMovimiento: string | null; }

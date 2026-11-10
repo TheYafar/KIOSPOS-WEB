@@ -36,7 +36,7 @@ export function PrimerosPasos({ onIr }: { onIr: (tab: string) => void }) {
   const hechos = pasos.length - faltan;
 
   return (
-    <section className="pp">
+    <section className="pp pasos">
       <div className="pp-head">
         <div>
           <b>Primeros pasos</b>

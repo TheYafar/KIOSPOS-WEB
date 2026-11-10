@@ -409,3 +409,22 @@ el alta/venta/login (try/catch + log).
   WhatsApp), tarjeta **Fiado** al cobrar con selector de cliente (teclado), y **Movimientos de caja** en el
   Cierre (`screens/MovimientosCaja.tsx`, teclas G/R/I/A). "Fiado" se puede apagar en Configuración.
 - Reporte del día: movimientos, comisión de avances y abonos recibidos.
+
+## 19. Compras, anular ventas y devoluciones (Sección 5)
+
+- **Compras** (V13 `proveedores`, `compras`, `compra_detalles`; `compra/CompraService`, solo dueño/encargado):
+  `/api/proveedores` (GET/POST/PUT), `/api/compras` (GET, POST, `/{id}`, `/{id}/pagada?valor=`, `/{id}/anular`).
+  Registrar suma stock ATÓMICO (`ProductoRepository.sumarStock`), recalcula **costo promedio ponderado**
+  (`CompraService.costoPromedio`), puede cambiar el precio de venta y queda pagada o "por pagar". Anular saca
+  el stock solo si todavía está.
+- **Anular venta** (`devolucion/DevolucionService.anular`): solo con su turno ABIERTO y sin devoluciones; el
+  cajero solo las de su caja. Vuelve el stock, sale del cuadre/reportes (estado ANULADA) y baja lo fiado.
+- **Devolución** parcial/total (V13 `devoluciones`, `devolucion_detalles`): nunca más de lo vendido; reembolso
+  `EFECTIVO_USD`/`EFECTIVO_BS` (sale de la gaveta del turno abierto, a la tasa de la venta), `A_CUENTA` (baja el
+  fiado) o `FUERA_DE_CAJA` (solo dueño). Cuadre resta las devoluciones en efectivo; reporte del día trae
+  `devolucionesUsd`.
+- API: `GET /api/ventas?fecha=` (caja: las suyas; dueño: todas), `GET /api/ventas/{id}/detalle`,
+  `POST /api/ventas/{id}/anular`, `POST /api/ventas/{id}/devolver`.
+- **PWA:** pestaña **Ventas** (`screens/Ventas.tsx`) en caja y dueño; **Compras** dentro de Productos
+  (`screens/Compras.tsx`: facturas + proveedores). Barra de pestañas deslizable en móvil y la app con menú
+  ocupa exactamente la pantalla (`.app:has(> .shell)`).

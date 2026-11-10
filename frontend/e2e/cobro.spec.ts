@@ -61,7 +61,7 @@ test("el dueño sube la tasa y se guarda en el servidor", async ({ page }) => {
   const st: Estado = { turnoAbierto: false };
   await preparar(page, st, { "kioskpos.sesion": sesionDueno });
   await ir(page);
-  await page.keyboard.press("Alt+5");
+  await page.keyboard.press("Alt+6");
   await page.getByRole("button", { name: "BCV + aumento" }).click();
   await page.getByLabel("Aumento sobre la BCV").pressSequentially("2,5", { delay: 120 });
   await expect(page.getByLabel("Aumento sobre la BCV")).toHaveValue("2,5"); // la coma no se pierde al guardar
@@ -79,7 +79,7 @@ test("la caja cobra con la tasa del negocio y el cajero no puede cambiarla", asy
   await abrirCobro(page);
   await expect(page.locator(".co-tot small")).toHaveText("Bs 2.524,50"); // 2,75 × 918
   await page.keyboard.press("Escape");
-  await page.keyboard.press("Alt+4");
+  await page.keyboard.press("Alt+5");
   await expect(page.locator(".cfg-ro")).toBeVisible();
   await expect(page.getByRole("button", { name: "Usar la BCV" })).toBeDisabled();
 });

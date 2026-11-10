@@ -71,7 +71,7 @@ test("pantalla Fiado: ver quién debe y registrar un abono en Bs", async ({ page
   const st: Estado = { turnoAbierto: true };
   await preparar(page, st, { "kioskpos.sesion": sesionDueno });
   await ir(page);
-  await page.keyboard.press("Alt+4");
+  await page.keyboard.press("Alt+5");
   await expect(page.locator(".cli-row").first()).toContainText("María Pérez");
   await expect(page.locator(".inv-stat").first()).toContainText("$ 8,00");
   await page.locator(".cli-row", { hasText: "María Pérez" }).click();

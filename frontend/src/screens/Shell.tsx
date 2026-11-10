@@ -4,6 +4,8 @@ import { turnoActual, type TurnoResumen } from "../api";
 import { getBcv, metodoActivo } from "../config";
 import { Configuracion } from "./Configuracion";
 import { Clientes } from "./Clientes";
+import { Ventas } from "./Ventas";
+import { Compras } from "./Compras";
 import { UIcono } from "../icons";
 import { Caja } from "./Caja";
 import { Contabilidad } from "./Contabilidad";
@@ -26,8 +28,8 @@ function saludo(): string {
 export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void }) {
   const esCaja = sesion.cajaId != null;
   const tabs: Tab[] = esCaja
-    ? [{ id: "caja", n: "Vender", icon: "cart" }, { id: "cuadre", n: "Cierre", icon: "cash" }, { id: "fiado", n: "Fiado", icon: "user" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }]
-    : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "contabilidad", n: "Cuentas", icon: "cash" }, { id: "fiado", n: "Fiado", icon: "user" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }];
+    ? [{ id: "caja", n: "Vender", icon: "cart" }, { id: "cuadre", n: "Cierre", icon: "cash" }, { id: "ventas", n: "Ventas", icon: "recibo" }, { id: "fiado", n: "Fiado", icon: "user" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }]
+    : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "ventas", n: "Ventas", icon: "recibo" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "contabilidad", n: "Cuentas", icon: "cash" }, { id: "fiado", n: "Fiado", icon: "user" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }];
   const [tab, setTab] = useState(tabs[0].id);
   const [online, setOnline] = useState(navigator.onLine);
   const [ayuda, setAyuda] = useState(false);
@@ -108,7 +110,8 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
           {tab === "caja" && esCaja && <Caja />}
           {tab === "cuadre" && esCaja && <Cuadre />}
           {tab === "reportes" && <Reportes onIr={setTab} />}
-          {tab === "inventario" && <Inventario />}
+          {tab === "inventario" && <ProductosYCompras />}
+          {tab === "ventas" && <Ventas />}
           {tab === "contabilidad" && <Contabilidad />}
           {tab === "config" && <Configuracion />}
           {tab === "fiado" && <Clientes />}
@@ -166,6 +169,22 @@ function TurnoBar({ turno, onIr }: { turno: TurnoResumen | null; onIr: () => voi
         {items.map((x) => <span key={x.id} className="tb-it"><small>{x.n}</small><b className="t">{x.v}</b></span>)}
       </div>
       <span className="tb-tot"><small>Total cobrado</small><b className="t">≈ $ {money(total)}</b></span>
+    </div>
+  );
+}
+
+/** Productos del dueño: inventario y, al lado, las compras a proveedores. */
+function ProductosYCompras() {
+  const [v, setV] = useState<"inv" | "compras">("inv");
+  return (
+    <div className="caja">
+      <div className="toolbar sub-tabs">
+        <div className="seg cmp-seg" role="tablist" aria-label="Productos o compras">
+          <button className={v === "inv" ? "on" : ""} onClick={() => setV("inv")}>Inventario</button>
+          <button className={v === "compras" ? "on" : ""} onClick={() => setV("compras")}>Compras</button>
+        </div>
+      </div>
+      {v === "inv" ? <Inventario /> : <Compras />}
     </div>
   );
 }

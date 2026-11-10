@@ -1351,3 +1351,63 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
 .cb3-cli-el svg, .cb3-cli-nm svg { width:16px; height:16px; }
 .cb3-cli-nm { display:flex; align-items:center; gap:6px; min-width:0; font-size:13.5px; }
 .cb3-cli-nm b { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .cb3-cli-nm small { color:var(--text-3); white-space:nowrap; }
+
+/* ---- Ventas (anular / devolver) ---- */
+.vt-fecha { display:flex; align-items:center; gap:8px; font-size:13px; color:var(--text-2); }
+.vt-fecha .inp { width:auto; }
+.vt-list { display:flex; flex-direction:column; gap:8px; }
+.vt-row { display:flex; align-items:center; gap:12px; padding:12px 14px; text-align:left; font:inherit; color:var(--text); border:0; cursor:pointer; min-width:0; }
+.vt-row.anulada { opacity:.6; }
+.vt-n { flex:none; min-width:56px; font-weight:700; color:var(--text-2); }
+.vt-tx { flex:1; display:flex; flex-direction:column; min-width:0; }
+.vt-tx b, .vt-tx small { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .vt-tx small { color:var(--text-3); font-size:12.5px; }
+.vt-m { flex:none; display:flex; flex-direction:column; align-items:flex-end; gap:3px; } .vt-m small { color:var(--text-3); font-size:12px; }
+.vt-res { display:flex; flex-direction:column; gap:4px; padding:12px 14px; border-radius:12px; background:var(--surface-2); }
+.vt-res span:first-child { font-size:13px; color:var(--text-2); } .vt-res b { font-size:24px; } .vt-res b small { font-size:13px; color:var(--text-2); font-weight:500; }
+.vt-res .pill { align-self:flex-start; }
+.vt-lineas { display:flex; flex-direction:column; }
+.vt-linea { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); min-width:0; }
+.vt-ln { flex:1; display:flex; flex-direction:column; min-width:0; } .vt-ln small { color:var(--text-3); font-size:12.5px; }
+.vt-dev { display:flex; align-items:center; gap:4px; flex:none; }
+.vt-dev button { width:34px; height:36px; border:0; border-radius:9px; background:var(--surface-2); font:inherit; font-size:18px; font-weight:700; color:var(--text); cursor:pointer; }
+.vt-dev .inp { width:56px; text-align:center; padding:0 6px; height:36px; }
+.vt-dev .vt-todo { width:auto; padding:0 10px; font-size:12.5px; }
+
+/* ---- Compras ---- */
+.sub-tabs { padding-bottom:0; }
+.cmp-seg { max-width:420px; flex:1 1 260px; }
+.cmp-card { max-width:860px; width:100%; }
+.cmp-top { display:grid; grid-template-columns:1.4fr 1fr 1fr; gap:10px; }
+@media (max-width:700px) { .cmp-top { grid-template-columns:1fr; } }
+.cmp-prov { display:flex; gap:6px; } .cmp-prov select { flex:1; min-width:0; }
+.cmp-lineas { display:flex; flex-direction:column; gap:6px; }
+.cmp-row { display:grid; grid-template-columns:minmax(0,2fr) 80px 100px 110px 34px; gap:8px; align-items:center; }
+.cmp-th { font-size:11.5px; color:var(--text-3); text-transform:uppercase; letter-spacing:.04em; }
+.cmp-nm { display:flex; flex-direction:column; min-width:0; } .cmp-nm b { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .cmp-nm small { color:var(--text-3); font-size:12px; }
+.cmp-row .inp.bad { border-color:var(--warn); }
+@media (max-width:640px) {
+  .cmp-th { display:none; }
+  .cmp-row { grid-template-columns:1fr 1fr 1fr 34px; padding:8px 0; border-bottom:1px solid var(--line); }
+  .cmp-nm { grid-column:1 / -1; }
+}
+/* Muchas pestañas en móvil: se pueden deslizar en vez de apretarse. */
+.tabbar { overflow-x:auto; scrollbar-width:none; } .tabbar::-webkit-scrollbar { display:none; }
+.tab { min-width:56px; }
+
+/* La app con menú ocupa exactamente la pantalla: el contenido se desplaza adentro
+   y la barra de pestañas queda siempre visible abajo en móvil. */
+.app:has(> .shell) { height:100%; }
+/* Primeros pasos en móvil: el botón baja debajo del texto en vez de taparlo. */
+@media (max-width:560px) {
+  .pp-item { flex-wrap:wrap; }
+  .pp-txt { flex:1 1 calc(100% - 60px); }
+  .pp-cta { margin-left:40px; }
+}
+/* Compras en móvil: cada casilla dice qué es. */
+.cmp-in { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.cmp-in > span { display:none; font-size:11px; color:var(--text-3); }
+@media (max-width:640px) { .cmp-in > span { display:block; } }
+/* Primeros pasos comparte nombre (.pp) con el precio de la caja: se anula aquí. */
+.pp.pasos { text-align:left; white-space:normal; display:block; }
+/* ".done" también es la pantalla de venta lista: aquí no se centra. */
+.pp-item.done { flex:none; overflow:visible; justify-content:flex-start; align-items:center; text-align:left; flex-wrap:nowrap; flex-direction:row; padding:10px; min-height:0; gap:12px; }

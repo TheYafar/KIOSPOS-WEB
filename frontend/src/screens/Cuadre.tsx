@@ -208,7 +208,7 @@ export function Cuadre() {
   const a = calcularArqueo(metodos, cont, tasa);
   const digital = metodos.filter((m) => m.digital).reduce((s, m) => s + m.esperado, 0);
   // Cómo se llega a lo esperado: fondo + ventas − vuelto ± movimientos de caja y abonos.
-  const NOMBRE_MOV: Record<string, string> = { GASTO: "gastos", RETIRO: "retiros", INGRESO: "ingresos", AVANCE: "avances", ABONO: "abonos fiado" };
+  const NOMBRE_MOV: Record<string, string> = { GASTO: "gastos", RETIRO: "retiros", INGRESO: "ingresos", AVANCE: "avances", ABONO: "abonos fiado", DEVOLUCION: "devoluciones" };
   const movTexto = (moneda: "USD" | "VES") => (turno.movimientos || []).filter((x) => x.moneda === moneda && x.total > 0)
     .map((x) => ` ${x.tipo === "INGRESO" || x.tipo === "ABONO" ? "+" : "−"} ${NOMBRE_MOV[x.tipo]} ${fmt(moneda, x.total)}`).join("");
   const detalle = (m: string) =>

@@ -18,7 +18,22 @@ export const productos = [
 /** Config de caja del negocio tal como la guarda el servidor (PUT /api/mi-negocio/caja-config). */
 export interface CajaCfg { metodosPago: string | null; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number; }
 export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: any; cierre?: any; tasa?: number | null; cajaConfig?: CajaCfg; puts?: CajaCfg[];
-  movs?: any[]; clientes?: any[]; abonos?: any[]; nuevoCliente?: any; }
+  movs?: any[]; clientes?: any[]; abonos?: any[]; nuevoCliente?: any;
+  anulada?: any; devuelta?: any; compra?: any; }
+
+export const ventasDemo = [
+  { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
+  { id: 12, numeroFactura: 4, fechaHora: "2026-11-10T13:10:00Z", cajaId: 1, totalUsd: 6, totalBs: 5400, estado: "COMPLETADA", clienteId: null, pagos: "PAGO_MOVIL", items: 1, devueltoUsd: 0 },
+];
+const detalleDemo = (id: number) => ({
+  id, numeroFactura: id === 11 ? 5 : 4, fechaHora: "2026-11-10T14:05:00Z", estado: "COMPLETADA", cajaId: 1, turnoId: 7, turnoAbierto: id === 11, tasa: 900,
+  totalUsd: id === 11 ? 2.75 : 6, totalBs: id === 11 ? 2475 : 5400, vueltoUsd: 0, vueltoBs: 0, clienteId: null, motivoAnulacion: null,
+  lineas: id === 11
+    ? [{ detalleId: 101, productoId: 2, nombre: "Coca-Cola 2L", cantidad: 1, precioUsd: 1.75, subtotalUsd: 1.75, devuelto: 0 }, { detalleId: 102, productoId: 1, nombre: "Harina PAN", cantidad: 1, precioUsd: 1, subtotalUsd: 1, devuelto: 0 }]
+    : [{ detalleId: 201, productoId: 3, nombre: "Arroz Mary", cantidad: 3, precioUsd: 2, subtotalUsd: 6, devuelto: 1 }],
+  pagos: [{ metodo: id === 11 ? "EFECTIVO_USD" : "PAGO_MOVIL", moneda: id === 11 ? "USD" : "VES", monto: id === 11 ? 2.75 : 5400, referencia: null }],
+  devoluciones: id === 11 ? [] : [{ id: 1, totalUsd: 2, metodoReembolso: "EFECTIVO_USD", montoReembolso: 2, motivo: null, createdAt: "" }], devueltoUsd: id === 11 ? 0 : 2,
+});
 
 export const clientesDemo = () => [
   { id: 1, nombre: "María Pérez", cedula: "V12345678", telefono: "04121234567", limiteUsd: 10, activo: true, saldoUsd: 8, ultimoMovimiento: "2026-11-09T12:00:00Z" },
@@ -77,6 +92,13 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     }
     if (u.includes("/api/clientes") && m === "POST") { const b = JSON.parse(r.request().postData() || "{}"); st.nuevoCliente = b; const c = { id: 50, cedula: null, telefono: null, limiteUsd: 0, activo: true, saldoUsd: 0, ultimoMovimiento: null, ...b }; (st.clientes ??= clientesDemo()).push(c); return r.fulfill({ json: c }); }
     if (u.includes("/api/clientes")) return r.fulfill({ json: st.clientes ?? clientesDemo() });
+    if (/\/api\/ventas\/\d+\/detalle/.test(u)) return r.fulfill({ json: detalleDemo(Number(u.split("/").slice(-2)[0])) });
+    if (/\/api\/ventas\/\d+\/anular/.test(u)) { st.anulada = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { id: 11, estado: "ANULADA" } }); }
+    if (/\/api\/ventas\/\d+\/devolver/.test(u)) { st.devuelta = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { id: 2 } }); }
+    if (u.includes("/api/ventas") && m === "GET") return r.fulfill({ json: ventasDemo });
+    if (u.includes("/api/proveedores")) return r.fulfill({ json: [{ id: 3, nombre: "Distribuidora Polar", rif: "J-1", telefono: null, contacto: null, activo: true, porPagarUsd: 40, compras: 2 }] });
+    if (u.includes("/api/compras") && m === "POST") { st.compra = JSON.parse(r.request().postData() || "{}"); return r.fulfill({ json: { compra: { id: 9 }, proveedor: null, detalles: [] } }); }
+    if (u.includes("/api/compras")) return r.fulfill({ json: [{ compra: { id: 8, proveedorId: 3, numeroFactura: "A-77", fecha: "2026-11-09", totalUsd: 40, tasa: 900, pagada: false, estado: "REGISTRADA", nota: null }, proveedor: "Distribuidora Polar", detalles: [] }] });
     if (u.includes("/api/ventas") && m === "POST") { st.venta = JSON.parse(r.request().postData() || "{}"); return r.fulfill({ json: { id: 99, numeroFactura: 1 } }); }
     if (u.includes("/api/mi-negocio/caja-config")) {
       if (m === "PUT") { st.cajaConfig = JSON.parse(r.request().postData() || "{}"); (st.puts ??= []).push(st.cajaConfig!); }
