@@ -450,3 +450,7 @@ el alta/venta/login (try/catch + log).
 - **Por peso o medida** (`productos.es_pesable` + `unidad_medida` KG/G/L/M): `screens/Pesable.tsx`
   (`CantidadPesable`, en portal) pide la cantidad, o el monto en $ / Bs, y calcula el precio. Se usa en Vender
   y en Fiar. Inventario → Nuevo producto tiene "Se vende por peso o medida" con la unidad.
+- **Categorías** (V17 `categorias`, `inventario/CategoriaService`): `GET/POST/PUT/DELETE /api/inventario/categorias`
+  (lista = creadas + las que usan los productos, con conteo; renombrar cambia sus productos; borrar los pasa a
+  "General"). Inventario: botón **Categorías**, filtro por categoría, y el formulario de producto (nuevo y
+  **Editar datos**) elige la categoría de una lista o crea una nueva, y marca peso/medida con su unidad.

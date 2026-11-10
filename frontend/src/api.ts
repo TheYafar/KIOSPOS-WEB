@@ -117,6 +117,21 @@ export interface DatosProducto {
 export async function crearProducto(d: DatosProducto): Promise<Producto> {
   return parse(await fetch("/api/inventario/productos", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(d) }));
 }
+export async function actualizarProducto(id: number, d: DatosProducto): Promise<Producto> {
+  return parse(await fetch("/api/inventario/productos/" + id, { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(d) }));
+}
+// ---------- Categorías ----------
+export interface Categoria { nombre: string; productos: number; }
+export async function listarCategorias(): Promise<Categoria[]> { return parse(await fetch("/api/inventario/categorias", { headers: auth() })); }
+export async function crearCategoria(nombre: string): Promise<Categoria> {
+  return parse(await fetch("/api/inventario/categorias", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ nombre }) }));
+}
+export async function renombrarCategoria(de: string, a: string): Promise<Categoria> {
+  return parse(await fetch("/api/inventario/categorias", { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ de, a }) }));
+}
+export async function borrarCategoria(nombre: string): Promise<void> {
+  await parse(await fetch("/api/inventario/categorias?nombre=" + encodeURIComponent(nombre), { method: "DELETE", headers: auth() }));
+}
 export async function ajustarStock(id: number, tipo: "ENTRADA" | "SALIDA" | "FIJAR", cantidad: number, motivo?: string): Promise<Producto> {
   return parse(await fetch("/api/inventario/productos/" + id + "/ajuste", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ tipo, cantidad, motivo }) }));
 }

@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState } from "react";
-import { ajustarStock, crearProducto, importarCsv, listarProductos, type Producto } from "../api";
+import { actualizarProducto, ajustarStock, borrarCategoria, crearCategoria, crearProducto, importarCsv, listarCategorias, listarProductos, renombrarCategoria, type Categoria, type Producto } from "../api";
+import { cantTxt } from "./Pesable";
 import { Icono, UIcono, catInfo } from "../icons";
 
 const usd = (n: number) => "$ " + n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (s: string) => (s ? parseFloat(s.replace(",", ".")) || 0 : 0);
 
-type Modal = null | { tipo: "nuevo" } | { tipo: "ajuste"; p: Producto } | { tipo: "csv" };
+type Modal = null | { tipo: "nuevo" } | { tipo: "editar"; p: Producto } | { tipo: "ajuste"; p: Producto } | { tipo: "csv" } | { tipo: "categorias" };
+const UNIDAD_N: Record<string, string> = { KG: "kilo", G: "gramo", L: "litro", M: "metro" };
+const UNIDAD_C: Record<string, string> = { KG: "kg", G: "g", L: "L", M: "m" };
 
 export function Inventario() {
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -13,14 +16,19 @@ export function Inventario() {
   const [modal, setModal] = useState<Modal>(null);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
+  const [cats, setCats] = useState<Categoria[]>([]);
+  const [cat, setCat] = useState("");
 
-  const cargar = () => listarProductos().then(setProductos).catch((e) => setErr((e as Error).message));
+  const cargar = () => {
+    listarProductos().then(setProductos).catch((e) => setErr((e as Error).message));
+    listarCategorias().then(setCats).catch(() => {});
+  };
   useEffect(() => { cargar(); }, []);
 
   const filtrados = useMemo(() => {
     const t = q.trim().toLowerCase();
-    return productos.filter((p) => !t || p.nombre.toLowerCase().includes(t) || p.codigoBarras.includes(t));
-  }, [productos, q]);
+    return productos.filter((p) => (!cat || p.categoria === cat) && (!t || p.nombre.toLowerCase().includes(t) || p.codigoBarras.includes(t)));
+  }, [productos, q, cat]);
 
   const valorInv = productos.reduce((s, p) => s + p.precioUsd * p.stockActual, 0);
   const bajos = productos.filter((p) => p.stockActual <= p.stockMinimo).length;
@@ -36,8 +44,17 @@ export function Inventario() {
       <div className="toolbar">
         <div className="search" style={{ flex: 1 }}><UIcono k="search" /><input placeholder="Buscar producto o código…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <button className="btn primary press" onClick={() => setModal({ tipo: "nuevo" })}><UIcono k="plus" sw={2.2} />Nuevo</button>
+        <button className="btn outline press" onClick={() => setModal({ tipo: "categorias" })}>Categorías</button>
         <button className="btn outline press" onClick={() => setModal({ tipo: "csv" })}>CSV</button>
       </div>
+      {cats.length > 1 && (
+        <div className="inv-cats" role="tablist" aria-label="Filtrar por categoría">
+          <button className={"chip press" + (!cat ? " on" : "")} onClick={() => setCat("")}>Todas · {productos.length}</button>
+          {cats.filter((c) => c.productos > 0 || c.nombre !== "General").map((c) => (
+            <button key={c.nombre} className={"chip press" + (cat === c.nombre ? " on" : "")} onClick={() => setCat(cat === c.nombre ? "" : c.nombre)}>{c.nombre} · {c.productos}</button>
+          ))}
+        </div>
+      )}
       {msg && <div className="toolbar" style={{ paddingTop: 0 }}><span className="pill ok"><UIcono k="check" sw={2.5} />{msg}</span></div>}
       <div className="scroll">
         <div className="inv-stats">
@@ -60,7 +77,7 @@ export function Inventario() {
                 <div className="mt"><span>{usd(p.precioUsd)}</span><span>·</span><span className={margen < 10 ? "mg-low" : ""}>+{margen}%</span><span>·</span><span>{p.categoria}</span></div>
               </div>
               <div className="rt">
-                <b className="t">{p.stockActual}{p.esPesable ? " " + p.unidadMedida : ""}</b>
+                <b className="t">{cantTxt(p, p.stockActual)}</b>
                 {out ? <span className="pill danger">Agotado</span> : low ? <span className="pill warn">Bajo</span> : <span className="stk">{sbar(p)}</span>}
               </div>
             </button>
@@ -69,47 +86,82 @@ export function Inventario() {
         {filtrados.length === 0 && !err && <p className="noresult">Sin productos. Crea uno o importa un CSV.</p>}
       </div>
 
-      {modal?.tipo === "nuevo" && <FormNuevo onClose={() => setModal(null)} onSaved={() => { setModal(null); setMsg("Producto creado"); cargar(); }} onErr={setErr} />}
-      {modal?.tipo === "ajuste" && <FormAjuste p={modal.p} onClose={() => setModal(null)} onSaved={() => { setModal(null); setMsg("Stock ajustado"); cargar(); }} onErr={setErr} />}
+      {modal?.tipo === "nuevo" && <FormProducto cats={cats} onClose={() => setModal(null)} onSaved={() => { setModal(null); setMsg("Producto creado"); cargar(); }} />}
+      {modal?.tipo === "editar" && <FormProducto p={modal.p} cats={cats} onClose={() => setModal(null)} onSaved={() => { setModal(null); setMsg("Producto actualizado"); cargar(); }} />}
+      {modal?.tipo === "ajuste" && <FormAjuste p={modal.p} onEditar={() => setModal({ tipo: "editar", p: modal.p })} onClose={() => setModal(null)} onSaved={() => { setModal(null); setMsg("Stock ajustado"); cargar(); }} onErr={setErr} />}
+      {modal?.tipo === "categorias" && <FormCategorias cats={cats} onClose={() => setModal(null)} onCambio={(t) => { setMsg(t); cargar(); }} />}
       {modal?.tipo === "csv" && <FormCsv onClose={() => setModal(null)} onSaved={(r) => { setModal(null); setMsg(`Importados: ${r.creados} nuevos, ${r.actualizados} actualizados`); cargar(); }} onErr={setErr} />}
     </div>
   );
 }
 
-function FormNuevo({ onClose, onSaved, onErr }: { onClose: () => void; onSaved: () => void; onErr: (s: string) => void }) {
-  const [f, setF] = useState({ codigoBarras: "", nombre: "", precioUsd: "", costoUsd: "", categoria: "General", stockInicial: "" });
-  const [pesable, setPesable] = useState(false);
-  const [unidad, setUnidad] = useState("KG");
+/** Crear o editar un producto: categoría de una lista (o nueva) y si se vende por peso o medida. */
+function FormProducto({ p, cats, onClose, onSaved }: { p?: Producto; cats: Categoria[]; onClose: () => void; onSaved: () => void }) {
+  const [f, setF] = useState({
+    codigoBarras: p?.codigoBarras ?? "", nombre: p?.nombre ?? "", precioUsd: p ? String(p.precioUsd).replace(".", ",") : "",
+    costoUsd: p && p.costoUsd ? String(p.costoUsd).replace(".", ",") : "", stockInicial: "", stockMinimo: p && p.stockMinimo ? String(p.stockMinimo).replace(".", ",") : "",
+  });
+  const [categoria, setCategoria] = useState(p?.categoria ?? (cats.find((c) => c.nombre !== "General")?.nombre || "General"));
+  const [nuevaCat, setNuevaCat] = useState<string | null>(null);
+  const [pesable, setPesable] = useState(p?.esPesable ?? false);
+  const [unidad, setUnidad] = useState(p?.esPesable ? (p.unidadMedida || "KG").toUpperCase() : "KG");
+  const [err, setErr] = useState("");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
+  const catFinal = nuevaCat != null ? nuevaCat.trim() : categoria;
+  const ok = f.codigoBarras.trim() && f.nombre.trim() && num(f.precioUsd) > 0 && catFinal;
   const guardar = async () => {
-    try { await crearProducto({ codigoBarras: f.codigoBarras.trim(), nombre: f.nombre.trim(), precioUsd: num(f.precioUsd), costoUsd: num(f.costoUsd), categoria: f.categoria, stockInicial: num(f.stockInicial), esPesable: pesable, unidadMedida: pesable ? unidad : "UND" }); onSaved(); }
-    catch (e) { onErr((e as Error).message); onClose(); }
+    if (!ok) return;
+    const d = { codigoBarras: f.codigoBarras.trim(), nombre: f.nombre.trim(), precioUsd: num(f.precioUsd), costoUsd: num(f.costoUsd), categoria: catFinal,
+      stockMinimo: num(f.stockMinimo), esPesable: pesable, unidadMedida: pesable ? unidad : "UND" };
+    try { if (p) await actualizarProducto(p.id, d); else await crearProducto({ ...d, stockInicial: num(f.stockInicial) }); onSaved(); }
+    catch (e) { setErr((e as Error).message); }
   };
-  const ok = f.codigoBarras.trim() && f.nombre.trim() && num(f.precioUsd) > 0;
+  const u = pesable ? UNIDAD_C[unidad] : "";
   return (
     <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
-      <div className="modal-card">
-        <div className="modal-head"><h2>Nuevo producto</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+      <div className="modal-card" onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Escape") onClose(); }}>
+        <div className="modal-head"><h2>{p ? "Editar producto" : "Nuevo producto"}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
         <div className="modal-body">
-          <label className="lbl">Código de barras<input className="inp" value={f.codigoBarras} onChange={set("codigoBarras")} /></label>
-          <label className="lbl">Nombre<input className="inp" value={f.nombre} onChange={set("nombre")} /></label>
+          <div className="two">
+            <label className="lbl">Código de barras<input className="inp" autoFocus={!p} value={f.codigoBarras} onChange={set("codigoBarras")} aria-label="Código de barras" placeholder="Escanéalo o inventa uno" /></label>
+            <label className="lbl">Nombre<input className="inp" value={f.nombre} onChange={set("nombre")} aria-label="Nombre del producto" /></label>
+          </div>
+          <div className="lbl">Categoría
+            {nuevaCat == null ? (
+              <div className="cmp-prov">
+                <select className="inp" value={categoria} onChange={(e) => { if (e.target.value === "__nueva") setNuevaCat(""); else setCategoria(e.target.value); }} aria-label="Categoría">
+                  {cats.map((c) => <option key={c.nombre} value={c.nombre}>{c.nombre}</option>)}
+                  {!cats.some((c) => c.nombre === categoria) && <option value={categoria}>{categoria}</option>}
+                  <option value="__nueva">＋ Nueva categoría…</option>
+                </select>
+                <button className="btn2 press" title="Nueva categoría" onClick={() => setNuevaCat("")}><UIcono k="plus" sw={2.2} /></button>
+              </div>
+            ) : (
+              <div className="cmp-prov">
+                <input className="inp" autoFocus value={nuevaCat} onChange={(e) => setNuevaCat(e.target.value)} placeholder="Ej: Charcutería, Bebidas, Limpieza" aria-label="Nombre de la categoría nueva" />
+                <button className="btn2 press" onClick={() => setNuevaCat(null)}>Elegir de la lista</button>
+              </div>
+            )}
+          </div>
           <button className="cfg-row press" role="switch" aria-checked={pesable} onClick={() => setPesable(!pesable)}>
-            <span className="cfg-tx"><b>Se vende por peso o medida</b><small>Queso, carne, granos, refresco a granel, tela… Al vender se escribe cuánto lleva.</small></span>
+            <span className="cfg-tx"><b>Se vende por peso o medida</b><small>Queso, carne, granos, a granel, tela… Al vender se escribe cuánto lleva.</small></span>
             <span className={"sw" + (pesable ? " on" : "")}><i /></span>
           </button>
           {pesable && (
-            <div className="seg cfg-seg" role="tablist" aria-label="Unidad de medida">
-              {[["KG", "Kilo"], ["G", "Gramo"], ["L", "Litro"], ["M", "Metro"]].map(([u, n]) => <button key={u} className={unidad === u ? "on" : ""} onClick={() => setUnidad(u)}>{n}</button>)}
+            <div className="seg uni-seg" role="tablist" aria-label="Unidad de medida">
+              {Object.entries(UNIDAD_N).map(([k, n]) => <button key={k} className={unidad === k ? "on" : ""} onClick={() => setUnidad(k)}>{n.charAt(0).toUpperCase() + n.slice(1)}</button>)}
             </div>
           )}
           <div className="two">
-            <label className="lbl">{pesable ? "Precio $ por " + ({ KG: "kilo", G: "gramo", L: "litro", M: "metro" } as Record<string, string>)[unidad] : "Precio $"}<input className="inp" inputMode="decimal" value={f.precioUsd} onChange={set("precioUsd")} aria-label="Precio" /></label>
-            <label className="lbl">Costo $<input className="inp" inputMode="decimal" value={f.costoUsd} onChange={set("costoUsd")} /></label>
+            <label className="lbl">{pesable ? "Precio $ por " + UNIDAD_N[unidad] : "Precio $"}<input className="inp" inputMode="decimal" value={f.precioUsd} onChange={set("precioUsd")} aria-label="Precio" /></label>
+            <label className="lbl">{pesable ? "Costo $ por " + UNIDAD_N[unidad] : "Costo $"}<input className="inp" inputMode="decimal" value={f.costoUsd} onChange={set("costoUsd")} aria-label="Costo" /></label>
           </div>
           <div className="two">
-            <label className="lbl">Categoría<input className="inp" value={f.categoria} onChange={set("categoria")} /></label>
-            <label className="lbl">{pesable ? "Hay (" + ({ KG: "kg", G: "g", L: "L", M: "m" } as Record<string, string>)[unidad] + ")" : "Stock inicial"}<input className="inp" inputMode="decimal" value={f.stockInicial} onChange={set("stockInicial")} /></label>
+            {!p && <label className="lbl">{pesable ? "Hay (" + u + ")" : "Stock inicial"}<input className="inp" inputMode="decimal" value={f.stockInicial} onChange={set("stockInicial")} aria-label="Stock inicial" /></label>}
+            <label className="lbl">Avisar cuando quede{pesable ? " (" + u + ")" : ""}<input className="inp" inputMode="decimal" value={f.stockMinimo} onChange={set("stockMinimo")} placeholder="0" aria-label="Stock mínimo" /></label>
           </div>
+          {p && <span className="hint">El stock se cambia con “Ajustar” (entra / sale / fijar).</span>}
+          {err && <p className="pinmsg err">{err}</p>}
         </div>
         <div className="modal-foot"><button className="btn primary big press" disabled={!ok} onClick={guardar}>Guardar</button></div>
       </div>
@@ -117,7 +169,52 @@ function FormNuevo({ onClose, onSaved, onErr }: { onClose: () => void; onSaved: 
   );
 }
 
-function FormAjuste({ p, onClose, onSaved, onErr }: { p: Producto; onClose: () => void; onSaved: () => void; onErr: (s: string) => void }) {
+/** Administrar categorías: crear, renombrar y borrar (sus productos pasan a "General"). */
+function FormCategorias({ cats, onClose, onCambio }: { cats: Categoria[]; onClose: () => void; onCambio: (msg: string) => void }) {
+  const [nueva, setNueva] = useState("");
+  const [editando, setEditando] = useState<{ de: string; a: string } | null>(null);
+  const [err, setErr] = useState("");
+  const correr = async (fn: () => Promise<unknown>, msg: string) => { setErr(""); try { await fn(); onCambio(msg); } catch (e) { setErr((e as Error).message); } };
+  return (
+    <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-card" onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Escape") onClose(); }}>
+        <div className="modal-head"><h2>Categorías</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="modal-body">
+          <div className="cmp-prov">
+            <input className="inp" autoFocus value={nueva} onChange={(e) => setNueva(e.target.value)} placeholder="Nueva categoría (ej. Charcutería)" aria-label="Nueva categoría"
+              onKeyDown={(e) => { if (e.key === "Enter" && nueva.trim()) correr(() => crearCategoria(nueva).then(() => setNueva("")), "Categoría creada"); }} />
+            <button className="btn primary press" disabled={!nueva.trim()} onClick={() => correr(() => crearCategoria(nueva).then(() => setNueva("")), "Categoría creada")}><UIcono k="plus" sw={2.2} />Agregar</button>
+          </div>
+          {err && <p className="pinmsg err">{err}</p>}
+          <div className="cat-list">
+            {cats.map((c) => (
+              <div key={c.nombre} className="cat-row">
+                {editando?.de === c.nombre ? (
+                  <>
+                    <input className="inp" autoFocus value={editando.a} onChange={(e) => setEditando({ ...editando, a: e.target.value })} aria-label={"Nuevo nombre de " + c.nombre}
+                      onKeyDown={(e) => { if (e.key === "Enter" && editando.a.trim()) correr(() => renombrarCategoria(c.nombre, editando.a).then(() => setEditando(null)), "Categoría renombrada"); }} />
+                    <button className="btn primary press" onClick={() => correr(() => renombrarCategoria(c.nombre, editando.a).then(() => setEditando(null)), "Categoría renombrada")}>Guardar</button>
+                  </>
+                ) : (
+                  <>
+                    <span className="cat-nm"><b>{c.nombre}</b><small>{c.productos} producto(s)</small></span>
+                    {c.nombre !== "General" && <>
+                      <button className="btn2 press" onClick={() => setEditando({ de: c.nombre, a: c.nombre })}>Renombrar</button>
+                      <button className="hdel" aria-label={"Borrar " + c.nombre} onClick={() => { if (window.confirm(`¿Borrar "${c.nombre}"?` + (c.productos ? ` Sus ${c.productos} producto(s) pasan a "General".` : ""))) correr(() => borrarCategoria(c.nombre), "Categoría borrada"); }}>✕</button>
+                    </>}
+                  </>
+                )}
+              </div>
+            ))}
+          </div>
+          <span className="hint">Las categorías salen como botones en Vender para encontrar rápido los productos.</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FormAjuste({ p, onEditar, onClose, onSaved, onErr }: { p: Producto; onEditar: () => void; onClose: () => void; onSaved: () => void; onErr: (s: string) => void }) {
   const [tipo, setTipo] = useState<"ENTRADA" | "SALIDA" | "FIJAR">("ENTRADA");
   const [cant, setCant] = useState("");
   const [motivo, setMotivo] = useState("");
@@ -131,7 +228,8 @@ function FormAjuste({ p, onClose, onSaved, onErr }: { p: Producto; onClose: () =
         <div className="modal-head"><h2>{p.nombre}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
         <div className="modal-body">
           <div className="inv-stat"><span className="ibox" style={{ background: "var(--surface-2)", color: "var(--text-2)" }}><UIcono k="box" /></span>
-            <div><span className="k">Stock actual</span><span className="v t">{p.stockActual}{p.esPesable ? " " + p.unidadMedida : ""}</span></div></div>
+            <div><span className="k">Stock actual · {p.categoria}</span><span className="v t">{cantTxt(p, p.stockActual)}</span></div>
+            <button className="btn2 press inv-editar" onClick={onEditar}>Editar datos</button></div>
           <div className="seg">
             {tipos.map((x) => <button key={x.id} className={tipo === x.id ? "on" : ""} onClick={() => setTipo(x.id)}>{x.n}</button>)}
           </div>

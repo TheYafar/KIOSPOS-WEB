@@ -20,7 +20,7 @@ export const productos = [
 export interface CajaCfg { metodosPago: string | null; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number; }
 export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: any; cierre?: any; tasa?: number | null; cajaConfig?: CajaCfg; puts?: CajaCfg[];
   movs?: any[]; clientes?: any[]; abonos?: any[]; nuevoCliente?: any;
-  anulada?: any; devuelta?: any; compra?: any; descuento?: any; fiado?: any; }
+  anulada?: any; devuelta?: any; compra?: any; descuento?: any; fiado?: any; producto?: any; categoria?: any; }
 
 export const ventasDemo = [
   { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
@@ -73,6 +73,11 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     const u = r.request().url(), m = r.request().method();
     if (u.includes("/api/caja/cajeros")) return r.fulfill({ json: [{ id: 2, nombre: "test1" }, { id: 3, nombre: "test2" }] });
     if (u.includes("/api/auth/login-cajero")) return r.fulfill({ json: { token: "x", rol: "CAJERO", usuarioId: 3, negocioId: 1, cajaId: 1, nombreCompleto: "test2" } });
+    if (u.includes("/api/inventario/categorias")) {
+      if (m !== "GET") { st.categoria = { metodo: m, ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { nombre: "x", productos: 0 } }); }
+      return r.fulfill({ json: [{ nombre: "Bebidas", productos: 1 }, { nombre: "Charcutería", productos: 1 }, { nombre: "General", productos: 0 }, { nombre: "Víveres", productos: 2 }] });
+    }
+    if (u.includes("/api/inventario/productos") && (m === "POST" || m === "PUT")) { st.producto = { metodo: m, ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: productos[0] }); }
     if (u.includes("/api/inventario")) return r.fulfill({ json: productos });
     if (u.includes("/api/tasa")) return r.fulfill({ json: { bs: st.tasa === undefined ? 900 : st.tasa } });
     if (u.includes("/api/cuadre/actual")) return st.turnoAbierto ? r.fulfill({ json: resumen }) : r.fulfill({ status: 204, body: "" });
