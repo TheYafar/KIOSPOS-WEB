@@ -8,5 +8,7 @@ public enum MetodoPago {
     PAGO_MOVIL,
     BIOPAGO,
     /** Forma de pago o moneda extra configurada por el negocio (nombre en la referencia). */
-    OTRO
+    OTRO,
+    /** Fiado: se anota en la cuenta del cliente (no entra dinero). Siempre en USD. */
+    FIADO
 }

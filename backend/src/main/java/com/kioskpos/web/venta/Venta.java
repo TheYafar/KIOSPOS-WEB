@@ -41,6 +41,10 @@ public class Venta {
     private Long turnoId;
 
     /** UUID del cliente para deduplicar reenvíos de la cola offline (idempotencia). */
+    /** Cliente al que se le fió (parte o todo), si aplica. */
+    @Column(name = "cliente_id")
+    private Long clienteId;
+
     @Column(name = "codigo_unico", length = 64)
     private String codigoUnico;
 

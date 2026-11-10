@@ -21,9 +21,32 @@ import org.springframework.web.bind.annotation.RestController;
 public class CuadreController {
 
     private final CuadreService cuadreService;
+    private final com.kioskpos.web.cuadre.MovimientoCajaService movimientoCajaService;
 
-    public CuadreController(CuadreService cuadreService) {
+    public CuadreController(CuadreService cuadreService,
+                            com.kioskpos.web.cuadre.MovimientoCajaService movimientoCajaService) {
         this.cuadreService = cuadreService;
+        this.movimientoCajaService = movimientoCajaService;
+    }
+
+    /** Gasto, retiro, ingreso o avance de efectivo en el turno abierto de ESTA caja. */
+    @PostMapping("/movimientos")
+    public com.kioskpos.web.cuadre.MovimientoCaja registrarMovimiento(@AuthenticationPrincipal KioskPrincipal principal,
+                                                                     @RequestBody com.kioskpos.web.cuadre.MovimientoCajaService.Nuevo req) {
+        exigirCaja(principal);
+        return movimientoCajaService.registrar(principal, req);
+    }
+
+    @GetMapping("/turnos/{id}/movimientos")
+    public java.util.List<com.kioskpos.web.cuadre.MovimientoCaja> movimientos(@PathVariable Long id) {
+        return movimientoCajaService.delTurno(id);
+    }
+
+    @PostMapping("/movimientos/{id}/anular")
+    public com.kioskpos.web.cuadre.MovimientoCaja anularMovimiento(@AuthenticationPrincipal KioskPrincipal principal,
+                                                                  @PathVariable Long id) {
+        exigirCaja(principal);
+        return movimientoCajaService.anular(id);
     }
 
     /** Apertura de turno con el fondo (base) de la gaveta. */

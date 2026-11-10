@@ -1,6 +1,8 @@
 package com.kioskpos.web.venta;
 
 import com.kioskpos.web.auth.security.KioskPrincipal;
+import com.kioskpos.web.cliente.Cliente;
+import com.kioskpos.web.cliente.ClienteService;
 import com.kioskpos.web.cuadre.Turno;
 import com.kioskpos.web.cuadre.TurnoRepository;
 import com.kioskpos.web.negocio.NegocioRepository;
@@ -36,19 +38,22 @@ public class VentaService {
 
     private final NegocioRepository negocioRepository;
     private final TasaNegocioService tasaNegocioService;
+    private final ClienteService clienteService;
 
     public VentaService(VentaRepository ventaRepository,
                         ProductoRepository productoRepository,
                         PermisoService permisoService,
                         TurnoRepository turnoRepository,
                         NegocioRepository negocioRepository,
-                        TasaNegocioService tasaNegocioService) {
+                        TasaNegocioService tasaNegocioService,
+                        ClienteService clienteService) {
         this.ventaRepository = ventaRepository;
         this.productoRepository = productoRepository;
         this.permisoService = permisoService;
         this.turnoRepository = turnoRepository;
         this.negocioRepository = negocioRepository;
         this.tasaNegocioService = tasaNegocioService;
+        this.clienteService = clienteService;
     }
 
     public record ItemInput(Long productoId, BigDecimal cantidad, BigDecimal precioUsd, String nombre) {
@@ -57,11 +62,18 @@ public class VentaService {
     public record PagoInput(MetodoPago metodo, Moneda moneda, BigDecimal montoOriginal, String referencia) {
     }
 
-    /** creadoAt: cuándo se cobró en la caja (epoch ms). Viene en las ventas de la cola sin internet. */
+    /**
+     * creadoAt: cuándo se cobró en la caja (epoch ms). Viene en las ventas de la cola sin internet.
+     * clienteId: a quién se le fía (obligatorio si algún pago es FIADO).
+     */
     public record VentaInput(String codigoUnico, BigDecimal tasaBcv,
-                             List<ItemInput> items, List<PagoInput> pagos, Long creadoAt) {
+                             List<ItemInput> items, List<PagoInput> pagos, Long creadoAt, Long clienteId) {
         public VentaInput(String codigoUnico, BigDecimal tasaBcv, List<ItemInput> items, List<PagoInput> pagos) {
-            this(codigoUnico, tasaBcv, items, pagos, null);
+            this(codigoUnico, tasaBcv, items, pagos, null, null);
+        }
+
+        public VentaInput(String codigoUnico, BigDecimal tasaBcv, List<ItemInput> items, List<PagoInput> pagos, Long creadoAt) {
+            this(codigoUnico, tasaBcv, items, pagos, creadoAt, null);
         }
     }
 
@@ -160,11 +172,33 @@ public class VentaService {
         venta.setTotalBs(totalBs);
 
         // 4. Pagos: validar que cubren el total y calcular el vuelto.
+        //    Lo FIADO (en USD) se descuenta del total; el resto se cobra normal. El vuelto
+        //    solo sale de lo pagado de verdad, nunca del fiado.
+        List<PagoInput> pagosIn = input.pagos() == null ? List.of() : input.pagos();
+        BigDecimal fiadoUsd = BigDecimal.ZERO;
         List<CobroCalculadora.Pago> pagosCobro = new ArrayList<>();
-        for (PagoInput p : (input.pagos() == null ? List.<PagoInput>of() : input.pagos())) {
-            pagosCobro.add(new CobroCalculadora.Pago(p.moneda(), p.montoOriginal()));
+        for (PagoInput p : pagosIn) {
+            if (p.metodo() == null || p.moneda() == null || p.montoOriginal() == null || p.montoOriginal().signum() < 0) {
+                throw new IllegalArgumentException("Pago inválido");
+            }
+            if (p.metodo() == MetodoPago.FIADO) {
+                if (p.moneda() != Moneda.USD) {
+                    throw new IllegalArgumentException("El fiado se anota en dólares");
+                }
+                fiadoUsd = fiadoUsd.add(p.montoOriginal().setScale(2, RoundingMode.HALF_UP));
+            } else {
+                pagosCobro.add(new CobroCalculadora.Pago(p.moneda(), p.montoOriginal()));
+            }
         }
-        CobroCalculadora.Resultado cobro = CobroCalculadora.calcular(totalUsd, tasa, pagosCobro);
+        Cliente clienteFiado = null;
+        if (fiadoUsd.signum() > 0) {
+            if (fiadoUsd.compareTo(totalUsd) > 0) {
+                throw new IllegalArgumentException("Lo fiado no puede ser mayor que el total de la venta");
+            }
+            clienteFiado = clienteService.validarFiado(input.clienteId(), fiadoUsd);
+            venta.setClienteId(clienteFiado.getId());
+        }
+        CobroCalculadora.Resultado cobro = CobroCalculadora.calcular(totalUsd.subtract(fiadoUsd), tasa, pagosCobro);
         if (!cobro.cubre()) {
             throw new IllegalArgumentException(String.format(
                     "Pago insuficiente. Falta cubrir el total de $%.2f (Bs. %.2f)", totalUsd, totalBs));
@@ -172,7 +206,7 @@ public class VentaService {
         venta.setVueltoUsd(cobro.vueltoUsd());
         venta.setVueltoBs(cobro.vueltoBs());
 
-        for (PagoInput p : input.pagos()) {
+        for (PagoInput p : pagosIn) {
             PagoVenta pago = new PagoVenta();
             pago.setMetodo(p.metodo());
             pago.setMoneda(p.moneda());
@@ -181,14 +215,19 @@ public class VentaService {
             pago.setEquivalenteUsd(p.moneda() == Moneda.USD
                     ? monto
                     : monto.divide(tasa, 2, RoundingMode.HALF_UP));
-            pago.setReferencia(p.referencia());
+            pago.setReferencia(p.metodo() == MetodoPago.FIADO ? clienteFiado.getNombre() : p.referencia());
             venta.addPago(pago);
         }
 
         // 5. Número de factura correlativo POR CAJA.
         venta.setNumeroFactura(ventaRepository.maxNumeroFacturaDeCaja(principal.cajaId()) + 1);
 
-        return ventaRepository.save(venta);
+        Venta guardada = ventaRepository.save(venta);
+        if (clienteFiado != null) {
+            clienteService.cargar(clienteFiado.getId(), fiadoUsd, guardada.getId(), guardada.getTurnoId(),
+                    principal.cajaId(), principal.usuarioId());
+        }
+        return guardada;
     }
 
     @Transactional(readOnly = true)

@@ -1,5 +1,7 @@
 package com.kioskpos.web.cuadre;
 
+import com.kioskpos.web.cliente.MovimientoCliente;
+import com.kioskpos.web.cliente.MovimientoClienteRepository;
 import com.kioskpos.web.tenant.NegocioContext;
 import com.kioskpos.web.venta.MetodoPago;
 import com.kioskpos.web.venta.PagoVenta;
@@ -22,16 +24,25 @@ import org.springframework.transaction.annotation.Transactional;
  * sale de la caja (CLAUDE.md §9). Lo contado ES la gaveta completa (con la base
  * adentro): el esperado ya incluye la base, así que NO se vuelve a sumar la apertura
  * (evita la "doble suma" del cierre).
+ *
+ * Además: − gastos, retiros y avances entregados; + ingresos y abonos de fiado en
+ * efectivo. Los avances y abonos digitales suman a su método (punto, pago móvil...).
  */
 @Service
 public class CuadreService {
 
     private final TurnoRepository turnoRepository;
     private final VentaRepository ventaRepository;
+    private final MovimientoCajaRepository movimientoCajaRepository;
+    private final MovimientoClienteRepository movimientoClienteRepository;
 
-    public CuadreService(TurnoRepository turnoRepository, VentaRepository ventaRepository) {
+    public CuadreService(TurnoRepository turnoRepository, VentaRepository ventaRepository,
+                         MovimientoCajaRepository movimientoCajaRepository,
+                         MovimientoClienteRepository movimientoClienteRepository) {
         this.turnoRepository = turnoRepository;
         this.ventaRepository = ventaRepository;
+        this.movimientoCajaRepository = movimientoCajaRepository;
+        this.movimientoClienteRepository = movimientoClienteRepository;
     }
 
     @Transactional
@@ -96,7 +107,8 @@ public class CuadreService {
 
         return new Resumen(turno.getId(), turno.getEstado(), r.fondoUsd(), r.fondoBs(),
                 r.efectivoUsd(), r.efectivoBs(), r.vueltoUsd(), r.vueltoBs(),
-                r.esperadoUsd(), r.esperadoBs(), dUsd, dBs, difUsd, difBs, r.metodos());
+                r.esperadoUsd(), r.esperadoBs(), dUsd, dBs, difUsd, difBs, r.metodos(), r.movimientos(),
+                r.fiadoUsd(), r.comisionAvancesBs());
     }
 
     private Resumen calcular(Turno turno) {
@@ -111,6 +123,7 @@ public class CuadreService {
         BigDecimal biopagoBs = BigDecimal.ZERO;
         BigDecimal otrosUsd = BigDecimal.ZERO;   // formas/monedas extra (OTRO) cobradas en $
         BigDecimal otrosBs = BigDecimal.ZERO;    // ... y en Bs
+        BigDecimal fiadoUsd = BigDecimal.ZERO;   // vendido fiado: no entra dinero
 
         for (Venta v : ventaRepository.findByTurnoId(turno.getId())) {
             if ("ANULADA".equals(v.getEstado())) {
@@ -126,6 +139,7 @@ public class CuadreService {
                     case PUNTO -> puntoBs = puntoBs.add(m);
                     case PAGO_MOVIL -> pagoMovilBs = pagoMovilBs.add(m);
                     case BIOPAGO -> biopagoBs = biopagoBs.add(m);
+                    case FIADO -> fiadoUsd = fiadoUsd.add(m);
                     case OTRO -> {
                         if (p.getMoneda() == com.kioskpos.web.venta.Moneda.USD) {
                             otrosUsd = otrosUsd.add(m);
@@ -138,10 +152,41 @@ public class CuadreService {
             }
         }
 
+        // Movimientos de efectivo que no son ventas (gastos, retiros, ingresos, avances).
+        Acum mov = new Acum();
+        BigDecimal comisionAvancesBs = BigDecimal.ZERO;
+        for (MovimientoCaja mc : movimientoCajaRepository.findByTurnoIdAndAnuladoFalse(turno.getId())) {
+            MovimientoCaja.Tipo tipo = MovimientoCaja.Tipo.valueOf(mc.getTipo());
+            mov.sumar(tipo.name(), mc.getMoneda(), mc.getMonto());
+            if (tipo == MovimientoCaja.Tipo.AVANCE) {
+                comisionAvancesBs = comisionAvancesBs.add(mc.getComision() == null ? BigDecimal.ZERO : mc.getComision());
+                switch (mc.getMetodoCobro()) {
+                    case "PUNTO" -> puntoBs = puntoBs.add(mc.getMontoCobrado());
+                    case "PAGO_MOVIL" -> pagoMovilBs = pagoMovilBs.add(mc.getMontoCobrado());
+                    case "BIOPAGO" -> biopagoBs = biopagoBs.add(mc.getMontoCobrado());
+                    default -> { /* validado al registrar */ }
+                }
+            }
+        }
+        // Abonos de fiado recibidos en este turno.
+        for (MovimientoCliente ab : movimientoClienteRepository.findByTurnoIdAndTipo(turno.getId(), MovimientoCliente.Tipo.ABONO.name())) {
+            BigDecimal m = ab.getMontoOriginal();
+            switch (ab.getMetodo()) {
+                case "EFECTIVO_USD" -> mov.sumar("ABONO", "USD", m);
+                case "EFECTIVO_BS" -> mov.sumar("ABONO", "VES", m);
+                case "PUNTO" -> puntoBs = puntoBs.add(m);
+                case "PAGO_MOVIL" -> pagoMovilBs = pagoMovilBs.add(m);
+                case "BIOPAGO" -> biopagoBs = biopagoBs.add(m);
+                default -> { /* validado al registrar */ }
+            }
+        }
+
         BigDecimal fondoUsd = turno.getFondoInicialUsd();
         BigDecimal fondoBs = turno.getFondoInicialBs();
-        BigDecimal esperadoUsd = noNeg(fondoUsd.add(efectivoUsd).subtract(vueltoUsd)).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal esperadoBs = noNeg(fondoBs.add(efectivoBs).subtract(vueltoBs)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal esperadoUsd = noNeg(fondoUsd.add(efectivoUsd).subtract(vueltoUsd)
+                .add(mov.entra("USD")).subtract(mov.sale("USD"))).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal esperadoBs = noNeg(fondoBs.add(efectivoBs).subtract(vueltoBs)
+                .add(mov.entra("VES")).subtract(mov.sale("VES"))).setScale(2, RoundingMode.HALF_UP);
 
         // Lista con TODOS los métodos (el cajero ve cada uno y si cuadra). El efectivo lleva
         // el esperado de la gaveta (fondo + cobrado − vuelto); los digitales, lo cobrado exacto.
@@ -161,7 +206,36 @@ public class CuadreService {
         return new Resumen(turno.getId(), turno.getEstado(), fondoUsd, fondoBs,
                 efectivoUsd.setScale(2, RoundingMode.HALF_UP), efectivoBs.setScale(2, RoundingMode.HALF_UP),
                 vueltoUsd.setScale(2, RoundingMode.HALF_UP), vueltoBs.setScale(2, RoundingMode.HALF_UP),
-                esperadoUsd, esperadoBs, null, null, null, null, metodos);
+                esperadoUsd, esperadoBs, null, null, null, null, metodos, mov.lineas(),
+                fiadoUsd.setScale(2, RoundingMode.HALF_UP), comisionAvancesBs.setScale(2, RoundingMode.HALF_UP));
+    }
+
+    /** Suma movimientos por tipo y moneda. GASTO/RETIRO/AVANCE salen; INGRESO/ABONO entran. */
+    private static final class Acum {
+        private final java.util.Map<String, MovLinea> m = new java.util.LinkedHashMap<>();
+
+        void sumar(String tipo, String moneda, BigDecimal monto) {
+            m.merge(tipo + ":" + moneda, new MovLinea(tipo, moneda, monto, 1),
+                    (a, b) -> new MovLinea(a.tipo(), a.moneda(), a.total().add(b.total()), a.cantidad() + 1));
+        }
+
+        BigDecimal entra(String moneda) {
+            return total(moneda, List.of("INGRESO", "ABONO"));
+        }
+
+        BigDecimal sale(String moneda) {
+            return total(moneda, List.of("GASTO", "RETIRO", "AVANCE"));
+        }
+
+        private BigDecimal total(String moneda, List<String> tipos) {
+            return m.values().stream().filter(l -> l.moneda().equals(moneda) && tipos.contains(l.tipo()))
+                    .map(MovLinea::total).reduce(BigDecimal.ZERO, BigDecimal::add);
+        }
+
+        List<MovLinea> lineas() {
+            return m.values().stream().map(l -> new MovLinea(l.tipo(), l.moneda(),
+                    l.total().setScale(2, RoundingMode.HALF_UP), l.cantidad())).toList();
+        }
     }
 
     private Turno cargar(Long id) {
@@ -191,7 +265,14 @@ public class CuadreService {
                           BigDecimal esperadoUsd, BigDecimal esperadoBs,
                           BigDecimal declaradoUsd, BigDecimal declaradoBs,
                           BigDecimal diferenciaUsd, BigDecimal diferenciaBs,
-                          List<MetodoLinea> metodos) {
+                          List<MetodoLinea> metodos,
+                          List<MovLinea> movimientos,
+                          BigDecimal fiadoUsd,
+                          BigDecimal comisionAvancesBs) {
+    }
+
+    /** Total de movimientos de un tipo en una moneda (GASTO, RETIRO, INGRESO, AVANCE, ABONO). */
+    public record MovLinea(String tipo, String moneda, BigDecimal total, int cantidad) {
     }
 
     /** Un método de pago en el cuadre: cuánto debería haber según el servidor. */

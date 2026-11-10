@@ -1,5 +1,9 @@
 package com.kioskpos.web.reporte;
 
+import com.kioskpos.web.cliente.MovimientoCliente;
+import com.kioskpos.web.cliente.MovimientoClienteRepository;
+import com.kioskpos.web.cuadre.MovimientoCaja;
+import com.kioskpos.web.cuadre.MovimientoCajaRepository;
 import com.kioskpos.web.cuadre.Turno;
 import com.kioskpos.web.cuadre.TurnoRepository;
 import com.kioskpos.web.venta.DetalleVentaRepository;
@@ -29,15 +33,21 @@ public class ReporteService {
     private final DetalleVentaRepository detalleVentaRepository;
     private final PagoVentaRepository pagoVentaRepository;
     private final TurnoRepository turnoRepository;
+    private final MovimientoCajaRepository movimientoCajaRepository;
+    private final MovimientoClienteRepository movimientoClienteRepository;
 
     public ReporteService(VentaRepository ventaRepository,
                           DetalleVentaRepository detalleVentaRepository,
                           PagoVentaRepository pagoVentaRepository,
-                          TurnoRepository turnoRepository) {
+                          TurnoRepository turnoRepository,
+                          MovimientoCajaRepository movimientoCajaRepository,
+                          MovimientoClienteRepository movimientoClienteRepository) {
         this.ventaRepository = ventaRepository;
         this.detalleVentaRepository = detalleVentaRepository;
         this.pagoVentaRepository = pagoVentaRepository;
         this.turnoRepository = turnoRepository;
+        this.movimientoCajaRepository = movimientoCajaRepository;
+        this.movimientoClienteRepository = movimientoClienteRepository;
     }
 
     @Transactional(readOnly = true)
@@ -63,7 +73,22 @@ public class ReporteService {
                     String.valueOf(fila[0]), String.valueOf(fila[1]), dec(fila[2]), dec(fila[3])));
         }
 
-        return new ResumenDia(d.toString(), cantidad, totalUsd, totalBs, costo, ganancia, desglose);
+        // Gastos, retiros, ingresos y avances del día (todas las cajas), y lo que pagaron de fiado.
+        java.util.Map<String, MovimientoDia> movs = new java.util.LinkedHashMap<>();
+        BigDecimal comision = BigDecimal.ZERO;
+        for (MovimientoCaja m : movimientoCajaRepository.findByAnuladoFalseAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(desde, hasta)) {
+            movs.merge(m.getTipo() + ":" + m.getMoneda(), new MovimientoDia(m.getTipo(), m.getMoneda(), m.getMonto(), 1),
+                    (a, b) -> new MovimientoDia(a.tipo(), a.moneda(), a.total().add(b.total()), a.cantidad() + 1));
+            if (m.getComision() != null) {
+                comision = comision.add(m.getComision());
+            }
+        }
+        BigDecimal abonos = movimientoClienteRepository.findByTipoAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(
+                MovimientoCliente.Tipo.ABONO.name(), desde, hasta).stream()
+                .map(MovimientoCliente::getMontoUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new ResumenDia(d.toString(), cantidad, totalUsd, totalBs, costo, ganancia, desglose,
+                List.copyOf(movs.values()), comision, abonos);
     }
 
     /**
@@ -114,7 +139,12 @@ public class ReporteService {
     }
 
     public record ResumenDia(String fecha, long cantidadVentas, BigDecimal totalUsd, BigDecimal totalBs,
-                             BigDecimal costoUsd, BigDecimal gananciaUsd, List<DesglosePago> pagos) {
+                             BigDecimal costoUsd, BigDecimal gananciaUsd, List<DesglosePago> pagos,
+                             List<MovimientoDia> movimientos, BigDecimal comisionAvancesBs, BigDecimal abonosFiadoUsd) {
+    }
+
+    /** Gastos/retiros/ingresos/avances del día por moneda. */
+    public record MovimientoDia(String tipo, String moneda, BigDecimal total, int cantidad) {
     }
 
     public record CierreDia(Long turnoId, Long cajaId, Instant fechaCierre,
