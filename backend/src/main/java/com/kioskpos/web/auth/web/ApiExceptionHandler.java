@@ -16,6 +16,11 @@ public class ApiExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage()));
     }
 
+    @ExceptionHandler(com.kioskpos.web.admin.SuperAdminService.Requiere2faException.class)
+    public ResponseEntity<Map<String, Object>> requiere2fa(RuntimeException e) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", e.getMessage(), "requiere2fa", true));
+    }
+
     @ExceptionHandler(PermisoDenegadoException.class)
     public ResponseEntity<Map<String, String>> permiso(PermisoDenegadoException e) {
         return ResponseEntity.status(HttpStatus.FORBIDDEN)

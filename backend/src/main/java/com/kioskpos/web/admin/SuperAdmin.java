@@ -38,6 +38,13 @@ public class SuperAdmin {
     @Column(nullable = false)
     private boolean activo = true;
 
+    /** Secreto TOTP (Base32) de la verificación en dos pasos; null si nunca se configuró. */
+    @Column(name = "totp_secreto", length = 64)
+    private String totpSecreto;
+
+    @Column(name = "totp_activo", nullable = false)
+    private boolean totpActivo = false;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
 }

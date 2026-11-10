@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from "react";
-import { adminLogin, listarCajeros, loginCajero, loginDueno, tasaBcvServidor, type Cajero } from "../api";
+import { adminLogin, listarCajeros, loginCajero, loginDueno, olvideClave, Requiere2fa, restablecerClave, tasaBcvServidor, type Cajero } from "../api";
 import { getCajaToken, getSesion, getTasa, setCajaToken, setTasa, type Sesion } from "../session";
 import { UIcono } from "../icons";
 import { TemaBtn } from "../TemaBtn";
 import { setBcv, tasaEfectiva } from "../config";
 
-type Vista = "config" | "pin" | "dueno" | "admin";
+type Vista = "config" | "pin" | "dueno" | "admin" | "olvide" | "reset";
 
 const AV_COLORES = [
   "var(--c-bebidas)", "var(--c-limpieza)", "var(--c-chucherias)",
@@ -33,6 +33,12 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
   const [guardando, setGuardando] = useState(false);
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [pass2, setPass2] = useState("");
+  const [codigo, setCodigo] = useState("");
+  const [pide2fa, setPide2fa] = useState(false);
+  const [ok, setOk] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [resetTok, setResetTok] = useState("");
 
   useEffect(() => {
     const t = setInterval(() => setReloj(new Date()), 1000);
@@ -51,6 +57,13 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
     if (m) {
       setCajaTok(decodeURIComponent(m[1]));
       setVista("config");
+      try { history.replaceState(null, "", window.location.pathname); } catch { /* ignore */ }
+    }
+    // Enlace de "olvidé mi contraseña": .../#reset=TOKEN abre el formulario de clave nueva.
+    const r = window.location.hash.match(/reset=([^&]+)/);
+    if (r) {
+      setResetTok(decodeURIComponent(r[1]));
+      setVista("reset");
       try { history.replaceState(null, "", window.location.pathname); } catch { /* ignore */ }
     }
   }, []);
@@ -91,8 +104,10 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
   const confirmarPin = useCallback(async (persona: Cajero, codigo: string) => {
     try {
       onLogin(await loginCajero(persona.id, codigo));
-    } catch {
-      setPinErr("PIN incorrecto. Intenta de nuevo.");
+    } catch (e) {
+      // El servidor dice cuántos intentos quedan o si se bloqueó por seguridad.
+      const m = (e as Error).message || "";
+      setPinErr(/PIN|intentos/i.test(m) ? m : "PIN incorrecto. Intenta de nuevo.");
       setPin("");
       setShake(true);
       setTimeout(() => setShake(false), 350);
@@ -141,6 +156,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
   });
 
   const entrarDueno = async () => {
+    setOk("");
     try {
       onLogin(await loginDueno(email.trim(), pass));
     } catch (e) {
@@ -150,12 +166,34 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
 
   const entrarAdmin = async () => {
     try {
-      await adminLogin(email.trim(), pass);
+      await adminLogin(email.trim(), pass, codigo.trim());
       const s = getSesion();
       if (s) onLogin(s);
     } catch (e) {
+      if (e instanceof Requiere2fa) { setPide2fa(true); setErr(""); return; }
       setErr((e as Error).message);
+      setCodigo("");
     }
+  };
+
+  const pedirEnlace = async () => {
+    setEnviando(true); setErr("");
+    try { setOk(await olvideClave(email.trim())); }
+    catch (e) { setErr((e as Error).message); }
+    finally { setEnviando(false); }
+  };
+
+  const ponerClave = async () => {
+    if (pass.length < 8) { setErr("La contraseña debe tener al menos 8 caracteres"); return; }
+    if (pass !== pass2) { setErr("Las dos contraseñas no coinciden"); return; }
+    setEnviando(true); setErr("");
+    try {
+      const correo = await restablecerClave(resetTok, pass);
+      setEmail(correo); setPass(""); setPass2("");
+      setOk("¡Listo! Ya puedes entrar con tu contraseña nueva.");
+      setVista("dueno");
+    } catch (e) { setErr((e as Error).message); }
+    finally { setEnviando(false); }
   };
 
   const fecha = reloj.toLocaleDateString("es-VE", { weekday: "long", day: "numeric", month: "long" });
@@ -221,10 +259,56 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
             <label>Contraseña
               <input className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="current-password" onKeyDown={(e) => { if (e.key === "Enter" && email && pass) entrarDueno(); }} />
             </label>
+            {ok && <p className="pinmsg ok">{ok}</p>}
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={entrarDueno} disabled={!email || !pass}>Entrar</button>
+            <button className="link" onClick={() => { setErr(""); setOk(""); setVista("olvide"); }}>¿Olvidaste tu contraseña?</button>
             {getCajaToken() && <button className="link" onClick={() => { setErr(""); setVista("pin"); }}>Volver a los cajeros</button>}
             <button className="link" onClick={() => { setErr(""); setEmail(""); setPass(""); setVista("admin"); }}>Soy el administrador</button>
+          </div>
+        </main>
+      </div></div>
+    );
+  }
+
+  if (vista === "olvide") {
+    return (
+      <div className="app"><div className="entrar">{side}
+        <main className="entrar-main">
+          <div className="entrar-head"><h1>¿Olvidaste tu contraseña?</h1><p>Te mandamos un enlace a tu correo para poner una nueva</p></div>
+          <div className="owner">
+            <label>Correo con el que entras
+              <input className="inp" type="email" value={email} autoFocus onChange={(e) => setEmail(e.target.value)} autoComplete="username"
+                onKeyDown={(e) => { if (e.key === "Enter" && email.includes("@")) pedirEnlace(); }} />
+            </label>
+            {ok ? <p className="pinmsg ok">{ok} Revisa también la carpeta de spam. El enlace vence en 30 minutos.</p>
+              : <p className="hint">¿No te llega? Pídele al soporte de KioskPOS un enlace por WhatsApp.</p>}
+            {err && <p className="pinmsg err">{err}</p>}
+            <button className="btn primary" onClick={pedirEnlace} disabled={!email.includes("@") || enviando}>{enviando ? "Enviando…" : ok ? "Enviar otra vez" : "Enviarme el enlace"}</button>
+            <button className="link" onClick={() => { setErr(""); setOk(""); setVista("dueno"); }}>Volver</button>
+          </div>
+        </main>
+      </div></div>
+    );
+  }
+
+  if (vista === "reset") {
+    return (
+      <div className="app"><div className="entrar">{side}
+        <main className="entrar-main">
+          <div className="entrar-head"><h1>Contraseña nueva</h1><p>Escríbela dos veces. Mínimo 8 caracteres.</p></div>
+          <div className="owner">
+            <label>Contraseña nueva
+              <input className="inp" type="password" value={pass} autoFocus onChange={(e) => setPass(e.target.value)} autoComplete="new-password" />
+            </label>
+            <label>Repítela
+              <input className="inp" type="password" value={pass2} onChange={(e) => setPass2(e.target.value)} autoComplete="new-password"
+                onKeyDown={(e) => { if (e.key === "Enter" && pass && pass2) ponerClave(); }} />
+            </label>
+            {pass.length > 0 && pass.length < 8 && <p className="hint">Faltan {8 - pass.length} caracteres</p>}
+            {err && <p className="pinmsg err">{err}</p>}
+            <button className="btn primary" onClick={ponerClave} disabled={!pass || !pass2 || enviando}>{enviando ? "Guardando…" : "Guardar contraseña"}</button>
+            <button className="link" onClick={() => { setErr(""); setPass(""); setPass2(""); setVista("dueno"); }}>Cancelar</button>
           </div>
         </main>
       </div></div>
@@ -239,9 +323,16 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
           <div className="owner">
             <label>Correo<input className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} /></label>
             <label>Contraseña<input className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && email && pass) entrarAdmin(); }} /></label>
+            {pide2fa && (
+              <label>Código de tu app de autenticación
+                <input className="inp t codigo2fa" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="000000" autoFocus
+                  value={codigo} onChange={(e) => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))} aria-label="Código de 6 dígitos"
+                  onKeyDown={(e) => { if (e.key === "Enter" && codigo.length === 6) entrarAdmin(); }} />
+              </label>
+            )}
             {err && <p className="pinmsg err">{err}</p>}
-            <button className="btn primary" onClick={entrarAdmin} disabled={!email || !pass}>Entrar</button>
-            <button className="link" onClick={() => { setErr(""); setVista("dueno"); }}>Volver</button>
+            <button className="btn primary" onClick={entrarAdmin} disabled={!email || !pass || (pide2fa && codigo.length !== 6)}>Entrar</button>
+            <button className="link" onClick={() => { setErr(""); setPide2fa(false); setCodigo(""); setVista("dueno"); }}>Volver</button>
           </div>
         </main>
       </div></div>

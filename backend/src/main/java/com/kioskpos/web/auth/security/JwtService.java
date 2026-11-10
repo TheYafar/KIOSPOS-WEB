@@ -9,6 +9,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.Date;
 import javax.crypto.SecretKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -20,6 +22,10 @@ import org.springframework.stereotype.Service;
  *  - "sesion": quién eres (login de dueño o cajero). TTL largo (horas).
  *  - "permiso": la caja PUEDE cobrar ahora. TTL corto (minutos, el lease); se renueva
  *    cada pocos minutos y solo si el negocio está al día (ver SuscripcionService).
+ *
+ * Rotación de la clave: se pone la nueva en KIOSKPOS_JWT_SECRET y la vieja en
+ * KIOSKPOS_JWT_SECRET_ANTERIOR. Se firma solo con la nueva y se ACEPTAN las dos, así
+ * nadie pierde la sesión de golpe; pasado el TTL de sesión (12 h) se borra la anterior.
  */
 @Service
 public class JwtService {
@@ -27,20 +33,24 @@ public class JwtService {
     private static final String TIPO_SESION = "sesion";
     private static final String TIPO_PERMISO = "permiso";
 
+    private static final Logger log = LoggerFactory.getLogger(JwtService.class);
+    static final String SECRETO_DEV = "dev-secret-cambiar-en-produccion-min-32-bytes!!";
+
     private final SecretKey key;
+    private final SecretKey keyAnterior; // null si no se está rotando
     private final Duration sesionTtl;
     private final Duration permisoTtl;
 
     public JwtService(
             @Value("${kioskpos.jwt.secret}") String secret,
             @Value("${kioskpos.jwt.ttl-minutes:720}") long sesionTtlMinutes,
-            @Value("${kioskpos.permiso.lease-minutes:10}") long permisoTtlMinutes) {
-        byte[] bytes = secret.getBytes(StandardCharsets.UTF_8);
-        if (bytes.length < 32) {
-            throw new IllegalStateException(
-                    "kioskpos.jwt.secret debe tener al menos 32 bytes (256 bits) para HS256");
+            @Value("${kioskpos.permiso.lease-minutes:10}") long permisoTtlMinutes,
+            @Value("${kioskpos.jwt.secret-anterior:}") String secretAnterior) {
+        this.key = clave(secret);
+        this.keyAnterior = secretAnterior == null || secretAnterior.isBlank() ? null : clave(secretAnterior);
+        if (SECRETO_DEV.equals(secret)) {
+            log.warn("¡Usando el secreto JWT de DESARROLLO! En producción define KIOSKPOS_JWT_SECRET.");
         }
-        this.key = Keys.hmacShaKeyFor(bytes);
         this.sesionTtl = Duration.ofMinutes(sesionTtlMinutes);
         this.permisoTtl = Duration.ofMinutes(permisoTtlMinutes);
     }
@@ -106,8 +116,25 @@ public class JwtService {
         return permisoTtl.toMinutes();
     }
 
+    private static SecretKey clave(String secreto) {
+        byte[] bytes = secreto.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length < 32) {
+            throw new IllegalStateException(
+                    "kioskpos.jwt.secret debe tener al menos 32 bytes (256 bits) para HS256");
+        }
+        return Keys.hmacShaKeyFor(bytes);
+    }
+
     private Claims parse(String token) {
-        return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+        try {
+            return Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+        } catch (io.jsonwebtoken.security.SignatureException e) {
+            if (keyAnterior == null) {
+                throw e;
+            }
+            // Firmado con la clave anterior (rotación en curso): sigue valiendo hasta que venza.
+            return Jwts.parser().verifyWith(keyAnterior).build().parseSignedClaims(token).getPayload();
+        }
     }
 
     public record Permiso(Long negocioId, Long cajaId, Instant expira) {

@@ -2,6 +2,7 @@ package com.kioskpos.web.auth;
 
 import com.kioskpos.web.auth.security.JwtService;
 import com.kioskpos.web.auth.security.KioskPrincipal;
+import com.kioskpos.web.seguridad.IntentosLoginService;
 import com.kioskpos.web.tenant.NegocioContext;
 import java.time.Instant;
 import java.util.List;
@@ -33,6 +34,7 @@ public class AuthService {
     private final UsuarioService usuarioService;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final IntentosLoginService intentos;
 
     public AuthService(CuentaLoginRepository cuentaLoginRepository,
                        CajaTokenRepository cajaTokenRepository,
@@ -40,7 +42,8 @@ public class AuthService {
                        CajaRepository cajaRepository,
                        UsuarioService usuarioService,
                        PasswordEncoder passwordEncoder,
-                       JwtService jwtService) {
+                       JwtService jwtService,
+                       IntentosLoginService intentos) {
         this.cuentaLoginRepository = cuentaLoginRepository;
         this.cajaTokenRepository = cajaTokenRepository;
         this.usuarioRepository = usuarioRepository;
@@ -48,10 +51,13 @@ public class AuthService {
         this.usuarioService = usuarioService;
         this.passwordEncoder = passwordEncoder;
         this.jwtService = jwtService;
+        this.intentos = intentos;
     }
 
     public ResultadoLogin loginDueno(String email, String password) {
         String correo = email == null ? "" : email.trim().toLowerCase();
+        String clave = IntentosLoginService.dueno(correo);
+        intentos.verificar(clave);
         CuentaLogin cuenta = cuentaLoginRepository.findByEmail(correo).orElse(null);
         // Mensaje genérico e igual trabajo de verificación tanto si el correo existe
         // como si no, para no revelar qué correos están registrados.
@@ -59,8 +65,10 @@ public class AuthService {
                 && cuenta.isActivo()
                 && passwordEncoder.matches(password == null ? "" : password, cuenta.getPasswordHash());
         if (!ok) {
-            throw new AuthException("Correo o contraseña incorrectos");
+            int quedan = intentos.fallo(clave);
+            throw new AuthException("Correo o contraseña incorrectos." + IntentosLoginService.quedan(quedan));
         }
+        intentos.exito(clave);
         try {
             NegocioContext.set(cuenta.getNegocioId());
             Usuario usuario = usuarioRepository.findById(cuenta.getUsuarioId())
@@ -88,6 +96,8 @@ public class AuthService {
             if (!caja.isActiva() || !caja.isAutorizada()) {
                 throw new AuthException("Esta caja no está autorizada para cobrar");
             }
+            String clave = IntentosLoginService.cajero(caja.getId(), usuarioId);
+            intentos.verificar(clave);
             Usuario cajero = usuarioRepository.findById(usuarioId).orElse(null);
             boolean ok = cajero != null
                     && cajero.isActivo()
@@ -95,8 +105,10 @@ public class AuthService {
                     && cajero.getPinHash() != null
                     && passwordEncoder.matches(pin == null ? "" : pin, cajero.getPinHash());
             if (!ok) {
-                throw new AuthException("PIN incorrecto");
+                int quedan = intentos.fallo(clave);
+                throw new AuthException("PIN incorrecto." + IntentosLoginService.quedan(quedan));
             }
+            intentos.exito(clave);
             caja.setLastSeen(Instant.now());
             cajaRepository.save(caja);
             KioskPrincipal p = new KioskPrincipal(

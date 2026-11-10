@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { adminAprobarPago, adminCrearNegocio, adminNegocios, adminPagosPendientes, adminReactivar, adminRegistrarPago, adminSuspender, type NegocioVista, type PagoPendiente } from "../api";
+import { admin2fa, adminAprobarPago, adminCrearNegocio, adminEnlaceClave, adminNegocios, adminPagosPendientes, adminReactivar, adminRegistrarPago, adminSuspender, type NegocioVista, type PagoPendiente } from "../api";
 import { UIcono } from "../icons";
 import { HorariosCierre } from "./negocio";
 import { TemaBtn } from "../TemaBtn";
+import { Seguridad2fa } from "./Seguridad2fa";
 
 const usd = (n: number | string) => "$ " + Number(n).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pillCls: Record<string, string> = { ACTIVA: "ok", AVISO: "soon", SUSPENDIDA: "late" };
@@ -33,6 +34,14 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
   const [q, setQ] = useState("");
   const [filtro, setFiltro] = useState("");
   const [pagoNeg, setPagoNeg] = useState<NegocioVista | null>(null);
+  const [seg, setSeg] = useState(false);
+  const [con2fa, setCon2fa] = useState<boolean | null>(null);
+  const [enlace, setEnlace] = useState<{ neg: string; url: string } | null>(null);
+  useEffect(() => { admin2fa().then((r) => setCon2fa(r.activo)).catch(() => {}); }, []);
+  const pedirEnlace = async (n: NegocioVista) => {
+    try { setEnlace({ neg: n.situacion.nombre, url: await adminEnlaceClave(n.situacion.negocioId) }); }
+    catch (e) { setErr((e as Error).message); }
+  };
 
   const cargar = async () => {
     try { setNegs(await adminNegocios()); setPagos(await adminPagosPendientes()); setErr(""); }
@@ -61,7 +70,9 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
         <div className="appmain">
           <header className="hdr">
             <div><h1>Administración</h1><div className="sub">Super admin · uriel</div></div>
-            <div className="hpills"><TemaBtn /><button className="btn primary press" onClick={() => setModal(true)}><UIcono k="plus" sw={2.2} />Nuevo negocio</button></div>
+            <div className="hpills"><TemaBtn />
+              <button className={"btn press " + (con2fa === false ? "warn-btn" : "ghost")} onClick={() => setSeg(true)}><UIcono k="lock" sw={2} />Seguridad</button>
+              <button className="btn primary press" onClick={() => setModal(true)}><UIcono k="plus" sw={2.2} />Nuevo negocio</button></div>
           </header>
           <div className="caja">
             <div className="scroll pad">
@@ -74,6 +85,11 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
                 <div className="inv-stat"><span className="ibox" style={{ background: "var(--accent-soft)", color: "var(--warn)" }}><UIcono k="cash" /></span>
                   <div><span className="k">Por cobrar</span><span className="v t">{usd(deuda)}</span><span className="d">deuda acumulada</span></div></div>
               </div>
+              {con2fa === false && (
+                <button className="sec-aviso" onClick={() => setSeg(true)}>
+                  <UIcono k="alert" sw={2} /><span><b>Activa la verificación en dos pasos.</b> Si alguien saca tu clave, sin el código de tu teléfono no entra.</span>
+                </button>
+              )}
               {err && <p className="noresult">{err}</p>}
 
               {pagos.length > 0 && (
@@ -121,6 +137,7 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
                       </div>
                       <div className="neg-foot">
                         <button className="btn ghost press" onClick={() => setPagoNeg(n)}>Registrar pago</button>
+                        <button className="btn ghost press" title="Enlace para que el dueño ponga contraseña nueva" onClick={() => pedirEnlace(n)}><UIcono k="lock" sw={2} />Clave</button>
                         {s.estadoEfectivo === "SUSPENDIDA"
                           ? <button className="btn primary press" onClick={() => accion(() => adminReactivar(s.negocioId), "Reactivado")}>Reactivar</button>
                           : <button className="btn danger press" onClick={() => accion(() => adminSuspender(s.negocioId), "Suspendido")}>Suspender</button>}
@@ -137,7 +154,32 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
       </div>
 
       {modal && <FormNegocio onClose={() => setModal(false)} onSaved={() => { setModal(false); setMsg("Negocio creado"); cargar(); }} onErr={setErr} />}
+      {seg && <Seguridad2fa onClose={() => setSeg(false)} onCambio={(a) => { setCon2fa(a); setMsg(a ? "Verificación en dos pasos activada" : "Verificación en dos pasos desactivada"); }} />}
+      {enlace && <EnlaceClave {...enlace} onClose={() => setEnlace(null)} />}
       {pagoNeg && <FormPago neg={pagoNeg} onClose={() => setPagoNeg(null)} onSaved={() => { setPagoNeg(null); setMsg("Pago registrado"); cargar(); }} onErr={(e) => { setPagoNeg(null); setErr(e); }} />}
+    </div>
+  );
+}
+
+/** Enlace de un solo uso (24 h) para que el dueño ponga contraseña nueva: copiar o mandar por WhatsApp. */
+function EnlaceClave({ neg, url, onClose }: { neg: string; url: string; onClose: () => void }) {
+  const [copiado, setCopiado] = useState(false);
+  const copiar = async () => { try { await navigator.clipboard.writeText(url); setCopiado(true); window.setTimeout(() => setCopiado(false), 2000); } catch { /* sin portapapeles */ } };
+  const texto = `Hola, este es tu enlace para poner una contraseña nueva en KioskPOS (vence en 24 horas y sirve una sola vez): ${url}`;
+  return (
+    <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-card">
+        <div className="modal-head"><h2>Cambiar clave del dueño</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="modal-body">
+          <span className="hint">Mándale este enlace al dueño de <b>{neg}</b>. Vence en 24 horas y sirve una sola vez; al generar otro, este deja de servir.</span>
+          <input className="inp" readOnly value={url} onFocus={(e) => e.currentTarget.select()} aria-label="Enlace para cambiar la clave" />
+          {copiado && <span className="pill ok" style={{ alignSelf: "flex-start" }}><UIcono k="check" sw={2.5} />Copiado</span>}
+        </div>
+        <div className="modal-foot two-btn">
+          <button className="btn ghost big press" onClick={copiar}>{copiado ? "¡Copiado!" : "Copiar enlace"}</button>
+          <a className="btn primary big press" href={"https://wa.me/?text=" + encodeURIComponent(texto)} target="_blank" rel="noreferrer">Enviar por WhatsApp</a>
+        </div>
+      </div>
     </div>
   );
 }

@@ -8,6 +8,8 @@ services:
       POSTGRES_USER: ${DB_ADMIN_USER:-kioskpos_admin}
       POSTGRES_PASSWORD: ${DB_ADMIN_PASSWORD:?define DB_ADMIN_PASSWORD en .env}
       POSTGRES_DB: ${DB_NAME:-kioskpos}
+      # Clave real del rol de runtime (la aplica db/init/02-app-password.sh al crear la BD).
+      DB_APP_PASSWORD: ${DB_APP_PASSWORD:-kioskpos_app_dev}
     volumes:
       - kioskpos_pgdata:/var/lib/postgresql/data
       - ./backend/src/main/resources/db/init:/docker-entrypoint-initdb.d:ro
@@ -32,6 +34,10 @@ services:
       DB_APP_USER: ${DB_APP_USER:-kioskpos_app}
       DB_APP_PASSWORD: ${DB_APP_PASSWORD:-kioskpos_app_dev}
       KIOSKPOS_JWT_SECRET: ${KIOSKPOS_JWT_SECRET:?define un secreto de 32+ bytes en .env}
+      # Solo durante una rotación de la clave JWT (ver SEGURIDAD.md); si no, vacío.
+      KIOSKPOS_JWT_SECRET_ANTERIOR: ${KIOSKPOS_JWT_SECRET_ANTERIOR:-}
+      KIOSKPOS_LOGIN_MAX_INTENTOS: ${KIOSKPOS_LOGIN_MAX_INTENTOS:-5}
+      KIOSKPOS_LOGIN_BLOQUEO_MINUTOS: ${KIOSKPOS_LOGIN_BLOQUEO_MINUTOS:-15}
       KIOSKPOS_BOOTSTRAP_SUPERADMINEMAIL: ${KIOSKPOS_BOOTSTRAP_SUPERADMINEMAIL:-}
       KIOSKPOS_BOOTSTRAP_SUPERADMINPASSWORD: ${KIOSKPOS_BOOTSTRAP_SUPERADMINPASSWORD:-}
       # Correo transaccional (Resend por SMTP). Déjalo vacío/false para no enviar.

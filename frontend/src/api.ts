@@ -70,6 +70,17 @@ export async function loginDueno(email: string, password: string): Promise<Sesio
   return s;
 }
 
+// ---------- Olvidé mi contraseña (dueño/encargado) ----------
+export async function olvideClave(email: string): Promise<string> {
+  const r = await parse(await fetch("/api/auth/olvide-clave", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) }));
+  return r.mensaje;
+}
+/** Pone la contraseña nueva con el enlace; devuelve el correo de la cuenta. */
+export async function restablecerClave(token: string, password: string): Promise<string> {
+  const r = await parse(await fetch("/api/auth/restablecer-clave", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ token, password }) }));
+  return r.email;
+}
+
 // ---------- Permiso de cobro (kill switch) ----------
 
 export async function renovarPermiso(): Promise<{ ok: boolean; estado?: string; mensaje?: string }> {
@@ -226,8 +237,17 @@ export async function crearCaja(nombre: string): Promise<CajaCreada> {
 
 // ---------- Super admin ----------
 
-export async function adminLogin(email: string, password: string): Promise<string> {
-  const r = await parse(await fetch("/api/admin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password }) }));
+/** La clave del super admin es correcta pero falta el código de la app de autenticación. */
+export class Requiere2fa extends Error {}
+
+export async function adminLogin(email: string, password: string, codigo?: string): Promise<string> {
+  const resp = await fetch("/api/admin/login", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, password, codigo: codigo || null }) });
+  if (resp.status === 401) {
+    const b = await resp.json().catch(() => ({}));
+    if (b.requiere2fa) throw new Requiere2fa(b.error || "Escribe el código de 6 dígitos");
+    throw new Error(b.error || "Correo o contraseña incorrectos");
+  }
+  const r = await parse(resp);
   const s: Sesion = { token: r.token, rol: "SUPER_ADMIN", usuarioId: 0, negocioId: 0, cajaId: null, nombre: "Administración" };
   setSesion(s);
   return r.token;
@@ -263,6 +283,19 @@ export interface CajaConfigServidor {
 export async function getCajaConfig(): Promise<CajaConfigServidor> { return parse(await fetch("/api/mi-negocio/caja-config", { headers: auth() })); }
 export async function putCajaConfig(body: { metodosPago: string; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number }): Promise<CajaConfigServidor> {
   return parse(await fetch("/api/mi-negocio/caja-config", { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+// ---------- Seguridad del super admin ----------
+export async function admin2fa(): Promise<{ activo: boolean }> { return parse(await fetch("/api/admin/2fa", { headers: auth() })); }
+export async function admin2faIniciar(): Promise<{ secreto: string; uri: string }> { return parse(await fetch("/api/admin/2fa/iniciar", { method: "POST", headers: auth() })); }
+export async function admin2faActivar(codigo: string): Promise<{ activo: boolean }> {
+  return parse(await fetch("/api/admin/2fa/activar", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ codigo }) }));
+}
+export async function admin2faDesactivar(codigo: string): Promise<{ activo: boolean }> {
+  return parse(await fetch("/api/admin/2fa/desactivar", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ codigo }) }));
+}
+/** Enlace (24 h, un uso) para que el dueño de un negocio ponga contraseña nueva. */
+export async function adminEnlaceClave(negocioId: number): Promise<string> {
+  return (await parse(await fetch(`/api/admin/negocios/${negocioId}/enlace-clave`, { method: "POST", headers: auth() }))).enlace;
 }
 export async function adminSuspender(id: number): Promise<void> { await parse(await fetch(`/api/admin/negocios/${id}/suspender`, { method: "POST", headers: auth() })); }
 export async function adminReactivar(id: number): Promise<void> { await parse(await fetch(`/api/admin/negocios/${id}/reactivar`, { method: "POST", headers: auth() })); }

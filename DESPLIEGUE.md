@@ -37,14 +37,16 @@ pantalla de configuración.
    - Abre los puertos **80 y 443** en el firewall del servidor.
    Al levantar, Caddy saca el certificado solo y sirve `https://tudominio`. (La PWA
    necesita HTTPS para instalarse y para el service worker.)
-6. Monitoreo: UptimeRobot gratis al `/` del sitio. Respaldo diario (lo da la BD
-   administrada de Vultr) o `pg_dump` off-site si usas la BD en Docker.
+6. Monitoreo: UptimeRobot gratis al `/actuator/health`. Respaldo diario: `ops/respaldo.sh`
+   (cron que deja `ops/vps-inicial.sh`) + copia fuera del servidor con rclone. Ver SEGURIDAD.md.
 
 ## Notas de seguridad
 
+> Guía completa (VPS, respaldos, 2FA, rotar claves): **[SEGURIDAD.md](SEGURIDAD.md)**.
+
 - Cambia **todas** las claves del `.env` (admin de BD, JWT, super admin).
-- Para producción seria, cambia también la clave de `kioskpos_app` en el script de
-  `db/init` y en `.env` (deben coincidir).
+- Pon una clave fuerte en `DB_APP_PASSWORD`: al crear la BD se aplica sola
+  (`db/init/02-app-password.sh`). Si la BD ya existía, cámbiala con `ALTER ROLE` (SEGURIDAD.md §4).
 - Quita las variables `KIOSKPOS_BOOTSTRAP_SUPERADMIN*` después del primer arranque.
 - El **Conector de impresión** corre en cada PC de caja (ver `conector/README.md`), no
   en el servidor.

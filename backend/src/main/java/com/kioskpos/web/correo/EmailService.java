@@ -73,6 +73,24 @@ public class EmailService {
         enviar(correo, "Pago recibido — KioskPOS", html);
     }
 
+    /** Enlace para cambiar la contraseña (vence en 30 minutos). */
+    @Async
+    public void recuperarClave(String correo, String enlace) {
+        String html = """
+                <div style="font-family:system-ui,Segoe UI,Roboto,sans-serif;color:#151513;max-width:520px;margin:0 auto">
+                  <h2 style="color:#0F766E">Cambia tu contraseña</h2>
+                  <p>Alguien (ojalá tú) pidió cambiar la contraseña de <b>%s</b> en KioskPOS.</p>
+                  <p style="margin:22px 0">
+                    <a href="%s" style="background:#0F766E;color:#fff;text-decoration:none;padding:12px 20px;border-radius:10px;font-weight:600">Poner contraseña nueva</a>
+                  </p>
+                  <p style="color:#5c5b55;font-size:14px">El enlace vence en 30 minutos y sirve una sola vez.
+                     Si no fuiste tú, ignora este correo: tu contraseña sigue igual.</p>
+                  <p style="color:#908e86;font-size:12px">KioskPOS · punto de venta para bodegas</p>
+                </div>
+                """.formatted(escapar(correo), enlace);
+        enviar(correo, "Cambia tu contraseña — KioskPOS", html);
+    }
+
     private void enviar(String to, String asunto, String html) {
         if (!enabled) {
             log.debug("Correo deshabilitado; no se envía \"{}\" a {}", asunto, to);

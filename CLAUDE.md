@@ -377,3 +377,20 @@ el alta/venta/login (try/catch + log).
   ±3%; una que llega de la cola sin internet (`creadoAt` > 10 min) se acepta con su tasa (ya se cobró).
 - `TasaService` no frena ventas: refresca en segundo plano si ya hay tasa y espera 5 min tras un fallo.
   En pruebas la URL de la BCV apunta a un puerto cerrado (sin red).
+
+## 17. Seguridad del acceso + operación (Sección 3)
+
+- **Bloqueo por intentos** (`seguridad/IntentosLoginService`, tabla directorio `intentos_login`, V11): 5 fallos
+  seguidos de PIN (por caja+cajero), clave del dueño (por correo) o super admin → 15 min bloqueado. Mensajes
+  "Te quedan N intentos". Configurable `KIOSKPOS_LOGIN_MAX_INTENTOS` / `_BLOQUEO_MINUTOS`.
+- **Olvidé mi contraseña** (`RecuperarClaveService`, tabla `reset_clave`): `POST /api/auth/olvide-clave`
+  (respuesta genérica, máx. 3/h) manda por correo `…/#reset=TOKEN` (30 min, un uso, se guarda el SHA-256);
+  `POST /api/auth/restablecer-clave`. Como Render bloquea SMTP, el super admin genera el enlace (24 h) con
+  `POST /api/admin/negocios/{id}/enlace-clave` y lo manda por WhatsApp (botón "Clave" en el panel).
+- **2FA del super admin** (TOTP RFC 6238, solo JDK: `seguridad/Totp`): `GET /api/admin/2fa`,
+  `POST …/2fa/iniciar|activar|desactivar`; el login responde 401 `{requiere2fa:true}` si falta el código.
+  QR generado en el navegador (`qrcode-generator`). Pendiente: cifrar `totp_secreto` en reposo.
+- **Rotación JWT:** `KIOSKPOS_JWT_SECRET_ANTERIOR` se acepta (no firma) durante la rotación.
+- **Operación:** `ops/vps-inicial.sh` (ufw, fail2ban, parches, swap, Docker, cron), `ops/respaldo.sh`
+  (pg_dump diario, 14 días, copia off-site con rclone), `ops/restaurar.sh`, `db/init/02-app-password.sh`
+  (clave real de `kioskpos_app`). Guía: **SEGURIDAD.md**.

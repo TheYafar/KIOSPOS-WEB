@@ -10,4 +10,6 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface CuentaLoginRepository extends JpaRepository<CuentaLogin, Long> {
     Optional<CuentaLogin> findByEmail(String email);
     boolean existsByEmail(String email);
+    /** La primera cuenta de un negocio es la del dueño (la crea el alta). Solo para el super admin. */
+    Optional<CuentaLogin> findFirstByNegocioIdOrderByIdAsc(Long negocioId);
 }
