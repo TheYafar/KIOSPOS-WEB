@@ -66,6 +66,15 @@ public class TasaService {
                 || Duration.between(actualizado, Instant.now()).compareTo(ttl) >= 0;
     }
 
+    /** 'promedio' de la respuesta del BCV redondeado HACIA ARRIBA al Bs entero (896,12 -> 897). */
+    static Integer tasaDesdeJson(JsonNode n) {
+        double promedio = n == null ? 0 : n.path("promedio").asDouble(0);
+        if (!(promedio > 0)) {
+            return null;
+        }
+        return (int) Math.ceil(promedio - 1e-9);
+    }
+
     /** Trae la tasa de la API y la redondea hacia arriba. No lanza: ante fallo, conserva la última. */
     public void refrescar() {
         if (!refrescando.compareAndSet(false, true)) {
@@ -82,15 +91,15 @@ public class TasaService {
                 return;
             }
             JsonNode n = json.readTree(resp.body());
-            double promedio = n.path("promedio").asDouble(0);
-            if (promedio <= 0) {
+            Integer redondeada = tasaDesdeJson(n);
+            if (redondeada == null) {
                 log.warn("Tasa BCV: 'promedio' inválido en la respuesta");
                 return;
             }
-            this.tasaBs = (int) Math.ceil(promedio);
+            this.tasaBs = redondeada;
             this.actualizado = Instant.now();
             this.fechaFuente = n.path("fechaActualizacion").asText(null);
-            log.info("Tasa BCV actualizada: {} Bs (promedio {})", tasaBs, promedio);
+            log.info("Tasa BCV actualizada: {} Bs", tasaBs);
         } catch (Exception e) {
             log.warn("Tasa BCV: no se pudo actualizar ({}), se mantiene la última", e.toString());
         } finally {

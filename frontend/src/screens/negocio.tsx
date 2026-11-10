@@ -78,7 +78,7 @@ export function avisoCierre(horarios: string | null | undefined, now: Date): Avi
     const diff = closeMin - nowMin;
     let cand: Aviso | null = null;
     if (diff > 0 && diff <= 20) cand = { tipo: "pronto", hora: s, minutos: diff };
-    else if (diff <= 0 && diff >= -30) cand = { tipo: "ahora", hora: s, minutos: -diff };
+    else if (diff <= 0 && diff >= -30) cand = { tipo: "ahora", hora: s, minutos: Math.abs(diff) };
     if (cand) {
       const mejorAhora = mejor && mejor.tipo === "ahora";
       const candMejor = !mejor

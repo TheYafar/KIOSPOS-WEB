@@ -25,3 +25,7 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Pruebas e2e
+frontend/test-results/
+frontend/playwright-report/

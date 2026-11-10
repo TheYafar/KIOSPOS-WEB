@@ -41,6 +41,7 @@ class CuadreServiceTest extends PostgresRlsTestBase {
     @Autowired private VentaService ventaService;
     @Autowired private PermisoService permisoService;
     @Autowired private CuadreService cuadreService;
+    @Autowired private TurnoRepository turnoRepository;
 
     @AfterEach
     void limpiar() {
@@ -117,6 +118,64 @@ class CuadreServiceTest extends PostgresRlsTestBase {
             cuadreService.abrir(m.cajaId(), m.cajeroId(), new BigDecimal("0"), new BigDecimal("0"));
             assertThatThrownBy(() -> cuadreService.abrir(m.cajaId(), m.cajeroId(), new BigDecimal("0"), new BigDecimal("0")))
                     .isInstanceOf(IllegalStateException.class);
+        } finally {
+            NegocioContext.clear();
+        }
+    }
+
+    @Test
+    void resumenDetallaPagoMovilYFormasExtra() {
+        Montado m = montar("cuadre3@ejemplo.com");
+        KioskPrincipal caja = new KioskPrincipal(m.cajeroId(), m.negocioId(), RolUsuario.CAJERO, m.cajaId());
+        try {
+            NegocioContext.set(m.negocioId());
+            Turno turno = cuadreService.abrir(m.cajaId(), m.cajeroId(), new BigDecimal("0"), new BigDecimal("0"));
+            var item = new VentaService.ItemInput(m.productoId(), new BigDecimal("1"), null, null);
+            // $3 a tasa 40 = Bs 120 por pago móvil.
+            ventaService.registrar(caja, m.permiso(), new VentaService.VentaInput("UUID-C3a", new BigDecimal("40.00"), List.of(item),
+                    List.of(new VentaService.PagoInput(MetodoPago.PAGO_MOVIL, Moneda.VES, new BigDecimal("120.00"), "1234"))));
+            // $3 con una forma extra (Zelle) en dólares: se guarda como OTRO (requiere V9).
+            ventaService.registrar(caja, m.permiso(), new VentaService.VentaInput("UUID-C3b", new BigDecimal("40.00"), List.of(item),
+                    List.of(new VentaService.PagoInput(MetodoPago.OTRO, Moneda.USD, new BigDecimal("3.00"), "Zelle"))));
+
+            var r = cuadreService.resumen(turno.getId());
+            var porMetodo = r.metodos().stream().collect(java.util.stream.Collectors.toMap(CuadreService.MetodoLinea::metodo, CuadreService.MetodoLinea::esperado));
+            assertThat(porMetodo.get("PAGO_MOVIL")).isEqualByComparingTo("120.00");
+            assertThat(porMetodo.get("OTRO_USD")).isEqualByComparingTo("3.00");
+            assertThat(porMetodo.get("EFECTIVO_USD")).isEqualByComparingTo("0.00");
+            assertThat(porMetodo).doesNotContainKey("OTRO_BS");
+        } finally {
+            NegocioContext.clear();
+        }
+    }
+
+    @Test
+    void cierreGuardaElArqueoYLasObservaciones() {
+        Montado m = montar("cuadre4@ejemplo.com");
+        try {
+            NegocioContext.set(m.negocioId());
+            Turno turno = cuadreService.abrir(m.cajaId(), m.cajeroId(), new BigDecimal("20.00"), new BigDecimal("0"));
+            String detalle = "[{\"metodo\":\"EFECTIVO_USD\",\"contado\":18,\"diferencia\":-2}]";
+            var cierre = cuadreService.cerrarSimple(turno.getId(), new BigDecimal("18.00"), new BigDecimal("0"), detalle, "  Faltan $2  ");
+            assertThat(cierre.diferenciaUsd()).isEqualByComparingTo("-2.00");
+            Turno guardado = turnoRepository.findById(turno.getId()).orElseThrow();
+            assertThat(guardado.getArqueoDetalle()).isEqualTo(detalle);
+            assertThat(guardado.getObservaciones()).isEqualTo("Faltan $2");
+        } finally {
+            NegocioContext.clear();
+        }
+    }
+
+    @Test
+    void turnoAbiertoSeRecuperaDesdeElServidor() {
+        Montado m = montar("cuadre5@ejemplo.com");
+        try {
+            NegocioContext.set(m.negocioId());
+            assertThat(cuadreService.turnoAbierto(m.cajaId())).isEmpty();
+            Turno turno = cuadreService.abrir(m.cajaId(), m.cajeroId(), new BigDecimal("0"), new BigDecimal("0"));
+            assertThat(cuadreService.turnoAbierto(m.cajaId())).get().extracting(Turno::getId).isEqualTo(turno.getId());
+            cuadreService.cerrarSimple(turno.getId(), BigDecimal.ZERO, BigDecimal.ZERO);
+            assertThat(cuadreService.turnoAbierto(m.cajaId())).isEmpty();
         } finally {
             NegocioContext.clear();
         }
