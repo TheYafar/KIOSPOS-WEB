@@ -25,8 +25,12 @@ export function Usuarios({ onSalir }: { onSalir: () => void }) {
       </div>
       {msg && <div className="toolbar" style={{ paddingTop: 0, color: "var(--ok)", fontSize: 13 }}>{msg}</div>}
       <div className="scroll">
+        <div className="mas-grid">
+        <div className="mas-col">
         <MiPlan />
         <AjustesNegocio />
+        </div>
+        <div className="mas-col">
         {err && <p className="noresult">{err}</p>}
         <span className="k" style={{ color: "var(--text-2)", fontWeight: 500 }}>Usuarios</span>
         {usuarios.map((u) => (
@@ -42,6 +46,8 @@ export function Usuarios({ onSalir }: { onSalir: () => void }) {
         ))}
         {cajas.length === 0 && <p className="noresult">Sin cajas. Crea una para registrar un equipo.</p>}
         <button className="btn ghost" style={{ marginTop: 16 }} onClick={onSalir}>Cerrar sesión</button>
+        </div>
+        </div>
       </div>
 
       {modal === "usuario" && <FormUsuario onClose={() => setModal(null)} onSaved={() => { setModal(null); setMsg("Usuario creado"); cargar(); }} onErr={setErr} />}

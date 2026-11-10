@@ -312,7 +312,7 @@ svg { display:block; }
 .rail-item svg { width:22px; height:22px; }
 .rail-item[aria-current="page"] { background:var(--rail-2,#212327); color:#fff; }
 @media (min-width:760px) {
-  .app { max-width:1180px; margin:0 auto; width:100%; }
+  .app { width:100%; }
   .tabbar { display:none; }
   .rail { display:flex; flex-direction:column; gap:4px; padding:14px 10px; background:var(--rail); align-items:center; }
   .rail .logo { margin-bottom:10px; }
@@ -931,7 +931,8 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
 /* ========================================================================
    Cierre de caja en una sola pantalla (como el KioskPOS de escritorio)
    ======================================================================== */
-.czwrap.wide { max-width:1100px; }
+.czwrap.wide { max-width:none; }
+@media (min-width:760px) { .czwrap.wide { padding:12px 24px 40px; } }
 .pill.info { background:color-mix(in srgb, var(--c-bebidas) 14%, transparent); color:var(--c-bebidas); }
 .cz-top { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
 .cz-tag { display:inline-flex; align-items:center; gap:6px; height:30px; padding:0 12px; border-radius:999px; background:var(--surface); border:1px solid var(--line); font-size:13px; color:var(--text-2); }
@@ -1081,3 +1082,52 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
 .btn.primary.cb3-go:disabled { background:var(--warn-soft); color:var(--warn); }
 .cb3-bills { grid-template-columns:repeat(auto-fill, minmax(44px, 1fr)); gap:5px; }
 .cb3-bills button { white-space:nowrap; font-size:12px; }
+
+/* ========================================================================
+   Responsive en pantallas grandes: la app usa todo el ancho y el contenido
+   se reparte en columnas en vez de estirarse o dejar huecos.
+   ======================================================================== */
+/* Vender: las tarjetas llenan el ancho disponible */
+.pgrid { display:grid; grid-template-columns:repeat(auto-fill, minmax(160px, 1fr)); align-content:start; }
+.pcard { width:auto; min-width:0; }
+.pgrid > .cat-empty, .pgrid > .noresult { grid-column:1 / -1; }
+
+/* Productos: filas en 2-3 columnas */
+.inv-list { display:grid; grid-template-columns:minmax(0,1fr); gap:10px; }
+@media (min-width:1200px) { .inv-list { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+@media (min-width:1700px) { .inv-list { grid-template-columns:repeat(3, minmax(0,1fr)); } }
+
+/* Más (equipo y cajas): plan + ajustes a la izquierda, usuarios + cajas a la derecha */
+.mas-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:16px; align-items:start; }
+.mas-col { display:flex; flex-direction:column; gap:10px; min-width:0; }
+.mas-col > .aj { margin-bottom:0; }
+@media (min-width:1200px) { .mas-grid { grid-template-columns:minmax(0,1.15fr) minmax(0,1fr); } }
+
+/* Cuentas: margen lateral como el resto de pantallas */
+.cb { padding:4px 16px 24px; }
+@media (min-width:760px) { .cb { padding:4px 24px 32px; } }
+
+/* Super admin: 3 columnas de negocios en pantallas muy anchas */
+@media (min-width:1600px) { .neg-grid { grid-template-columns:repeat(3, minmax(0,1fr)); } }
+
+/* Abrir caja: formulario + guía lado a lado en PC */
+.cz-open { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; align-items:start; }
+.cz-open-main { display:flex; flex-direction:column; gap:14px; min-width:0; }
+@media (min-width:1024px) { .cz-open { grid-template-columns:minmax(0,1.4fr) minmax(0,1fr); } }
+.cz-guide { display:flex; flex-direction:column; gap:12px; }
+.cz-guide .h3 { font-size:14px; color:var(--text); }
+.cz-steps-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:12px; }
+.cz-steps-list li { display:flex; gap:12px; align-items:flex-start; }
+.cz-steps-list li > b { flex:none; width:28px; height:28px; border-radius:50%; display:grid; place-items:center; background:var(--primary-soft); color:var(--primary); font-size:13px; font-weight:800; }
+.cz-steps-list strong { display:block; font-size:14px; font-weight:700; }
+.cz-steps-list span { font-size:13px; color:var(--text-2); }
+/* Tablet: ticket más angosto para que el catálogo tenga 2+ columnas */
+@media (min-width:760px) and (max-width:1199px) { .tkpanel { width:320px; } .pgrid { grid-template-columns:repeat(auto-fill, minmax(140px, 1fr)); padding:0 16px 16px; gap:12px; } }
+/* Reloj de la entrada: se ajusta al ancho y no se parte */
+.entrar-clock .hh { white-space:nowrap; }
+@media (min-width:760px) { .entrar-clock .hh { font-size:clamp(56px, 7.5vw, 104px); } }
+/* Barras de herramientas: botones sin partirse y buscador que cede espacio */
+.toolbar { min-width:0; }
+.toolbar .search { min-width:0; }
+.toolbar .btn { flex:none; white-space:nowrap; }
+@media (max-width:759px) { .toolbar .btn { height:44px; padding:0 12px; font-size:14px; } .toolbar .btn svg { margin-right:2px; } }

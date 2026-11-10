@@ -92,18 +92,49 @@ export function Cuadre() {
 
   // ----- Caja sin abrir -----
   if (!turno) {
+    const tasaHoy = Number(getTasa()) || 0;
     return (
-      <div className="czwrap">
-        <div className="card czhero"><span className="ibox" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}><UIcono k="cash" sw={1.9} /></span><div><b>La caja está cerrada</b><span>Cuenta el fondo de la gaveta y ábrela para empezar a vender.</span></div></div>
-        <div className="card fld"><span className="h3">¿Con cuánto abres?</span>
-          <div className="two">
-            <div className="inpw"><i>$</i><input className="inp pre t" value={fUsd} onChange={(e) => setFUsd(e.target.value)} inputMode="decimal" aria-label="Fondo en dólares" /></div>
-            <div className="inpw"><i>Bs</i><input className="inp t" style={{ paddingLeft: 40 }} value={fBs} onChange={(e) => setFBs(e.target.value)} inputMode="decimal" aria-label="Fondo en bolívares" /></div>
+      <div className="czwrap wide">
+        <div className="cz-open">
+          <div className="cz-open-main">
+            <div className="card czhero"><span className="ibox" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}><UIcono k="cash" sw={1.9} /></span><div><b>La caja está cerrada</b><span>Cuenta el fondo de la gaveta y ábrela para empezar a vender.</span></div></div>
+            <div className="card cz-count">
+              <h3 className="h3">¿Con cuánto abres la gaveta?</h3>
+              <div className="cz-fields">
+                <div className="cz-field">
+                  <span className="k">Fondo en dólares</span>
+                  <div className="cz-in">
+                    <div className="inpw"><i>$</i><input className="inp pre t" value={fUsd} onChange={(e) => setFUsd(e.target.value)} inputMode="decimal" aria-label="Fondo en dólares" /></div>
+                    <button className="btn2 press" onClick={() => setCalc("USD")}><UIcono k="bills" />Contar billetes</button>
+                  </div>
+                </div>
+                <div className="cz-field">
+                  <span className="k">Fondo en bolívares</span>
+                  <div className="cz-in">
+                    <div className="inpw"><i>Bs</i><input className="inp t" style={{ paddingLeft: 40 }} value={fBs} onChange={(e) => setFBs(e.target.value)} inputMode="decimal" aria-label="Fondo en bolívares" /></div>
+                    <button className="btn2 press" onClick={() => setCalc("VES")}><UIcono k="bills" />Contar billetes</button>
+                  </div>
+                </div>
+              </div>
+              <span className="hint">El fondo es el sencillo para dar vuelto. Se suma una sola vez al cuadre.</span>
+              {err && <p className="pinmsg err">{err}</p>}
+              <button className="cta center press cz-cerrar" onClick={abrir}><UIcono k="check" sw={2.2} />Abrir caja</button>
+            </div>
           </div>
-          <span className="hint">El fondo se suma una sola vez al cuadre.</span>
+          <aside className="card cz-guide">
+            <h3 className="h3">Así funciona el turno</h3>
+            <ol className="cz-steps-list">
+              <li><b>1</b><div><strong>Abre con el fondo</strong><span>Cuenta el sencillo que dejas en la gaveta para dar vuelto.</span></div></li>
+              <li><b>2</b><div><strong>Vende</strong><span>Cada venta se suma sola al turno: efectivo, pago móvil, punto y Biopago.</span></div></li>
+              <li><b>3</b><div><strong>Cuenta y cierra</strong><span>Al final cuentas la gaveta y la app te dice si cuadra, sobra o falta.</span></div></li>
+            </ol>
+            {tasaHoy > 0 && <div className="cz-total"><span>Tasa BCV de hoy</span><div><b className="t">Bs {money(tasaHoy)}</b></div></div>}
+          </aside>
         </div>
-        {err && <p className="pinmsg err">{err}</p>}
-        <button className="cta center press" onClick={abrir}>Abrir caja</button>
+        {calc && (
+          <CalcBilletes moneda={calc} onClose={() => setCalc(null)}
+            onUsar={(total) => { (calc === "USD" ? setFUsd : setFBs)(money(total)); setCalc(null); }} />
+        )}
       </div>
     );
   }

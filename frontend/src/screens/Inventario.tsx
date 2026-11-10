@@ -49,7 +49,7 @@ export function Inventario() {
             <div><span className="k">Valor del inventario (a precio de venta)</span><span className="v t">{usd(valorInv)}</span></div></div>
         </div>
         {err && <p className="noresult">{err}</p>}
-        {filtrados.map((p) => {
+        <div className="inv-list">{filtrados.map((p) => {
           const info = catInfo(p.categoria);
           const margen = p.costoUsd > 0 ? Math.round(((p.precioUsd - p.costoUsd) / p.costoUsd) * 100) : 0;
           const out = p.stockActual <= 0; const low = !out && p.stockActual <= p.stockMinimo;
@@ -65,7 +65,7 @@ export function Inventario() {
               </div>
             </button>
           );
-        })}
+        })}</div>
         {filtrados.length === 0 && !err && <p className="noresult">Sin productos. Crea uno o importa un CSV.</p>}
       </div>
 
