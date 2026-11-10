@@ -75,7 +75,9 @@ public class VentaController {
      */
     @GetMapping
     public List<VentaLista> delDia(@AuthenticationPrincipal KioskPrincipal principal,
-                                   @org.springframework.web.bind.annotation.RequestParam(required = false) java.time.LocalDate fecha) {
+                                   @org.springframework.web.bind.annotation.RequestParam(required = false)
+                                   @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE)
+                                   java.time.LocalDate fecha) {
         List<Venta> l = ventaService.ventasDelDia(principal, fecha);
         var dev = devolucionService.devueltoPorVenta(l.stream().map(Venta::getId).toList());
         return l.stream().map(v -> VentaLista.de(v, dev.getOrDefault(v.getId(), BigDecimal.ZERO))).toList();
