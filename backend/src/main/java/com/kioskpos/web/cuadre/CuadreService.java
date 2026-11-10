@@ -55,6 +55,12 @@ public class CuadreService {
         return calcular(turno);
     }
 
+    /** El turno ABIERTO de una caja, si hay (para que la caja lo recupere aunque el equipo lo olvide). */
+    @Transactional(readOnly = true)
+    public java.util.Optional<Turno> turnoAbierto(Long cajaId) {
+        return turnoRepository.findFirstByCajaIdAndEstado(cajaId, Turno.Estado.ABIERTO.name());
+    }
+
     /** Cierre simple: compara lo contado contra lo esperado y guarda la diferencia. */
     @Transactional
     public Resumen cerrarSimple(Long turnoId, BigDecimal declaradoUsd, BigDecimal declaradoBs) {

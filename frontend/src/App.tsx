@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { renovarPermiso, sincronizar, tasaBcvServidor } from "./api";
 import { cerrarSesion, getSesion, setTasa, type Sesion } from "./session";
+import { getBcv, setBcv, tasaEfectiva } from "./config";
 import { Login } from "./screens/Login";
 import { Shell } from "./screens/Shell";
 import { SuperAdmin } from "./screens/SuperAdmin";
@@ -21,13 +22,16 @@ export function App() {
     const sync = async () => {
       try {
         const t = await tasaBcvServidor();
-        if (vivo && t.bs) { setTasa(String(t.bs)); setTick((x) => x + 1); }
+        if (vivo && t.bs) { setBcv(t.bs); setTasa(String(tasaEfectiva(t.bs))); setTick((x) => x + 1); }
       } catch { /* sin conexión: se mantiene la última tasa */ }
     };
     sync();
     const id = setInterval(sync, 60 * 60 * 1000);
     window.addEventListener("online", sync);
-    return () => { vivo = false; clearInterval(id); window.removeEventListener("online", sync); };
+    // Si cambian la configuración (aumento/tasa manual), se recalcula al instante.
+    const onCfg = () => { const e = tasaEfectiva(getBcv()); if (e > 0) setTasa(String(e)); setTick((x) => x + 1); };
+    window.addEventListener("kp-config", onCfg);
+    return () => { vivo = false; clearInterval(id); window.removeEventListener("online", sync); window.removeEventListener("kp-config", onCfg); };
   }, []);
 
   // Al entrar una caja: renueva el permiso cada pocos minutos y sincroniza la cola.

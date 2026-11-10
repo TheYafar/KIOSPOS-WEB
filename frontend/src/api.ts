@@ -196,6 +196,10 @@ export async function abrirTurno(fondoUsd: number, fondoBs: number): Promise<Tur
   const resp = await fetch("/api/cuadre/abrir", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ fondoUsd, fondoBs }) });
   return parse(resp);
 }
+/** Turno abierto de esta caja según el servidor (null si la caja está cerrada). */
+export async function turnoActual(): Promise<TurnoResumen | null> {
+  return parse(await fetch("/api/cuadre/actual", { headers: auth() }));
+}
 export async function resumenTurno(id: number): Promise<TurnoResumen> {
   return parse(await fetch("/api/cuadre/turnos/" + id, { headers: auth() }));
 }

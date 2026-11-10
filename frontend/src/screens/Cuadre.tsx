@@ -1,9 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { abrirTurno, cerrarTurno, resumenTurno, type TurnoResumen } from "../api";
+import { abrirTurno, cerrarTurno, resumenTurno, turnoActual, type TurnoResumen } from "../api";
 import { getTasa, getTurnoId, setTurnoId } from "../session";
 import { UIcono } from "../icons";
 import { calcularArqueo, leerMonto, type FilaArqueo } from "../arqueo";
 import { conectorDisponible, imprimirTicket } from "../conector";
+import { metodoActivo } from "../config";
+
+/** Avisa al resto de la app (barra de montos, indicador) que el turno cambió. */
+const avisarTurno = () => window.dispatchEvent(new Event("kp-turno"));
 
 // Cierre de caja: el cajero CUENTA cada forma de pago (efectivo $, efectivo Bs, pago
 // móvil, punto, Biopago) y la app le dice fila por fila si cuadra, falta o sobra.
@@ -71,10 +75,16 @@ export function Cuadre() {
   const fondoRef = useRef<HTMLInputElement>(null);
   const tasa = Number(getTasa()) || 0;
 
+  // El servidor manda: si el equipo olvidó el turno (otro navegador, se borró la memoria),
+  // se le pregunta al servidor si esta caja tiene un turno ABIERTO y se recupera.
+  const recuperar = () => turnoActual()
+    .then((t) => { if (t && t.turnoId) { setTurnoId(t.turnoId); setTurno(t); } else { setTurnoId(null); setTurno(null); } })
+    .catch(() => { /* sin conexión: se queda como está */ })
+    .finally(() => setCargando(false));
   useEffect(() => {
     const id = getTurnoId();
-    if (id) resumenTurno(id).then((t) => { setTurno(t); setCargando(false); }).catch(() => { setTurnoId(null); setCargando(false); });
-    else setCargando(false);
+    if (id) resumenTurno(id).then((t) => { if (t.estado === "ABIERTO") { setTurno(t); setCargando(false); } else recuperar(); }).catch(() => recuperar());
+    else recuperar();
   }, []);
 
   // En PC, el cursor arranca en la primera casilla (abrir: fondo; cerrar: efectivo $).
@@ -86,8 +96,12 @@ export function Cuadre() {
   const abrir = async () => {
     try {
       const t = await abrirTurno(numOf(fUsd), numOf(fBs));
-      setTurnoId(t.turnoId); setTurno(t); setErr("");
-    } catch (e) { setErr((e as Error).message); }
+      setTurnoId(t.turnoId); setTurno(t); setErr(""); avisarTurno();
+    } catch (e) {
+      const msg = (e as Error).message;
+      // Ya estaba abierta en el servidor: la recuperamos en vez de mostrar el error.
+      if (/turno abierto/i.test(msg)) { await recuperar(); avisarTurno(); } else setErr(msg);
+    }
   };
 
   const refrescar = async () => {
@@ -184,10 +198,10 @@ export function Cuadre() {
   }
 
   // ----- Turno abierto: arqueo por forma de pago -----
-  const metodos = turno.metodos?.length ? turno.metodos : [
+  const metodos = (turno.metodos?.length ? turno.metodos : [
     { metodo: "EFECTIVO_USD", moneda: "USD", esperado: turno.esperadoUsd, digital: false },
     { metodo: "EFECTIVO_BS", moneda: "VES", esperado: turno.esperadoBs, digital: false },
-  ];
+  ]).filter((m) => metodoActivo(m.metodo) || m.esperado !== 0); // las apagadas no se cuentan, salvo que tengan dinero
   const a = calcularArqueo(metodos, cont, tasa);
   const digital = metodos.filter((m) => m.digital).reduce((s, m) => s + m.esperado, 0);
   const detalle = (m: string) =>
@@ -213,7 +227,7 @@ export function Cuadre() {
       const efBs = a.filas.find((f) => f.metodo === "EFECTIVO_BS")?.contado ?? 0;
       const det = JSON.stringify(a.filas.map((f) => ({ metodo: f.metodo, moneda: f.moneda, esperado: f.esperado, contado: f.contado, diferencia: f.diferencia })));
       await cerrarTurno(turno.turnoId, efUsd, efBs, det, obs);
-      setTurnoId(null);
+      setTurnoId(null); avisarTurno();
       setCerrado({ turnoId: turno.turnoId, filas: a.filas, difUsd: a.diferenciaUsd, obs });
       setAviso(""); setConfirmar(false);
     } catch (e) { setErr((e as Error).message); }

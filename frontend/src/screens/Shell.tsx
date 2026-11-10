@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import { getTasa, type Sesion } from "../session";
+import { turnoActual, type TurnoResumen } from "../api";
+import { getBcv, metodoActivo } from "../config";
+import { Configuracion } from "./Configuracion";
 import { UIcono } from "../icons";
 import { Caja } from "./Caja";
 import { Contabilidad } from "./Contabilidad";
@@ -22,11 +25,22 @@ function saludo(): string {
 export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void }) {
   const esCaja = sesion.cajaId != null;
   const tabs: Tab[] = esCaja
-    ? [{ id: "caja", n: "Vender", icon: "cart" }, { id: "cuadre", n: "Cierre", icon: "cash" }, { id: "mas", n: "Más", icon: "more" }]
-    : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "contabilidad", n: "Cuentas", icon: "cash" }, { id: "mas", n: "Más", icon: "more" }];
+    ? [{ id: "caja", n: "Vender", icon: "cart" }, { id: "cuadre", n: "Cierre", icon: "cash" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }]
+    : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "contabilidad", n: "Cuentas", icon: "cash" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }];
   const [tab, setTab] = useState(tabs[0].id);
   const [online, setOnline] = useState(navigator.onLine);
   const [ayuda, setAyuda] = useState(false);
+  // Turno de la caja según el SERVIDOR: undefined = cargando, null = caja cerrada.
+  const [turno, setTurno] = useState<TurnoResumen | null | undefined>(undefined);
+  useEffect(() => {
+    if (!esCaja) return;
+    let vivo = true;
+    const cargar = () => { turnoActual().then((t) => { if (vivo) setTurno(t && t.turnoId ? t : null); }).catch(() => { /* sin conexión */ }); };
+    cargar();
+    const id = setInterval(cargar, 60 * 1000);
+    window.addEventListener("kp-turno", cargar);
+    return () => { vivo = false; clearInterval(id); window.removeEventListener("kp-turno", cargar); };
+  }, [esCaja]);
 
   // Teclado global: Alt+1..n cambia de pestaña, F1 muestra los atajos.
   useEffect(() => {
@@ -75,7 +89,12 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
               <div className="sub">{fecha.charAt(0).toUpperCase() + fecha.slice(1)}</div>
             </div>
             <div className="hpills">
-              <span className="hpill"><span className="t3">Tasa BCV</span><b className="t">Bs {getTasa()}</b></span>
+              {esCaja && turno !== undefined && (
+                <button className={"hpill caja-est " + (turno ? "ab" : "ce")} onClick={() => setTab("cuadre")} title={turno ? "Caja abierta — ir al cierre" : "Caja cerrada — ábrela para vender"}>
+                  <span className="dot" /><b>{turno ? "Caja abierta" : "Caja cerrada"}</b>{turno && <span className="t3">#{turno.turnoId}</span>}
+                </button>
+              )}
+              <span className="hpill" title={getBcv() && String(getBcv()) !== getTasa() ? "BCV Bs " + getBcv() + " (con ajuste en Config.)" : "Tasa BCV automática"}><span className="t3">{getBcv() && String(getBcv()) !== getTasa() ? "Tasa" : "Tasa BCV"}</span><b className="t">Bs {getTasa()}</b></span>
               <span className={"hpill" + (online ? " ok" : "")}>
                 <span className="dot" style={{ background: online ? "var(--ok)" : "var(--bad)" }} />
                 <b>{online ? "En línea" : "Sin conexión"}</b>
@@ -90,9 +109,11 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
           {tab === "reportes" && <Reportes onIr={setTab} />}
           {tab === "inventario" && <Inventario />}
           {tab === "contabilidad" && <Contabilidad />}
+          {tab === "config" && <Configuracion />}
           {tab === "mas" && (esCaja
             ? <div className="stub"><b>Más</b><p>El manejo de usuarios y cajas lo hace el dueño desde su panel.</p><button className="btn ghost" onClick={onSalir}>Cerrar sesión</button></div>
             : <Usuarios onSalir={onSalir} />)}
+          {esCaja && turno !== undefined && <TurnoBar turno={turno} onIr={() => setTab("cuadre")} />}
         </div>
       </div>
 
@@ -104,6 +125,43 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
           </button>
         ))}
       </nav>
+    </div>
+  );
+}
+
+const money = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+/** Barra de abajo: lo cobrado en el turno por cada forma de pago activa. */
+function TurnoBar({ turno, onIr }: { turno: TurnoResumen | null; onIr: () => void }) {
+  if (!turno) {
+    return (
+      <div className="turno-bar ce">
+        <span className="tb-st"><i />Caja cerrada</span>
+        <span className="tb-msg">Ábrela para empezar a vender.</span>
+        <button className="tb-btn press" onClick={onIr}>Abrir caja</button>
+      </div>
+    );
+  }
+  const dig = (m: string) => turno.metodos?.find((x) => x.metodo === m)?.esperado ?? 0;
+  const items: { id: string; n: string; v: string; usd: number }[] = [];
+  const tasa = Number(getTasa()) || 1;
+  const add = (id: string, n: string, monto: number, moneda: "USD" | "VES") => {
+    if (!metodoActivo(id) && monto === 0) return;
+    items.push({ id, n, v: (moneda === "USD" ? "$ " : "Bs ") + money(monto), usd: moneda === "USD" ? monto : monto / tasa });
+  };
+  add("EFECTIVO_USD", "Efectivo $", turno.efectivoUsd, "USD");
+  add("EFECTIVO_BS", "Efectivo Bs", turno.efectivoBs, "VES");
+  add("PAGO_MOVIL", "Pago móvil", dig("PAGO_MOVIL"), "VES");
+  add("PUNTO", "Punto", dig("PUNTO"), "VES");
+  add("BIOPAGO", "Biopago", dig("BIOPAGO"), "VES");
+  const total = items.reduce((s, x) => s + x.usd, 0);
+  return (
+    <div className="turno-bar ab" role="status" aria-label="Cobrado en el turno">
+      <button className="tb-st press" onClick={onIr} title="Ir al cierre"><i />Turno #{turno.turnoId}</button>
+      <div className="tb-items">
+        {items.map((x) => <span key={x.id} className="tb-it"><small>{x.n}</small><b className="t">{x.v}</b></span>)}
+      </div>
+      <span className="tb-tot"><small>Total cobrado</small><b className="t">≈ $ {money(total)}</b></span>
     </div>
   );
 }

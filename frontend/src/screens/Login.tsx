@@ -3,6 +3,7 @@ import { adminLogin, listarCajeros, loginCajero, loginDueno, tasaBcvServidor, ty
 import { getCajaToken, getSesion, getTasa, setCajaToken, setTasa, type Sesion } from "../session";
 import { UIcono } from "../icons";
 import { TemaBtn } from "../TemaBtn";
+import { setBcv, tasaEfectiva } from "../config";
 
 type Vista = "config" | "pin" | "dueno" | "admin";
 
@@ -40,7 +41,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
 
   // Tasa BCV automática: prellenar con la del servidor (el cajero no la escribe).
   useEffect(() => {
-    tasaBcvServidor().then((t) => { if (t.bs) { setTasa(String(t.bs)); setTasaLocal(String(t.bs)); } }).catch(() => { /* usa la última */ });
+    tasaBcvServidor().then((t) => { if (t.bs) { setBcv(t.bs); const e = tasaEfectiva(t.bs); setTasa(String(e)); setTasaLocal(String(e)); } }).catch(() => { /* usa la última */ });
   }, []);
 
   // Enlace de configuración: abrir .../#caja=TOKEN en el equipo lo precarga y abre la config.

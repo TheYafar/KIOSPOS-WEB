@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { type PagoCobro } from "../api";
 import { UIcono } from "../icons";
 import { calcularCobro, restoPara, type MetodoId, type Montos } from "../cobroCalc";
+import { metodoActivo } from "../config";
 
 // Cobro como el KioskPOS de escritorio (cobro-modal.fxml / CobroModalController):
 // TODAS las formas de pago visibles de una vez (sin "agregar" una por una),
@@ -43,7 +44,10 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   const [foco, setFoco] = useState<MetodoId>("EFECTIVO_USD"); // casilla activa (para F8)
   const primero = useRef<HTMLInputElement>(null);
 
-  const montos: Montos = Object.fromEntries(FORMAS.map((f) => [f.id, numOf(txt[f.id])])) as Montos;
+  // Solo las formas de pago activas en Configuración (si apagaron todas, se muestran todas).
+  const activas = FORMAS.filter((f) => metodoActivo(f.id));
+  const formas = activas.length ? activas : FORMAS;
+  const montos: Montos = Object.fromEntries(formas.map((f) => [f.id, numOf(txt[f.id])])) as Montos;
   const e = calcularCobro(total, tasa, montos);
   const pmUsado = (montos.PAGO_MOVIL || 0) > 0;
   const refMala = pmUsado && !/^\d{4,6}$/.test(ref);
@@ -63,7 +67,7 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   const confirmar = () => {
     if (!valido) return;
     setEnviando(true);
-    const usados = FORMAS.filter((f) => (montos[f.id] || 0) > 0);
+    const usados = formas.filter((f) => (montos[f.id] || 0) > 0);
     const pagos: PagoCobro[] = usados.map((f) => ({
       metodo: f.id, moneda: f.moneda, montoOriginal: Math.round((montos[f.id] || 0) * 100) / 100,
       ...(f.id === "PAGO_MOVIL" ? { referencia: ref } : {}),
@@ -110,17 +114,17 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
           {/* Resumen: Total / Cubierto / Falta / Vuelto */}
           <div className="cb3-sum">
             <div className="cb3-cell tot"><span className="k">Total a cobrar</span><b className="t">{usd(total)}</b><span className="s t">{bs(e.totalBs)}</span></div>
-            <div className="cb3-cell ok"><span className="k">Cubierto</span><b className="t">{usd(Math.min(e.cubierto, total))}</b><span className="s">{(() => { const n = FORMAS.filter((f) => (montos[f.id] || 0) > 0).length; return n === 0 ? "Sin pagos" : n === 1 ? "1 forma de pago" : n + " formas de pago"; })()}</span></div>
+            <div className="cb3-cell ok"><span className="k">Cubierto</span><b className="t">{usd(Math.min(e.cubierto, total))}</b><span className="s">{(() => { const n = formas.filter((f) => (montos[f.id] || 0) > 0).length; return n === 0 ? "Sin pagos" : n === 1 ? "1 forma de pago" : n + " formas de pago"; })()}</span></div>
             <div className={"cb3-cell" + (e.cubre ? "" : " warn")}><span className="k">Falta</span><b className="t">{usd(e.faltaUsd)}</b><span className="s t">{bs(e.faltaBs)}</span></div>
             <div className={"cb3-cell" + (e.vueltoUsd > 0 || e.vueltoBs > 0 ? " info" : "")}><span className="k">Vuelto</span><b className="t">{e.vueltoBs > 0 ? bs(e.vueltoBs) : usd(e.vueltoUsd)}</b><span className="s t">{e.vueltoUsd > 0 ? bs(Math.round(e.vueltoUsd * tasa * 100) / 100) : "Sale del efectivo"}</span></div>
             <div className="progress cb3-bar">
-              {FORMAS.map((f) => { const w = pct(f.id); return w > 0 ? <i key={f.id} style={{ width: w + "%", background: f.color }} /> : null; })}
+              {formas.map((f) => { const w = pct(f.id); return w > 0 ? <i key={f.id} style={{ width: w + "%", background: f.color }} /> : null; })}
             </div>
           </div>
 
           {/* TODAS las formas de pago a la vista */}
           <div className="cb3-grid">
-            {FORMAS.map((f, i) => {
+            {formas.map((f, i) => {
               const m = montos[f.id] || 0;
               return (
                 <div key={f.id} className={"cb3-card" + (m > 0 ? " on" : "")} style={{ ["--mc" as string]: f.color }}>

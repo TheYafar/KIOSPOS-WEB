@@ -4,6 +4,7 @@ import com.kioskpos.web.auth.security.KioskPrincipal;
 import com.kioskpos.web.cuadre.CuadreService;
 import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -33,6 +34,15 @@ public class CuadreController {
         var turno = cuadreService.abrir(principal.cajaId(), principal.usuarioId(),
                 req.fondoUsd(), req.fondoBs());
         return cuadreService.resumen(turno.getId());
+    }
+
+    /** Turno abierto de ESTA caja (204 si la caja está cerrada). */
+    @GetMapping("/actual")
+    public ResponseEntity<CuadreService.Resumen> actual(@AuthenticationPrincipal KioskPrincipal principal) {
+        exigirCaja(principal);
+        return cuadreService.turnoAbierto(principal.cajaId())
+                .map(t -> ResponseEntity.ok(cuadreService.resumen(t.getId())))
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     /** Resumen vivo del turno (lo esperado en gaveta hasta ahora). */

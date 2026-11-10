@@ -120,6 +120,7 @@ export function Caja() {
     try {
       const its = [...carrito.values()].map((i) => ({ productoId: i.producto.id, cantidad: i.qty }));
       await cobrar(its, pagos);
+      window.dispatchEvent(new Event("kp-turno"));
       setDone({ total, totalBs, payLine: resumen.payLine, change: resumen.change, changeNote: resumen.changeNote, receipt: recibo(resumen.payLine, resumen.change) });
       setView("done");
     } catch (e) { setErr((e as Error).message); }
