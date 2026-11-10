@@ -30,4 +30,17 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
     @Query("UPDATE Producto p SET p.stockActual = p.stockActual - :cantidad "
             + "WHERE p.id = :id AND p.stockActual >= :cantidad")
     int descontarStock(@Param("id") Long id, @Param("cantidad") BigDecimal cantidad);
+
+    /** Suma stock de forma atómica (compras, devoluciones, anulaciones). */
+    @Modifying
+    @Query("UPDATE Producto p SET p.stockActual = p.stockActual + :cantidad WHERE p.id = :id")
+    int sumarStock(@Param("id") Long id, @Param("cantidad") BigDecimal cantidad);
+
+    @Modifying
+    @Query("UPDATE Producto p SET p.costoUsd = :costo WHERE p.id = :id")
+    int fijarCosto(@Param("id") Long id, @Param("costo") BigDecimal costo);
+
+    @Modifying
+    @Query("UPDATE Producto p SET p.precioUsd = :precio WHERE p.id = :id")
+    int fijarPrecio(@Param("id") Long id, @Param("precio") BigDecimal precio);
 }

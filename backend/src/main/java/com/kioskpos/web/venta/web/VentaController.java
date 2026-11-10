@@ -31,7 +31,11 @@ public class VentaController {
     private final VentaService ventaService;
     private final TicketService ticketService;
 
-    public VentaController(VentaService ventaService, TicketService ticketService) {
+    private final com.kioskpos.web.devolucion.DevolucionService devolucionService;
+
+    public VentaController(VentaService ventaService, TicketService ticketService,
+                           com.kioskpos.web.devolucion.DevolucionService devolucionService) {
+        this.devolucionService = devolucionService;
         this.ventaService = ventaService;
         this.ticketService = ticketService;
     }
@@ -65,9 +69,47 @@ public class VentaController {
         return ticketService.generar(ventaService.buscar(id));
     }
 
+    /**
+     * Ventas de un día (hoy por defecto, zona America/Caracas). Una caja ve las suyas; el
+     * dueño/encargado sin caja ve las de todas sus cajas.
+     */
     @GetMapping
-    public List<VentaResponse> delDia(@AuthenticationPrincipal KioskPrincipal principal) {
-        return ventaService.ventasDeCaja(principal.cajaId()).stream().map(VentaResponse::de).toList();
+    public List<VentaLista> delDia(@AuthenticationPrincipal KioskPrincipal principal,
+                                   @org.springframework.web.bind.annotation.RequestParam(required = false) java.time.LocalDate fecha) {
+        List<Venta> l = ventaService.ventasDelDia(principal, fecha);
+        var dev = devolucionService.devueltoPorVenta(l.stream().map(Venta::getId).toList());
+        return l.stream().map(v -> VentaLista.de(v, dev.getOrDefault(v.getId(), BigDecimal.ZERO))).toList();
+    }
+
+    @GetMapping("/{id}/detalle")
+    public com.kioskpos.web.devolucion.DevolucionService.DetalleVentaVista detalle(@PathVariable Long id) {
+        return devolucionService.detalle(id);
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/{id}/anular")
+    public VentaResponse anular(@AuthenticationPrincipal KioskPrincipal principal, @PathVariable Long id,
+                                @RequestBody AnularRequest req) {
+        return VentaResponse.de(devolucionService.anular(principal, id, req.motivo()));
+    }
+
+    @org.springframework.web.bind.annotation.PostMapping("/{id}/devolver")
+    public com.kioskpos.web.devolucion.Devolucion devolver(@AuthenticationPrincipal KioskPrincipal principal, @PathVariable Long id,
+                                                           @RequestBody com.kioskpos.web.devolucion.DevolucionService.NuevaDevolucion req) {
+        return devolucionService.devolver(principal, id, req);
+    }
+
+    public record AnularRequest(String motivo) {
+    }
+
+    /** Fila de la lista de ventas: con cómo se pagó y lo ya devuelto. */
+    public record VentaLista(Long id, Integer numeroFactura, Instant fechaHora, Long cajaId, BigDecimal totalUsd,
+                             BigDecimal totalBs, String estado, Long clienteId, String pagos, int items, BigDecimal devueltoUsd) {
+        static VentaLista de(Venta v, BigDecimal devuelto) {
+            String pagos = v.getPagos().stream().map(p -> p.getMetodo().name()).distinct()
+                    .reduce((a, b) -> a + "," + b).orElse("");
+            return new VentaLista(v.getId(), v.getNumeroFactura(), v.getFechaHora(), v.getCajaId(), v.getTotalUsd(),
+                    v.getTotalBs(), v.getEstado(), v.getClienteId(), pagos, v.getDetalles().size(), devuelto);
+        }
     }
 
     public record ItemRequest(Long productoId, @NotNull BigDecimal cantidad, BigDecimal precioUsd, String nombre) {

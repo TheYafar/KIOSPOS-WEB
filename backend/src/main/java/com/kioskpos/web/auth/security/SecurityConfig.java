@@ -43,6 +43,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.PUT, "/api/mi-negocio/caja-config").hasAnyRole("DUENO", "ENCARGADO")
                         // Fiado: cambiar límite / desactivar un cliente, solo dueño o encargado.
                         .requestMatchers(HttpMethod.PUT, "/api/clientes/**").hasAnyRole("DUENO", "ENCARGADO")
+                        // Compras y proveedores: solo dueño o encargado.
+                        .requestMatchers("/api/compras/**", "/api/proveedores/**").hasAnyRole("DUENO", "ENCARGADO")
                         // Inventario: leer lo puede todo usuario; crear/editar/borrar/importar solo dueño/encargado.
                         .requestMatchers(HttpMethod.POST, "/api/inventario/**").hasAnyRole("DUENO", "ENCARGADO")
                         .requestMatchers(HttpMethod.PUT, "/api/inventario/**").hasAnyRole("DUENO", "ENCARGADO")

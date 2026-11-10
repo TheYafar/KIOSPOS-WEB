@@ -163,7 +163,8 @@ public class InventarioService {
         return new ResultadoImport(creados, actualizados);
     }
 
-    private void registrarMovimiento(Producto p, String tipo, BigDecimal cantidad,
+    /** Deja un movimiento en la bitácora de inventario (lo usan compras y devoluciones). */
+    public void registrarMovimiento(Producto p, String tipo, BigDecimal cantidad,
                                      BigDecimal previo, BigDecimal posterior,
                                      String referencia, String descripcion, Long usuarioId) {
         MovimientoInventario m = new MovimientoInventario();

@@ -35,13 +35,16 @@ public class ReporteService {
     private final TurnoRepository turnoRepository;
     private final MovimientoCajaRepository movimientoCajaRepository;
     private final MovimientoClienteRepository movimientoClienteRepository;
+    private final com.kioskpos.web.devolucion.DevolucionRepository devolucionRepository;
 
     public ReporteService(VentaRepository ventaRepository,
                           DetalleVentaRepository detalleVentaRepository,
                           PagoVentaRepository pagoVentaRepository,
                           TurnoRepository turnoRepository,
                           MovimientoCajaRepository movimientoCajaRepository,
-                          MovimientoClienteRepository movimientoClienteRepository) {
+                          MovimientoClienteRepository movimientoClienteRepository,
+                          com.kioskpos.web.devolucion.DevolucionRepository devolucionRepository) {
+        this.devolucionRepository = devolucionRepository;
         this.ventaRepository = ventaRepository;
         this.detalleVentaRepository = detalleVentaRepository;
         this.pagoVentaRepository = pagoVentaRepository;
@@ -87,8 +90,12 @@ public class ReporteService {
                 MovimientoCliente.Tipo.ABONO.name(), desde, hasta).stream()
                 .map(MovimientoCliente::getMontoUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        // Devoluciones del día: restan de lo vendido (la mercancía volvió al stock).
+        BigDecimal devuelto = devolucionRepository.findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(desde, hasta).stream()
+                .map(com.kioskpos.web.devolucion.Devolucion::getTotalUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
+
         return new ResumenDia(d.toString(), cantidad, totalUsd, totalBs, costo, ganancia, desglose,
-                List.copyOf(movs.values()), comision, abonos);
+                List.copyOf(movs.values()), comision, abonos, devuelto);
     }
 
     /**
@@ -140,7 +147,8 @@ public class ReporteService {
 
     public record ResumenDia(String fecha, long cantidadVentas, BigDecimal totalUsd, BigDecimal totalBs,
                              BigDecimal costoUsd, BigDecimal gananciaUsd, List<DesglosePago> pagos,
-                             List<MovimientoDia> movimientos, BigDecimal comisionAvancesBs, BigDecimal abonosFiadoUsd) {
+                             List<MovimientoDia> movimientos, BigDecimal comisionAvancesBs, BigDecimal abonosFiadoUsd,
+                             BigDecimal devolucionesUsd) {
     }
 
     /** Gastos/retiros/ingresos/avances del día por moneda. */

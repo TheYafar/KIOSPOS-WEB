@@ -239,6 +239,20 @@ public class VentaService {
         return v;
     }
 
+    /** Ventas de un día: las de la caja de la sesión, o todas si es el dueño/encargado sin caja. */
+    @Transactional(readOnly = true)
+    public List<Venta> ventasDelDia(KioskPrincipal principal, java.time.LocalDate fecha) {
+        java.time.ZoneId zona = java.time.ZoneId.of("America/Caracas");
+        java.time.LocalDate d = fecha != null ? fecha : java.time.LocalDate.now(zona);
+        Instant desde = d.atStartOfDay(zona).toInstant();
+        Instant hasta = d.plusDays(1).atStartOfDay(zona).toInstant();
+        List<Venta> l = ventaRepository.findByFechaHoraBetweenOrderByFechaHoraDesc(desde, hasta).stream()
+                .filter(v -> principal.cajaId() == null || principal.cajaId().equals(v.getCajaId()))
+                .toList();
+        l.forEach(v -> { v.getDetalles().size(); v.getPagos().size(); });
+        return l;
+    }
+
     @Transactional(readOnly = true)
     public List<Venta> ventasDeCaja(Long cajaId) {
         return ventaRepository.findByCajaIdOrderByFechaHoraDesc(cajaId);

@@ -35,10 +35,13 @@ public class CuadreService {
     private final VentaRepository ventaRepository;
     private final MovimientoCajaRepository movimientoCajaRepository;
     private final MovimientoClienteRepository movimientoClienteRepository;
+    private final com.kioskpos.web.devolucion.DevolucionRepository devolucionRepository;
 
     public CuadreService(TurnoRepository turnoRepository, VentaRepository ventaRepository,
                          MovimientoCajaRepository movimientoCajaRepository,
-                         MovimientoClienteRepository movimientoClienteRepository) {
+                         MovimientoClienteRepository movimientoClienteRepository,
+                         com.kioskpos.web.devolucion.DevolucionRepository devolucionRepository) {
+        this.devolucionRepository = devolucionRepository;
         this.turnoRepository = turnoRepository;
         this.ventaRepository = ventaRepository;
         this.movimientoCajaRepository = movimientoCajaRepository;
@@ -181,6 +184,15 @@ public class CuadreService {
             }
         }
 
+        // Devoluciones reembolsadas en efectivo desde esta gaveta.
+        for (var dv : devolucionRepository.findByTurnoId(turno.getId())) {
+            if ("EFECTIVO_USD".equals(dv.getMetodoReembolso())) {
+                mov.sumar("DEVOLUCION", "USD", dv.getMontoReembolso());
+            } else if ("EFECTIVO_BS".equals(dv.getMetodoReembolso())) {
+                mov.sumar("DEVOLUCION", "VES", dv.getMontoReembolso());
+            }
+        }
+
         BigDecimal fondoUsd = turno.getFondoInicialUsd();
         BigDecimal fondoBs = turno.getFondoInicialBs();
         BigDecimal esperadoUsd = noNeg(fondoUsd.add(efectivoUsd).subtract(vueltoUsd)
@@ -224,7 +236,7 @@ public class CuadreService {
         }
 
         BigDecimal sale(String moneda) {
-            return total(moneda, List.of("GASTO", "RETIRO", "AVANCE"));
+            return total(moneda, List.of("GASTO", "RETIRO", "AVANCE", "DEVOLUCION"));
         }
 
         private BigDecimal total(String moneda, List<String> tipos) {
@@ -271,7 +283,7 @@ public class CuadreService {
                           BigDecimal comisionAvancesBs) {
     }
 
-    /** Total de movimientos de un tipo en una moneda (GASTO, RETIRO, INGRESO, AVANCE, ABONO). */
+    /** Total de movimientos de un tipo en una moneda (GASTO, RETIRO, INGRESO, AVANCE, ABONO, DEVOLUCION). */
     public record MovLinea(String tipo, String moneda, BigDecimal total, int cantidad) {
     }
 

@@ -185,6 +185,37 @@ public class ClienteService {
         return movimientos.save(m);
     }
 
+    /**
+     * Baja la deuda por una venta anulada o devuelta (no entra dinero a ninguna caja).
+     * Nunca deja saldo a favor: abona como mucho lo que debe. Devuelve lo abonado.
+     */
+    @Transactional
+    public BigDecimal descontarPorVenta(Long clienteId, BigDecimal montoUsd, Long ventaId, String motivo, Long usuarioId) {
+        BigDecimal monto = montoUsd.min(saldo(clienteId)).setScale(2, RoundingMode.HALF_UP);
+        if (monto.signum() <= 0) {
+            return BigDecimal.ZERO;
+        }
+        MovimientoCliente m = new MovimientoCliente();
+        m.setNegocioId(NegocioContext.require());
+        m.setClienteId(clienteId);
+        m.setTipo(MovimientoCliente.Tipo.ABONO.name());
+        m.setMontoUsd(monto);
+        m.setVentaId(ventaId);
+        m.setUsuarioId(usuarioId);
+        m.setMetodo(motivo);   // ANULACION o DEVOLUCION: no cuenta como dinero en el cuadre
+        m.setMoneda("USD");
+        m.setMontoOriginal(monto);
+        m.setNota("ANULACION".equals(motivo) ? "Venta anulada" : "Devolución de mercancía");
+        movimientos.save(m);
+        return monto;
+    }
+
+    /** Saldo actual (USD) de un cliente. */
+    @Transactional(readOnly = true)
+    public BigDecimal saldoDe(Long clienteId) {
+        return saldo(clienteId);
+    }
+
     private BigDecimal saldo(Long clienteId) {
         Object s = movimientos.saldo(clienteId);
         return s == null ? BigDecimal.ZERO : new BigDecimal(s.toString());

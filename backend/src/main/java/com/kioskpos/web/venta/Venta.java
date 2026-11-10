@@ -72,6 +72,12 @@ public class Venta {
     @Column(nullable = false, length = 20)
     private String estado = "COMPLETADA";
 
+    @Column(name = "anulada_por")
+    private Long anuladaPor;
+
+    @Column(name = "motivo_anulacion", length = 200)
+    private String motivoAnulacion;
+
     @OneToMany(mappedBy = "venta", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<DetalleVenta> detalles = new ArrayList<>();
 
