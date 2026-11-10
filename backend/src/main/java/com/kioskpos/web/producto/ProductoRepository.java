@@ -43,4 +43,12 @@ public interface ProductoRepository extends JpaRepository<Producto, Long> {
     @Modifying
     @Query("UPDATE Producto p SET p.precioUsd = :precio WHERE p.id = :id")
     int fijarPrecio(@Param("id") Long id, @Param("precio") BigDecimal precio);
+
+    /** [categoria, cantidad] de los productos del negocio (RLS). */
+    @Query("SELECT p.categoria, COUNT(p) FROM Producto p GROUP BY p.categoria")
+    List<Object[]> contarPorCategoria();
+
+    @Modifying
+    @Query("UPDATE Producto p SET p.categoria = :a WHERE LOWER(p.categoria) = LOWER(:de)")
+    int renombrarCategoria(@Param("de") String de, @Param("a") String a);
 }

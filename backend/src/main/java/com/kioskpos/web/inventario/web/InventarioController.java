@@ -24,9 +24,41 @@ import org.springframework.web.bind.annotation.RestController;
 public class InventarioController {
 
     private final InventarioService inventarioService;
+    private final com.kioskpos.web.inventario.CategoriaService categoriaService;
 
-    public InventarioController(InventarioService inventarioService) {
+    public InventarioController(InventarioService inventarioService,
+                                com.kioskpos.web.inventario.CategoriaService categoriaService) {
         this.inventarioService = inventarioService;
+        this.categoriaService = categoriaService;
+    }
+
+    // ---- Categorías (leer: todos; crear/renombrar/borrar: dueño o encargado por SecurityConfig) ----
+
+    @GetMapping("/categorias")
+    public List<com.kioskpos.web.inventario.CategoriaService.CategoriaVista> categorias() {
+        return categoriaService.listar();
+    }
+
+    @PostMapping("/categorias")
+    public com.kioskpos.web.inventario.CategoriaService.CategoriaVista crearCategoria(@RequestBody CategoriaRequest req) {
+        return categoriaService.crear(req.nombre());
+    }
+
+    @PutMapping("/categorias")
+    public com.kioskpos.web.inventario.CategoriaService.CategoriaVista renombrarCategoria(@RequestBody RenombrarRequest req) {
+        return categoriaService.renombrar(req.de(), req.a());
+    }
+
+    @DeleteMapping("/categorias")
+    public Map<String, Object> borrarCategoria(@RequestParam String nombre) {
+        categoriaService.borrar(nombre);
+        return Map.of("borrada", true);
+    }
+
+    public record CategoriaRequest(String nombre) {
+    }
+
+    public record RenombrarRequest(String de, String a) {
     }
 
     @GetMapping("/productos")
@@ -36,11 +68,13 @@ public class InventarioController {
 
     @PostMapping("/productos")
     public ProductoResponse crear(@RequestBody ProductoRequest req) {
+        categoriaService.asegurar(req.aDatos().categoria());
         return ProductoResponse.de(inventarioService.crear(req.aDatos()));
     }
 
     @PutMapping("/productos/{id}")
     public ProductoResponse actualizar(@PathVariable Long id, @RequestBody ProductoRequest req) {
+        categoriaService.asegurar(req.aDatos().categoria());
         return ProductoResponse.de(inventarioService.actualizar(id, req.aDatos()));
     }
 
