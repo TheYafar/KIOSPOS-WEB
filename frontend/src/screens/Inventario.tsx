@@ -78,9 +78,11 @@ export function Inventario() {
 
 function FormNuevo({ onClose, onSaved, onErr }: { onClose: () => void; onSaved: () => void; onErr: (s: string) => void }) {
   const [f, setF] = useState({ codigoBarras: "", nombre: "", precioUsd: "", costoUsd: "", categoria: "General", stockInicial: "" });
+  const [pesable, setPesable] = useState(false);
+  const [unidad, setUnidad] = useState("KG");
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const guardar = async () => {
-    try { await crearProducto({ codigoBarras: f.codigoBarras.trim(), nombre: f.nombre.trim(), precioUsd: num(f.precioUsd), costoUsd: num(f.costoUsd), categoria: f.categoria, stockInicial: num(f.stockInicial) }); onSaved(); }
+    try { await crearProducto({ codigoBarras: f.codigoBarras.trim(), nombre: f.nombre.trim(), precioUsd: num(f.precioUsd), costoUsd: num(f.costoUsd), categoria: f.categoria, stockInicial: num(f.stockInicial), esPesable: pesable, unidadMedida: pesable ? unidad : "UND" }); onSaved(); }
     catch (e) { onErr((e as Error).message); onClose(); }
   };
   const ok = f.codigoBarras.trim() && f.nombre.trim() && num(f.precioUsd) > 0;
@@ -91,13 +93,22 @@ function FormNuevo({ onClose, onSaved, onErr }: { onClose: () => void; onSaved: 
         <div className="modal-body">
           <label className="lbl">Código de barras<input className="inp" value={f.codigoBarras} onChange={set("codigoBarras")} /></label>
           <label className="lbl">Nombre<input className="inp" value={f.nombre} onChange={set("nombre")} /></label>
+          <button className="cfg-row press" role="switch" aria-checked={pesable} onClick={() => setPesable(!pesable)}>
+            <span className="cfg-tx"><b>Se vende por peso o medida</b><small>Queso, carne, granos, refresco a granel, tela… Al vender se escribe cuánto lleva.</small></span>
+            <span className={"sw" + (pesable ? " on" : "")}><i /></span>
+          </button>
+          {pesable && (
+            <div className="seg cfg-seg" role="tablist" aria-label="Unidad de medida">
+              {[["KG", "Kilo"], ["G", "Gramo"], ["L", "Litro"], ["M", "Metro"]].map(([u, n]) => <button key={u} className={unidad === u ? "on" : ""} onClick={() => setUnidad(u)}>{n}</button>)}
+            </div>
+          )}
           <div className="two">
-            <label className="lbl">Precio $<input className="inp" inputMode="decimal" value={f.precioUsd} onChange={set("precioUsd")} /></label>
+            <label className="lbl">{pesable ? "Precio $ por " + ({ KG: "kilo", G: "gramo", L: "litro", M: "metro" } as Record<string, string>)[unidad] : "Precio $"}<input className="inp" inputMode="decimal" value={f.precioUsd} onChange={set("precioUsd")} aria-label="Precio" /></label>
             <label className="lbl">Costo $<input className="inp" inputMode="decimal" value={f.costoUsd} onChange={set("costoUsd")} /></label>
           </div>
           <div className="two">
             <label className="lbl">Categoría<input className="inp" value={f.categoria} onChange={set("categoria")} /></label>
-            <label className="lbl">Stock inicial<input className="inp" inputMode="decimal" value={f.stockInicial} onChange={set("stockInicial")} /></label>
+            <label className="lbl">{pesable ? "Hay (" + ({ KG: "kg", G: "g", L: "L", M: "m" } as Record<string, string>)[unidad] + ")" : "Stock inicial"}<input className="inp" inputMode="decimal" value={f.stockInicial} onChange={set("stockInicial")} /></label>
           </div>
         </div>
         <div className="modal-foot"><button className="btn primary big press" disabled={!ok} onClick={guardar}>Guardar</button></div>

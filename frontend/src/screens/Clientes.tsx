@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { abonarCliente, actualizarCliente, crearCliente, descontarSueldo, detalleCliente, listarClientes, type ClienteFiado, type MovCliente } from "../api";
+import { abonarCliente, actualizarCliente, crearCliente, descontarSueldo, detalleCliente, fiarCliente, listarClientes, listarProductos, type ClienteFiado, type MovCliente, type Producto } from "../api";
+import { CantidadPesable, cantTxt } from "./Pesable";
 import { getSesion, getTasa } from "../session";
 import { UIcono } from "../icons";
 import { leerMonto } from "../arqueo";
@@ -164,6 +165,7 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
   const [ok, setOk] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [desc, setDesc] = useState("");
+  const [pestana, setPestana] = useState<"cuenta" | "fiar">("cuenta");
   const tasa = Number(getTasa()) || 0;
   const cargar = () => detalleCliente(id).then(setD).catch((e) => setErr((e as Error).message));
   useEffect(() => { cargar(); }, [id]);
@@ -198,7 +200,14 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
   return (
     <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card cli-det" onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Escape") { e.preventDefault(); onClose(); } }}>
-        <div className="modal-head"><h2>{c.nombre}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="modal-head"><h2>{c.nombre}{trab && <span className="pill info cli-badge">Trabajador</span>}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="cli-tabs">
+          <div className="seg" role="tablist" aria-label="Cuenta o fiar">
+            <button role="tab" aria-selected={pestana === "cuenta"} className={pestana === "cuenta" ? "on" : ""} onClick={() => setPestana("cuenta")}>Cuenta</button>
+            <button role="tab" aria-selected={pestana === "fiar"} className={pestana === "fiar" ? "on" : ""} onClick={() => { setOk(""); setErr(""); setPestana("fiar"); }}>Fiar productos</button>
+          </div>
+        </div>
+        {pestana === "fiar" ? <FiarProductos cliente={c} onHecho={(t) => { setOk(t); setPestana("cuenta"); cargar(); }} /> : (
         <div className="modal-body">
           <div className={"cli-saldo" + (c.saldoUsd > 0 ? " debe" : "")}>
             <span>{c.saldoUsd > 0 ? "Debe" : "Está al día"}</span>
@@ -258,6 +267,7 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
             ))}
           </div>
         </div>
+        )}
       </div>
       {editar && <FormCliente cliente={c} onClose={() => setEditar(false)} onSaved={() => { setEditar(false); cargar(); }} />}
     </div>
@@ -305,5 +315,94 @@ export function ElegirCliente({ onElegir, onClose }: { onElegir: (c: ClienteFiad
         <div className="modal-foot"><button className="btn2 big press" onClick={() => setNuevo(true)}><UIcono k="plus" sw={2.2} />Anotar cliente nuevo{q.trim() ? ": " + q.trim() : ""}</button></div>
       </div>
     </div>
+  );
+}
+
+/** Límite de fiado: el propio, o el sueldo si es un trabajador sin límite (igual que el servidor). */
+const limiteDe = (c: ClienteFiado) => (c.limiteUsd > 0 ? c.limiteUsd : c.tipo === "TRABAJADOR" ? c.sueldoUsd || 0 : 0);
+
+/** Pestaña "Fiar productos": buscar productos y anotarlos en la cuenta (baja el stock). */
+function FiarProductos({ cliente: c, onHecho }: { cliente: ClienteFiado; onHecho: (msg: string) => void }) {
+  const [productos, setProductos] = useState<Producto[]>([]);
+  const [q, setQ] = useState("");
+  const [sel, setSel] = useState(0);
+  const [carro, setCarro] = useState<Map<number, { p: Producto; qty: number }>>(new Map());
+  const [pesar, setPesar] = useState<{ p: Producto; inicial?: number } | null>(null);
+  const [err, setErr] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const tasa = Number(getTasa()) || 0;
+  useEffect(() => { listarProductos().then(setProductos).catch((e) => setErr((e as Error).message)); }, []);
+  const t = q.trim().toLowerCase();
+  const res = (t ? productos.filter((p) => p.nombre.toLowerCase().includes(t) || p.codigoBarras.includes(t)) : productos).slice(0, t ? 12 : 8);
+  const fijar = (p: Producto, qty: number) => { const m = new Map(carro); if (qty <= 0) m.delete(p.id); else m.set(p.id, { p, qty: Math.min(qty, p.stockActual) }); setCarro(m); };
+  const agregar = (p: Producto) => {
+    if (p.stockActual <= 0) return;
+    if (p.esPesable) { setPesar({ p, inicial: carro.get(p.id)?.qty }); return; }
+    fijar(p, (carro.get(p.id)?.qty ?? 0) + 1); setQ(""); setSel(0);
+  };
+  const lineas = [...carro.values()];
+  const total = Math.round(lineas.reduce((s, l) => s + Math.round(l.p.precioUsd * l.qty * 100) / 100, 0) * 100) / 100;
+  const lim = limiteDe(c);
+  const pasa = lim > 0 && c.saldoUsd + total > lim + 0.005;
+  const fiar = async () => {
+    if (!lineas.length || pasa || enviando) return;
+    setEnviando(true); setErr("");
+    try {
+      const r = await fiarCliente(c.id, lineas.map((l) => ({ productoId: l.p.id, cantidad: l.qty })));
+      onHecho("Fiado " + "$ " + money(r.totalUsd) + " a " + c.nombre + " ✓ (los productos bajaron del inventario)");
+    } catch (e) { setErr((e as Error).message); setEnviando(false); }
+  };
+  return (
+    <>
+      <div className="modal-body">
+        <label className="search">
+          <UIcono k="search" sw={2} />
+          <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setSel(0); }} placeholder="Busca el producto o escanea el código…" aria-label="Buscar producto para fiar"
+            onKeyDown={(e) => {
+              if (e.key === "ArrowDown") { e.preventDefault(); setSel((x) => Math.min(x + 1, res.length - 1)); }
+              else if (e.key === "ArrowUp") { e.preventDefault(); setSel((x) => Math.max(x - 1, 0)); }
+              else if (e.key === "Enter") { e.preventDefault(); const exacto = productos.find((p) => p.codigoBarras === q.trim()); const p = exacto || res[sel]; if (p) agregar(p); }
+            }} />
+        </label>
+        <div className="cli-pick fiar-res">
+          {res.map((p, i) => (
+            <button key={p.id} className={"cli-pick-row press" + (i === sel ? " sel" : "")} disabled={p.stockActual <= 0} onClick={() => agregar(p)}>
+              <b>{p.nombre}{p.esPesable && <span className="pill cli-badge">por {cantTxt(p, 1).replace(/^1 /, "")}</span>}</b>
+              <small>{p.stockActual <= 0 ? "Agotado" : "Hay " + cantTxt(p, p.stockActual)}</small>
+              <span className="t">$ {money(p.precioUsd)}{p.esPesable ? " / " + cantTxt(p, 1).replace(/^1 /, "") : ""}</span>
+            </button>
+          ))}
+          {res.length === 0 && <span className="hint">{productos.length ? "Nada coincide." : "Cargando productos…"}</span>}
+        </div>
+        {lineas.length > 0 && (
+          <div className="vt-lineas fiar-carro">
+            {lineas.map((l) => (
+              <div key={l.p.id} className="vt-linea">
+                <span className="vt-ln"><b>{l.p.nombre}</b><small className="t">{cantTxt(l.p, l.qty)} × $ {money(l.p.precioUsd)}</small></span>
+                <span className="vt-dev">
+                  <button className="press" aria-label={"Menos " + l.p.nombre} onClick={() => (l.p.esPesable ? fijar(l.p, 0) : fijar(l.p, l.qty - 1))}>−</button>
+                  <button className="vt-todo press t" onClick={() => (l.p.esPesable ? setPesar({ p: l.p, inicial: l.qty }) : undefined)} aria-label={"Cantidad de " + l.p.nombre}>{cantTxt(l.p, l.qty)}</button>
+                  {!l.p.esPesable && <button className="press" aria-label={"Más " + l.p.nombre} onClick={() => fijar(l.p, l.qty + 1)}>+</button>}
+                </span>
+                <b className="t fiar-sub">$ {money(Math.round(l.p.precioUsd * l.qty * 100) / 100)}</b>
+              </div>
+            ))}
+          </div>
+        )}
+        {lineas.length > 0 && (
+          <div className={"cli-saldo" + (pasa ? " debe" : "")}>
+            <span>Se anota en su cuenta</span>
+            <b className="t">$ {money(total)}</b>
+            <small className="t">Bs {money(Math.round(total * tasa * 100) / 100)} · quedaría debiendo $ {money(c.saldoUsd + total)}{lim > 0 ? " de $ " + money(lim) + (c.tipo === "TRABAJADOR" && c.limiteUsd <= 0 ? " (su sueldo)" : "") : ""}</small>
+            {pasa && <small className="mg-bad">Pasa su límite de fiado: quita algo o cóbrale una parte.</small>}
+          </div>
+        )}
+        {!c.activo && <p className="pinmsg err">A {c.nombre} no se le está fiando (desactivado).</p>}
+        {err && <p className="pinmsg err">{err}</p>}
+      </div>
+      <div className="modal-foot"><button className="btn primary big press" disabled={!lineas.length || pasa || enviando || !c.activo} onClick={fiar}>{enviando ? "Guardando…" : lineas.length ? "Fiar $ " + money(total) : "Agrega productos"}</button></div>
+      {pesar && <CantidadPesable producto={pesar.p} tasa={tasa} inicial={pesar.inicial} onClose={() => setPesar(null)}
+        onOk={(cant) => { fijar(pesar.p, cant); setPesar(null); setQ(""); setSel(0); }} />}
+    </>
   );
 }

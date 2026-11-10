@@ -3,6 +3,7 @@ import { cobrar, getTasa, listarProductos, type PagoCobro, type Producto } from 
 import { conectorDisponible, imprimirTicket } from "../conector";
 import { Icono, UIcono, catInfo } from "../icons";
 import { Cobro, type ResumenPago } from "./Cobro";
+import { CantidadPesable, cantTxt } from "./Pesable";
 
 interface Item { producto: Producto; qty: number; }
 
@@ -56,14 +57,23 @@ export function Caja() {
 
   const total = useMemo(() => r2([...carrito.values()].reduce((s, i) => s + i.producto.precioUsd * i.qty, 0)), [carrito]);
   const totalBs = r2(total * tasa);
-  const unidades = [...carrito.values()].reduce((s, i) => s + i.qty, 0);
+  const unidades = [...carrito.values()].reduce((s, i) => s + (i.producto.esPesable ? 1 : i.qty), 0);
 
+  // Por peso o medida (kg, litro, metro): se pregunta cuánto y se calcula el precio.
+  const [pesar, setPesar] = useState<{ p: Producto; inicial?: number } | null>(null);
+  const fijar = (p: Producto, qty: number) => {
+    const c = new Map(carrito);
+    if (qty <= 0) c.delete(p.id); else c.set(p.id, { producto: p, qty });
+    setCarrito(c);
+  };
   const add = (p: Producto) => {
+    if (p.esPesable) { setPesar({ p, inicial: carrito.get(p.id)?.qty }); return; }
     const c = new Map(carrito); const it = c.get(p.id);
     c.set(p.id, { producto: p, qty: (it?.qty ?? 0) + 1 }); setCarrito(c);
   };
   const paso = (id: number, d: number) => {
     const c = new Map(carrito); const it = c.get(id); if (!it) return;
+    if (it.producto.esPesable) { if (d < 0) { c.delete(id); setCarrito(c); } else setPesar({ p: it.producto, inicial: it.qty }); return; }
     const q2 = it.qty + d; if (q2 <= 0) c.delete(id); else c.set(id, { ...it, qty: q2 }); setCarrito(c);
   };
 
@@ -132,7 +142,7 @@ export function Caja() {
     const now = new Date();
     const dt = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} ` + now.toLocaleTimeString("es-VE", { hour: "numeric", minute: "2-digit" });
     const L = [center("BODEGA COCOA"), center("Valencia"), dt, "-".repeat(w)];
-    [...carrito.values()].forEach((i) => { L.push(i.producto.nombre.slice(0, w)); L.push(pad("  " + i.qty + " x " + money(i.producto.precioUsd), usd(r2(i.producto.precioUsd * i.qty)))); });
+    [...carrito.values()].forEach((i) => { L.push(i.producto.nombre.slice(0, w)); L.push(pad("  " + cantTxt(i.producto, i.qty) + " x " + money(i.producto.precioUsd), usd(r2(i.producto.precioUsd * i.qty)))); });
     L.push("-".repeat(w), pad("TOTAL", usd(total)), pad("En Bs (BCV " + tasa + ")", bs(totalBs)), payLine.slice(0, w));
     if (change) L.push(pad("Vuelto", change));
     L.push("-".repeat(w), center("Gracias por su compra"));
@@ -243,9 +253,9 @@ export function Caja() {
       return (
         <div className="tkp-ln" key={i.producto.id}>
           <span className="pi" style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }}><Icono k={info.icon} /></span>
-          <div className="tkp-txt"><b>{i.producto.nombre}</b><span className="t">{i.qty} × {usd(i.producto.precioUsd)}</span></div>
+          <div className="tkp-txt"><b>{i.producto.nombre}</b><span className="t">{cantTxt(i.producto, i.qty)} × {usd(i.producto.precioUsd)}</span></div>
           <div className="tkp-r"><strong className="t">{usd(r2(i.producto.precioUsd * i.qty))}</strong>
-            <div className="stp"><button onClick={() => paso(i.producto.id, -1)}>−</button><span className="t">{i.qty}</span><button onClick={() => paso(i.producto.id, 1)}>+</button></div>
+            <div className="stp"><button onClick={() => paso(i.producto.id, -1)}>−</button><span className="t">{cantTxt(i.producto, i.qty)}</span><button onClick={() => paso(i.producto.id, 1)}>+</button></div>
           </div>
         </div>
       );
@@ -253,18 +263,24 @@ export function Caja() {
     return (
       <div className="ln" key={i.producto.id}>
         <span className="pi sm" style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }}><Icono k={info.icon} /></span>
-        <div style={{ minWidth: 0 }}><div className="ln-n">{i.producto.nombre}</div><div className="ln-s t">{i.qty} × {usd(i.producto.precioUsd)}</div></div>
+        <div style={{ minWidth: 0 }}><div className="ln-n">{i.producto.nombre}</div><div className="ln-s t">{cantTxt(i.producto, i.qty)} × {usd(i.producto.precioUsd)}</div></div>
         <div className="ln-r"><div className="ln-a t">{usd(r2(i.producto.precioUsd * i.qty))}</div>
-          <div className="stp"><button onClick={() => paso(i.producto.id, -1)}>−</button><span className="t">{i.qty}</span><button onClick={() => paso(i.producto.id, 1)}>+</button></div>
+          <div className="stp"><button onClick={() => paso(i.producto.id, -1)}>−</button><span className="t">{cantTxt(i.producto, i.qty)}</span><button onClick={() => paso(i.producto.id, 1)}>+</button></div>
         </div>
       </div>
     );
   };
 
+  const pesarModal = pesar && (
+    <CantidadPesable producto={pesar.p} tasa={tasa} inicial={pesar.inicial} onClose={() => setPesar(null)}
+      onOk={(cant) => { fijar(pesar.p, cant); setPesar(null); setQ(""); setSelIdx(0); }} />
+  );
+
   // ----- ESCRITORIO / TABLET (pantalla 01): catálogo en tarjetas + ticket fijo -----
   if (isDesktop) {
     return (
       <div className="caja-wrap">
+        {pesarModal}
         <div className="caja desk">
           {searchrow}
           {chips}
@@ -306,6 +322,7 @@ export function Caja() {
   // ----- TELÉFONO (pantalla 05): lista + barra flotante + hoja -----
   return (
     <div className="caja">
+      {pesarModal}
       {searchrow}
       {chips}
       <div className="prods">

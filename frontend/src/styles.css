@@ -1427,3 +1427,16 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
 .vt-todo-btn { height:40px; }
 .cli-badge { margin-left:6px; font-size:10.5px; padding:1px 6px; vertical-align:middle; }
 .cli-tipo { flex:none; align-self:flex-start; width:min(100%, 360px); }
+/* Cantidad por peso o medida */
+.pes-card { max-width:460px; width:100%; }
+.pes-in .inp { font-size:28px; height:60px; padding-left:52px; }
+.pes-in i { font-size:15px; }
+.pes-res { display:flex; flex-direction:column; gap:2px; padding:12px 14px; border-radius:12px; background:var(--primary-soft); }
+.pes-res span { font-size:13px; color:var(--text-2); } .pes-res b { font-size:26px; } .pes-res small { color:var(--text-2); }
+.pes-res.bad { background:var(--bad-soft); } .pes-res.bad small { color:var(--bad); }
+/* Perfil del cliente: pestañas Cuenta | Fiar productos */
+.cli-tabs { padding:0 18px 6px; } .cli-tabs .seg { max-width:360px; }
+.fiar-res { max-height:min(34vh, 300px); }
+.cli-pick-row:disabled { opacity:.45; cursor:not-allowed; }
+.fiar-carro .vt-todo { min-width:64px; }
+.fiar-sub { min-width:70px; text-align:right; }

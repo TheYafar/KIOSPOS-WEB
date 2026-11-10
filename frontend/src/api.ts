@@ -283,6 +283,10 @@ export async function crearCliente(body: { nombre: string; cedula?: string; tele
 export async function actualizarCliente(id: number, body: { nombre: string; cedula?: string | null; telefono?: string | null; limiteUsd?: number; activo?: boolean; tipo?: string; sueldoUsd?: number }): Promise<ClienteFiado> {
   return parse(await fetch(`/api/clientes/${id}`, { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
 }
+/** Fiar productos directo desde el perfil del cliente/trabajador (el servidor pone los precios y baja el stock). */
+export async function fiarCliente(id: number, items: { productoId: number; cantidad: number }[]): Promise<{ ventaId: number; numeroFactura: number; totalUsd: number; totalBs: number }> {
+  return parse(await fetch(`/api/clientes/${id}/fiar`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ tasa: Number(getTasa()) || 1, items }) }));
+}
 /** El dueño descuenta del sueldo de un trabajador lo que debe (sin monto = todo). */
 export async function descontarSueldo(id: number, montoUsd?: number, nota?: string): Promise<MovCliente> {
   return parse(await fetch(`/api/clientes/${id}/descuento-sueldo`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ montoUsd: montoUsd ?? null, nota: nota || null }) }));

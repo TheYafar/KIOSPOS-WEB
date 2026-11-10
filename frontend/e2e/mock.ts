@@ -13,13 +13,14 @@ export const productos = [
   { id: 1, codigoBarras: "7591001", nombre: "Harina PAN", precioUsd: 1, costoUsd: 0.7, stockActual: 20, stockMinimo: 2, categoria: "Víveres", esPesable: false, unidadMedida: "UND", activo: true },
   { id: 2, codigoBarras: "7591002", nombre: "Coca-Cola 2L", precioUsd: 1.75, costoUsd: 1, stockActual: 20, stockMinimo: 2, categoria: "Bebidas", esPesable: false, unidadMedida: "UND", activo: true },
   { id: 3, codigoBarras: "7591003", nombre: "Arroz Mary", precioUsd: 2.5, costoUsd: 1.5, stockActual: 0, stockMinimo: 2, categoria: "Víveres", esPesable: false, unidadMedida: "UND", activo: true },
+  { id: 4, codigoBarras: "2000001", nombre: "Queso blanco", precioUsd: 6, costoUsd: 4, stockActual: 5, stockMinimo: 1, categoria: "Charcutería", esPesable: true, unidadMedida: "KG", activo: true },
 ];
 
 /** Config de caja del negocio tal como la guarda el servidor (PUT /api/mi-negocio/caja-config). */
 export interface CajaCfg { metodosPago: string | null; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number; }
 export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: any; cierre?: any; tasa?: number | null; cajaConfig?: CajaCfg; puts?: CajaCfg[];
   movs?: any[]; clientes?: any[]; abonos?: any[]; nuevoCliente?: any;
-  anulada?: any; devuelta?: any; compra?: any; descuento?: any; }
+  anulada?: any; devuelta?: any; compra?: any; descuento?: any; fiado?: any; }
 
 export const ventasDemo = [
   { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
@@ -86,6 +87,7 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
       return r.fulfill({ json: mv });
     }
     if (u.includes("/api/cuadre/turnos/")) return r.fulfill({ json: resumen });
+    if (/\/api\/clientes\/\d+\/fiar/.test(u)) { st.fiado = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { ventaId: 70, numeroFactura: 3, totalUsd: 3.5, totalBs: 3150 } }); }
     if (/\/api\/clientes\/\d+\/descuento-sueldo/.test(u)) { st.descuento = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { id: 98, tipo: "ABONO" } }); }
     if (/\/api\/clientes\/\d+\/abonos/.test(u)) { const b = JSON.parse(r.request().postData() || "{}"); (st.abonos ??= []).push(b); return r.fulfill({ json: { id: 99, tipo: "ABONO", ...b } }); }
     if (/\/api\/clientes\/\d+$/.test(u)) {

@@ -439,3 +439,14 @@ el alta/venta/login (try/catch + log).
 - **Fiado de trabajadores** (V15 `clientes.tipo` CLIENTE/TRABAJADOR + `sueldo_usd`): lo que se lleva un
   trabajador es una venta fiada (baja stock); sin límite propio no puede deber más que su sueldo; el dueño hace
   `POST /api/clientes/{id}/descuento-sueldo` (abono `NOMINA`, no toca caja). Pestaña Fiado: Clientes | Trabajadores.
+
+## 21. Fiar desde el perfil + productos por peso o medida
+
+- **Perfil del cliente/trabajador** (Fiado → tocar un nombre): pestañas **Cuenta** | **Fiar productos**. En
+  "Fiar productos" se buscan productos (o se escanea el código) y se fían ahí mismo:
+  `POST /api/clientes/{id}/fiar {tasa, items}` → `VentaService.fiarDesdeLibreta` (precios del servidor, baja
+  stock, todo como FIADO, respeta límite/sueldo, exige negocio al día). Sin caja (dueño): venta con
+  `caja_id NULL` (V16) y correlativo propio (`maxNumeroFacturaSinCaja`); desde una caja, queda en esa caja.
+- **Por peso o medida** (`productos.es_pesable` + `unidad_medida` KG/G/L/M): `screens/Pesable.tsx`
+  (`CantidadPesable`, en portal) pide la cantidad, o el monto en $ / Bs, y calcula el precio. Se usa en Vender
+  y en Fiar. Inventario → Nuevo producto tiene "Se vende por peso o medida" con la unidad.
