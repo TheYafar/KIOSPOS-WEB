@@ -49,7 +49,7 @@ test("formas de pago apagadas no salen y las monedas extra se cobran como OTRO",
     extras: [{ id: "eur", nombre: "Euros", tipo: "OTRA", simbolo: "€", tasaUsd: 1.1, activo: true }] }) };
   await preparar(page, st, { "kioskpos.sesion": sesionCajero });
   await ir(page); await abrirCobro(page);
-  await expect(page.locator(".cb3-nm b")).toHaveText(["Efectivo $", "Efectivo Bs", "Pago móvil", "Euros"]);
+  await expect(page.locator(".cb3-nm b")).toHaveText(["Efectivo $", "Efectivo Bs", "Pago móvil", "Euros", "Fiado"]);
   await boton(page, "Euros").click();
   await expect(page.getByLabel("Monto en Euros")).toHaveValue("2,50"); // 2,75 / 1,10
   await page.keyboard.press("Enter");
@@ -61,7 +61,7 @@ test("el dueño sube la tasa y se guarda en el servidor", async ({ page }) => {
   const st: Estado = { turnoAbierto: false };
   await preparar(page, st, { "kioskpos.sesion": sesionDueno });
   await ir(page);
-  await page.keyboard.press("Alt+4");
+  await page.keyboard.press("Alt+5");
   await page.getByRole("button", { name: "BCV + aumento" }).click();
   await page.getByLabel("Aumento sobre la BCV").pressSequentially("2,5", { delay: 120 });
   await expect(page.getByLabel("Aumento sobre la BCV")).toHaveValue("2,5"); // la coma no se pierde al guardar
@@ -79,7 +79,7 @@ test("la caja cobra con la tasa del negocio y el cajero no puede cambiarla", asy
   await abrirCobro(page);
   await expect(page.locator(".co-tot small")).toHaveText("Bs 2.524,50"); // 2,75 × 918
   await page.keyboard.press("Escape");
-  await page.keyboard.press("Alt+3");
+  await page.keyboard.press("Alt+4");
   await expect(page.locator(".cfg-ro")).toBeVisible();
   await expect(page.getByRole("button", { name: "Usar la BCV" })).toBeDisabled();
 });

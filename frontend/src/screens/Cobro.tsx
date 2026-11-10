@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { type PagoCobro } from "../api";
+import { type ClienteFiado, type PagoCobro } from "../api";
 import { UIcono } from "../icons";
 import { calcularCobro, restoPara, type Montos } from "../cobroCalc";
 import { extrasActivas, metodoActivo, type MetodoExtra } from "../config";
+import { ElegirCliente } from "./Clientes";
 
 // Cobro como el KioskPOS de escritorio (cobro-modal.fxml / CobroModalController):
 // TODAS las formas de pago visibles de una vez (sin "agregar" una por una),
@@ -41,13 +42,16 @@ export interface ResumenPago { payLine: string; change: string; changeNote: stri
 export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   total: number; tasa: number; isDesktop: boolean; err: string;
   onBack: () => void;
-  onConfirm: (pagos: PagoCobro[], resumen: ResumenPago) => void;
+  onConfirm: (pagos: PagoCobro[], resumen: ResumenPago, clienteId?: number | null) => void;
 }) {
   const [txt, setTxt] = useState<Record<string, string>>({});
   const [ref, setRef] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [foco, setFoco] = useState<string>("EFECTIVO_USD"); // casilla activa (para F8)
   const primero = useRef<HTMLInputElement>(null);
+  const [cliente, setCliente] = useState<ClienteFiado | null>(null);
+  const [eligiendo, setEligiendo] = useState(false);
+  const eligiendoRef = useRef(false); eligiendoRef.current = eligiendo;
 
   // Solo las formas de pago activas en Configuración (si apagaron todas, se muestran todas).
   const activas = FORMAS.filter((f) => metodoActivo(f.id));
@@ -57,7 +61,10 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
     sub: x.tipo === "OTRA" ? `1 ${x.simbolo || "u"} = $ ${money(x.tasaUsd || 0)}` : x.tipo === "USD" ? "En dólares" : "En bolívares",
     sim: x.tipo === "OTRA" ? (x.simbolo || "u") : undefined,
   }));
-  const formas = [...(activas.length ? activas : FORMAS), ...extras];
+  // Fiado: se anota en la cuenta de un cliente (en $). No entra dinero ni da vuelto.
+  const fiado: Forma[] = metodoActivo("FIADO") ? [{ id: "FIADO", n: "Fiado", moneda: "USD", icon: "user", color: "var(--c-charcuteria)",
+    sub: cliente ? cliente.nombre + (cliente.saldoUsd > 0 ? " · debe " + usd(cliente.saldoUsd) : "") : "A cuenta de un cliente" }] : [];
+  const formas = [...(activas.length ? activas : FORMAS), ...extras, ...fiado];
   const forma = (id: string) => formas.find((f) => f.id === id);
   const monedaDe = (id: string) => forma(id)?.moneda ?? "USD";
   // Unidades escritas -> monto para el cálculo (otra moneda se pasa a $ con su tasa).
@@ -68,11 +75,18 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   const e = calcularCobro(total, tasa, montos, monedaDe);
   const pmUsado = (montos.PAGO_MOVIL || 0) > 0;
   const refMala = pmUsado && !/^\d{4,6}$/.test(ref);
+  const fiadoUsd = montos.FIADO || 0;
+  const fiadoMal = fiadoUsd <= 0 ? ""
+    : !cliente ? "Elige a quién le fías"
+    : fiadoUsd > total + 0.005 ? "Lo fiado no puede pasar del total"
+    : cliente.limiteUsd > 0 && cliente.saldoUsd + fiadoUsd > cliente.limiteUsd + 0.005 ? "Pasa el límite de fiado de " + cliente.nombre + " (" + usd(cliente.limiteUsd) + ")"
+    : "";
 
   // El motivo REAL por el que no se puede cobrar (antes decía "Faltan $0,00" aunque faltara la referencia).
   const bloqueo = !e.hayPago ? "Escribe cuánto pagó el cliente"
     : !e.cubre ? "Faltan " + usd(e.faltaUsd) + " · " + bs(e.faltaBs)
     : refMala ? "Falta la referencia del pago móvil (4 a 6 dígitos)"
+    : fiadoMal ? fiadoMal
     : "";
   const valido = !bloqueo && !enviando;
 
@@ -103,14 +117,16 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
     if (!valido) return;
     setEnviando(true);
     const usados = formas.filter((f) => (montos[f.id] || 0) > 0);
-    const pagos: PagoCobro[] = usados.map((f) => f.extra
+    const pagos: PagoCobro[] = usados.map((f) => f.id === "FIADO"
+      ? { metodo: "FIADO", moneda: "USD", montoOriginal: Math.round(fiadoUsd * 100) / 100 }
+      : f.extra
       ? { metodo: "OTRO", moneda: f.moneda, montoOriginal: Math.round((montos[f.id] || 0) * 100) / 100,
           referencia: (f.n + (f.sim ? " " + f.sim + " " + money(unidades(f)) : "")).slice(0, 100) }
       : { metodo: f.id as PagoCobro["metodo"], moneda: f.moneda, montoOriginal: Math.round((montos[f.id] || 0) * 100) / 100,
           ...(f.id === "PAGO_MOVIL" ? { referencia: ref } : {}) });
-    const payLine = usados.map((f) => f.n + " " + fmtF(f, unidades(f)) + (f.id === "PAGO_MOVIL" ? " ref. " + ref : "")).join(" + ");
+    const payLine = usados.map((f) => f.n + " " + fmtF(f, unidades(f)) + (f.id === "PAGO_MOVIL" ? " ref. " + ref : f.id === "FIADO" && cliente ? " (" + cliente.nombre + ")" : "")).join(" + ");
     const change = e.vueltoUsd > 0 ? usd(e.vueltoUsd) + " (" + bs(Math.round(e.vueltoUsd * tasa * 100) / 100) + ")" : e.vueltoBs > 0 ? bs(e.vueltoBs) : "";
-    onConfirm(pagos, { payLine, change, changeNote: change ? "El vuelto sale del efectivo" : "" });
+    onConfirm(pagos, { payLine, change, changeNote: change ? "El vuelto sale del efectivo" : "" }, fiadoUsd > 0 ? cliente?.id : null);
   };
 
   // Teclado como el escritorio: Enter cobra, Esc regresa.
@@ -119,6 +135,7 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   const restoRef = useRef(() => {}); restoRef.current = () => accionResto(foco);
   useEffect(() => {
     const h = (ev: KeyboardEvent) => {
+      if (eligiendoRef.current) return; // el selector de cliente maneja su teclado
       if (ev.key === "Enter") { ev.preventDefault(); confirmarRef.current(); }
       else if (ev.key === "Escape") { ev.preventDefault(); backRef.current(); }
       else if (ev.key === "F8") { ev.preventDefault(); restoRef.current(); }
@@ -139,6 +156,10 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
 
   return (
     <div className="view">
+      {eligiendo && <ElegirCliente onClose={() => setEligiendo(false)} onElegir={(c) => {
+        setCliente(c); setEligiendo(false);
+        if (!((montos.FIADO || 0) > 0)) { const r = restoPara("FIADO", total, tasa, montos, monedaDe); if (r > 0) set("FIADO", aTexto(r)); }
+      }} />}
       <div className="co-head">
         <button className="back press" onClick={onBack}><UIcono k="back" sw={2} />Ticket <kbd className="kb">Esc</kbd></button>
         <div className="steps"><b style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Cobrar</b></div>
@@ -184,6 +205,14 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
                       <input className="t" inputMode="numeric" placeholder="4 a 6 dígitos" value={ref} onChange={(ev) => setRef(ev.target.value.replace(/\D/g, "").slice(0, 6))} aria-label="Referencia del pago móvil" />
                       {!refMala && ref.length >= 4 && <span className="okc"><UIcono k="check" sw={2.4} /></span>}
                     </label>
+                  )}
+                  {f.id === "FIADO" && (
+                    <div className="cb3-cli">
+                      {cliente
+                        ? <><span className="cb3-cli-nm"><UIcono k="user" sw={2} /><b>{cliente.nombre}</b>{cliente.limiteUsd > 0 && <small>límite {usd(cliente.limiteUsd)}</small>}</span>
+                            <button className="press" onClick={() => setEligiendo(true)}>Cambiar</button></>
+                        : <button className="press cb3-cli-el" onClick={() => setEligiendo(true)}><UIcono k="search" sw={2} />Elegir cliente</button>}
+                    </div>
                   )}
                   {f.billetes && (
                     <div className="cb3-bills">

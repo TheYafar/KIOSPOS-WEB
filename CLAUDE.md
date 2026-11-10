@@ -394,3 +394,18 @@ el alta/venta/login (try/catch + log).
 - **Operación:** `ops/vps-inicial.sh` (ufw, fail2ban, parches, swap, Docker, cron), `ops/respaldo.sh`
   (pg_dump diario, 14 días, copia off-site con rclone), `ops/restaurar.sh`, `db/init/02-app-password.sh`
   (clave real de `kioskpos_app`). Guía: **SEGURIDAD.md**.
+
+## 18. Gastos, avances y fiado (Sección 4)
+
+- **Movimientos de caja** (V12 `movimientos_caja`, `cuadre/MovimientoCajaService`): GASTO, RETIRO, INGRESO y
+  AVANCE (cliente paga por punto/pago móvil/biopago, se le entrega efectivo; `comision` = ganancia en Bs).
+  `POST /api/cuadre/movimientos`, `GET /api/cuadre/turnos/{id}/movimientos`, `POST …/movimientos/{id}/anular`.
+  No deja sacar más efectivo del que hay. Cuadre: esperado = fondo + ventas − vuelto − gastos − retiros −
+  avances + ingresos + abonos en efectivo; avances/abonos digitales suman a su método.
+- **Fiado** (V12 `clientes`, `movimientos_cliente` CARGO/ABONO, `ventas.cliente_id`, método `FIADO` en USD):
+  `/api/clientes` (GET ?q, POST, PUT solo dueño/encargado, `/{id}`, `/{id}/abonos`). Límite opcional por cliente;
+  el cajero anota clientes pero el límite lo pone el dueño. Saldo = cargos − abonos.
+- **PWA:** pestaña **Fiado** (`screens/Clientes.tsx`: lista con quién debe, detalle, abonos, recordatorio por
+  WhatsApp), tarjeta **Fiado** al cobrar con selector de cliente (teclado), y **Movimientos de caja** en el
+  Cierre (`screens/MovimientosCaja.tsx`, teclas G/R/I/A). "Fiado" se puede apagar en Configuración.
+- Reporte del día: movimientos, comisión de avances y abonos recibidos.

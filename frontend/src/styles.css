@@ -1287,3 +1287,67 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
 .sec-man code { font-size:15px; font-weight:700; word-break:break-all; background:var(--surface-2, var(--bg)); padding:10px; border-radius:10px; letter-spacing:.04em; }
 .modal-foot.two-btn { display:flex; gap:10px; flex-wrap:wrap; }
 .modal-foot.two-btn > * { flex:1 1 160px; justify-content:center; text-decoration:none; }
+
+/* ---- Movimientos de caja ---- */
+.movs { display:flex; flex-direction:column; gap:12px; }
+.movs-head { display:flex; justify-content:space-between; gap:12px; align-items:flex-start; }
+.movs-btns { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; }
+@media (max-width:860px) { .movs-btns { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+.movs-btn { display:flex; align-items:center; gap:10px; text-align:left; padding:10px 12px; border-radius:12px; border:1px solid var(--line); background:var(--surface); font:inherit; color:var(--text); cursor:pointer; min-width:0; }
+.movs-btn:hover { border-color:color-mix(in srgb, var(--mc) 50%, var(--line)); }
+.movs-btn .co2-ic { background:color-mix(in srgb, var(--mc) 15%, var(--surface)); color:var(--mc); flex:none; }
+.movs-btn > span:last-child { display:flex; flex-direction:column; min-width:0; }
+.movs-btn small { font-size:11.5px; color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.movs-list { display:flex; flex-direction:column; border-top:1px solid var(--line); }
+.movs-row { display:flex; align-items:center; gap:10px; padding:9px 2px; border-bottom:1px solid var(--line); font-size:14px; min-width:0; }
+.movs-row.anulado { opacity:.5; } .movs-row.anulado .movs-m { text-decoration:line-through; }
+.movs-tag { flex:none; font-size:11.5px; font-weight:700; padding:3px 8px; border-radius:8px; color:var(--mc); background:color-mix(in srgb, var(--mc) 13%, var(--surface)); }
+.movs-con { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.movs-con small { color:var(--text-3); }
+.movs-m { flex:none; } .movs-m.menos { color:var(--bad); } .movs-m.mas { color:var(--ok); }
+.movs-vacio { margin:0; }
+.chips { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+.chip.press { cursor:pointer; border:0; font:inherit; font-size:12.5px; }
+.chip.on { background:var(--primary); color:#fff; }
+.mov-av { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:8px; }
+.mov-av > div { display:flex; flex-direction:column; gap:2px; padding:10px; border-radius:10px; background:var(--surface-2); font-size:12.5px; color:var(--text-2); }
+.mov-av b { font-size:16px; color:var(--text); } .mov-av .ok b { color:var(--ok); } .mov-av .bad b { color:var(--bad); }
+@media (max-width:520px) { .mov-av { grid-template-columns:1fr; } }
+
+/* ---- Fiado ---- */
+.cli { display:flex; flex-direction:column; gap:14px; }
+.cli-head { display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+.cli-head h2 { margin:0; font-size:22px; } .cli-head p { margin:2px 0 0; color:var(--text-2); font-size:14px; }
+.cli-search { max-width:none; }
+.cli-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap:10px; }
+.cli-row { display:flex; align-items:center; gap:12px; padding:12px 14px; text-align:left; font:inherit; color:var(--text); border:0; cursor:pointer; min-width:0; }
+.cli-row.off { opacity:.6; }
+.cli-nm { flex:1; display:flex; flex-direction:column; min-width:0; }
+.cli-nm b, .cli-nm small { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.cli-nm small { color:var(--text-3); font-size:12.5px; }
+.cli-sal { display:flex; flex-direction:column; align-items:flex-end; flex:none; }
+.cli-sal small { font-size:11.5px; color:var(--text-3); }
+.cli-cero { color:var(--ok); font-size:13px; }
+.mg-ok { color:var(--ok); font-weight:600; }
+.cli-det .modal-body { gap:12px; }
+.cli-saldo { display:flex; flex-direction:column; align-items:flex-start; gap:2px; padding:14px; border-radius:12px; background:var(--ok-soft); }
+.cli-saldo.debe { background:var(--bad-soft); }
+.cli-saldo span { font-size:13px; color:var(--text-2); } .cli-saldo b { font-size:28px; }
+.cli-saldo.debe b { color:var(--bad); } .cli-saldo small { color:var(--text-2); font-size:12.5px; }
+.cli-acc { display:flex; gap:8px; flex-wrap:wrap; } .cli-acc > * { text-decoration:none; }
+.cli-abono { display:flex; flex-direction:column; gap:10px; padding:12px; border:1px solid var(--line); border-radius:12px; }
+.cli-met { display:flex; flex-wrap:wrap; } .cli-met button { flex:1 1 auto; }
+.cli-abono-in { display:flex; gap:8px; } .cli-abono-in .inpw { flex:1; min-width:0; }
+.cli-movs { display:flex; flex-direction:column; }
+.cli-mov { display:flex; align-items:center; gap:10px; padding:9px 0; border-bottom:1px solid var(--line); font-size:14px; }
+.cli-mov-tx { flex:1; min-width:0; display:flex; flex-direction:column; } .cli-mov-tx small { color:var(--text-3); font-size:12px; }
+.cli-pick { display:flex; flex-direction:column; max-height:min(50vh, 380px); overflow:auto; }
+.cli-pick-row { display:grid; grid-template-columns:1fr auto; grid-template-areas:"n s" "d s"; align-items:center; text-align:left; gap:0 10px; padding:10px 10px; border:0; border-radius:10px; background:none; font:inherit; color:var(--text); cursor:pointer; }
+.cli-pick-row b { grid-area:n; } .cli-pick-row small { grid-area:d; color:var(--text-3); font-size:12px; } .cli-pick-row span { grid-area:s; font-size:13px; }
+.cli-pick-row.sel, .cli-pick-row:hover { background:var(--primary-soft); }
+.cb3-cli { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:8px; }
+.cb3-cli button { font:inherit; font-size:13px; font-weight:600; border:0; background:var(--surface-2); color:var(--text); padding:7px 10px; border-radius:9px; cursor:pointer; }
+.cb3-cli-el { width:100%; display:flex; align-items:center; justify-content:center; gap:6px; }
+.cb3-cli-el svg, .cb3-cli-nm svg { width:16px; height:16px; }
+.cb3-cli-nm { display:flex; align-items:center; gap:6px; min-width:0; font-size:13.5px; }
+.cb3-cli-nm b { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; } .cb3-cli-nm small { color:var(--text-3); white-space:nowrap; }

@@ -125,7 +125,8 @@ export async function importarCsv(csv: string): Promise<{ creados: number; actua
 }
 
 export interface DesglosePago { metodo: string; moneda: string; montoOriginal: number; equivalenteUsd: number; }
-export interface ReporteDia { fecha: string; cantidadVentas: number; totalUsd: number; totalBs: number; costoUsd: number; gananciaUsd: number; pagos: DesglosePago[]; }
+export interface ReporteDia { fecha: string; cantidadVentas: number; totalUsd: number; totalBs: number; costoUsd: number; gananciaUsd: number; pagos: DesglosePago[];
+  movimientos?: { tipo: string; moneda: string; total: number; cantidad: number }[]; comisionAvancesBs?: number; abonosFiadoUsd?: number; }
 export async function reporteDia(fecha?: string): Promise<ReporteDia> {
   return parse(await fetch("/api/reportes/dia" + (fecha ? "?fecha=" + fecha : ""), { headers: auth() }));
 }
@@ -143,7 +144,7 @@ export async function cierresDia(fecha?: string): Promise<CierreDia[]> {
 
 export interface LineaCobro { productoId?: number | null; cantidad: number; precioUsd?: number; nombre?: string; }
 export interface PagoCobro {
-  metodo: "EFECTIVO_USD" | "EFECTIVO_BS" | "PUNTO" | "PAGO_MOVIL" | "BIOPAGO" | "OTRO";
+  metodo: "EFECTIVO_USD" | "EFECTIVO_BS" | "PUNTO" | "PAGO_MOVIL" | "BIOPAGO" | "OTRO" | "FIADO";
   moneda: "USD" | "VES"; montoOriginal: number; referencia?: string;
 }
 
@@ -153,9 +154,9 @@ function nuevoCodigo(): string {
 }
 
 /** Registra una venta: la encola (durable) y trata de enviarla ya. */
-export async function cobrar(items: LineaCobro[], pagos: PagoCobro[]): Promise<string> {
+export async function cobrar(items: LineaCobro[], pagos: PagoCobro[], clienteId?: number | null): Promise<string> {
   const codigoUnico = nuevoCodigo();
-  await encolar(codigoUnico, { codigoUnico, tasaBcv: Number(getTasa()) || 1, items, pagos });
+  await encolar(codigoUnico, { codigoUnico, tasaBcv: Number(getTasa()) || 1, items, pagos, ...(clienteId ? { clienteId } : {}) });
   await sincronizar();
   return codigoUnico;
 }
@@ -202,6 +203,46 @@ export interface TurnoResumen {
   declaradoUsd: number | null; declaradoBs: number | null;
   diferenciaUsd: number | null; diferenciaBs: number | null;
   metodos: { metodo: string; moneda: string; esperado: number; digital: boolean }[];
+  /** Gastos, retiros, ingresos, avances (efectivo entregado) y abonos en efectivo del turno. */
+  movimientos?: MovLinea[];
+  fiadoUsd?: number;
+  comisionAvancesBs?: number;
+}
+export interface MovLinea { tipo: "GASTO" | "RETIRO" | "INGRESO" | "AVANCE" | "ABONO"; moneda: "USD" | "VES"; total: number; cantidad: number; }
+
+// ---------- Movimientos de caja (gastos, retiros, ingresos, avances) ----------
+export type TipoMov = "GASTO" | "RETIRO" | "INGRESO" | "AVANCE";
+export interface MovimientoCaja {
+  id: number; turnoId: number; tipo: TipoMov; moneda: "USD" | "VES"; monto: number; concepto: string;
+  metodoCobro: string | null; montoCobrado: number | null; comision: number | null; anulado: boolean; createdAt: string;
+}
+export async function registrarMovimiento(body: { tipo: TipoMov; moneda: "USD" | "VES"; monto: number; concepto: string; metodoCobro?: string; montoCobrado?: number; tasa?: number }): Promise<MovimientoCaja> {
+  return parse(await fetch("/api/cuadre/movimientos", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+export async function movimientosTurno(turnoId: number): Promise<MovimientoCaja[]> {
+  return parse(await fetch(`/api/cuadre/turnos/${turnoId}/movimientos`, { headers: auth() }));
+}
+export async function anularMovimiento(id: number): Promise<MovimientoCaja> {
+  return parse(await fetch(`/api/cuadre/movimientos/${id}/anular`, { method: "POST", headers: auth() }));
+}
+
+// ---------- Fiado (clientes) ----------
+export interface ClienteFiado { id: number; nombre: string; cedula: string | null; telefono: string | null; limiteUsd: number; activo: boolean; saldoUsd: number; ultimoMovimiento: string | null; }
+export interface MovCliente { id: number; tipo: "CARGO" | "ABONO"; montoUsd: number; ventaId: number | null; metodo: string | null; moneda: string | null; montoOriginal: number | null; referencia: string | null; nota: string | null; createdAt: string; }
+export async function listarClientes(q?: string): Promise<ClienteFiado[]> {
+  return parse(await fetch("/api/clientes" + (q ? "?q=" + encodeURIComponent(q) : ""), { headers: auth() }));
+}
+export async function detalleCliente(id: number): Promise<{ cliente: ClienteFiado; movimientos: MovCliente[] }> {
+  return parse(await fetch(`/api/clientes/${id}`, { headers: auth() }));
+}
+export async function crearCliente(body: { nombre: string; cedula?: string; telefono?: string; limiteUsd?: number }): Promise<ClienteFiado> {
+  return parse(await fetch("/api/clientes", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+export async function actualizarCliente(id: number, body: { nombre: string; cedula?: string | null; telefono?: string | null; limiteUsd?: number; activo?: boolean }): Promise<ClienteFiado> {
+  return parse(await fetch(`/api/clientes/${id}`, { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+export async function abonarCliente(id: number, body: { metodo: string; monto: number; tasa?: number; referencia?: string; nota?: string }): Promise<MovCliente> {
+  return parse(await fetch(`/api/clientes/${id}/abonos`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
 }
 
 export async function abrirTurno(fondoUsd: number, fondoBs: number): Promise<TurnoResumen> {

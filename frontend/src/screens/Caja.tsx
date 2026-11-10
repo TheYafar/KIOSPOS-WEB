@@ -116,10 +116,10 @@ export function Caja() {
   // En PC el buscador arranca con el cursor puesto.
   useEffect(() => { if (view === "caja" && window.matchMedia("(min-width:1024px)").matches) buscarRef.current?.focus(); }, [view]);
 
-  const confirmar = async (pagos: PagoCobro[], resumen: ResumenPago) => {
+  const confirmar = async (pagos: PagoCobro[], resumen: ResumenPago, clienteId?: number | null) => {
     try {
       const its = [...carrito.values()].map((i) => ({ productoId: i.producto.id, cantidad: i.qty }));
-      await cobrar(its, pagos);
+      await cobrar(its, pagos, clienteId);
       window.dispatchEvent(new Event("kp-turno"));
       setDone({ total, totalBs, payLine: resumen.payLine, change: resumen.change, changeNote: resumen.changeNote, receipt: recibo(resumen.payLine, resumen.change) });
       setView("done");

@@ -2,7 +2,7 @@
 // dólar a partir de la BCV automática. Es del NEGOCIO y vive en el servidor (la comparten
 // todas sus cajas); aquí queda una copia en el equipo para cobrar sin internet.
 
-export type MetodoId = "EFECTIVO_USD" | "EFECTIVO_BS" | "PAGO_MOVIL" | "PUNTO" | "BIOPAGO";
+export type MetodoId = "EFECTIVO_USD" | "EFECTIVO_BS" | "PAGO_MOVIL" | "PUNTO" | "BIOPAGO" | "FIADO";
 export type TasaModo = "bcv" | "ajuste" | "manual";
 
 /** Forma de pago o moneda extra que agrega el negocio (Zelle, Binance, euros...). */
@@ -27,7 +27,7 @@ export interface ConfigCaja {
 const KEY = "kp_config";
 const BCV_KEY = "kp_bcv";
 export const DEFAULT_CONFIG: ConfigCaja = {
-  metodos: { EFECTIVO_USD: true, EFECTIVO_BS: true, PAGO_MOVIL: true, PUNTO: true, BIOPAGO: true },
+  metodos: { EFECTIVO_USD: true, EFECTIVO_BS: true, PAGO_MOVIL: true, PUNTO: true, BIOPAGO: true, FIADO: true },
   extras: [],
   tasaModo: "bcv", ajusteTipo: "pct", ajuste: 0, tasaManual: 0,
 };

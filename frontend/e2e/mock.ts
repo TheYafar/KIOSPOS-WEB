@@ -17,7 +17,13 @@ export const productos = [
 
 /** Config de caja del negocio tal como la guarda el servidor (PUT /api/mi-negocio/caja-config). */
 export interface CajaCfg { metodosPago: string | null; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number; }
-export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: any; cierre?: any; tasa?: number | null; cajaConfig?: CajaCfg; puts?: CajaCfg[]; }
+export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: any; cierre?: any; tasa?: number | null; cajaConfig?: CajaCfg; puts?: CajaCfg[];
+  movs?: any[]; clientes?: any[]; abonos?: any[]; nuevoCliente?: any; }
+
+export const clientesDemo = () => [
+  { id: 1, nombre: "María Pérez", cedula: "V12345678", telefono: "04121234567", limiteUsd: 10, activo: true, saldoUsd: 8, ultimoMovimiento: "2026-11-09T12:00:00Z" },
+  { id: 2, nombre: "José Rojas", cedula: null, telefono: null, limiteUsd: 0, activo: true, saldoUsd: 0, ultimoMovimiento: null },
+];
 
 /** Config del servidor a partir de la de la PWA (para armar escenarios). */
 export const cfgServidor = (c: { metodos?: object; extras?: object[]; tasaModo?: string; ajusteTipo?: string; ajuste?: number; tasaManual?: number }): CajaCfg => ({
@@ -55,7 +61,22 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     if (u.includes("/api/cuadre/actual")) return st.turnoAbierto ? r.fulfill({ json: resumen }) : r.fulfill({ status: 204, body: "" });
     if (u.includes("/api/cuadre/abrir")) { const ya = st.turnoAbierto; st.turnoAbierto = true; return st.abrirFalla && ya ? r.fulfill({ status: 409, json: { error: "Esta caja ya tiene un turno abierto" } }) : r.fulfill({ json: resumen }); }
     if (u.includes("/cerrar")) { st.cierre = JSON.parse(r.request().postData() || "{}"); st.turnoAbierto = false; return r.fulfill({ json: { ...resumen, estado: "CERRADO", declaradoUsd: st.cierre.declaradoUsd, declaradoBs: st.cierre.declaradoBs, diferenciaUsd: st.cierre.declaradoUsd - 62, diferenciaBs: st.cierre.declaradoBs - 9000 } }); }
+    if (/\/api\/cuadre\/turnos\/\d+\/movimientos/.test(u)) return r.fulfill({ json: st.movs ?? [] });
+    if (u.includes("/api/cuadre/movimientos") && m === "POST" && !u.includes("/anular")) {
+      const b = JSON.parse(r.request().postData() || "{}");
+      const mv = { id: (st.movs?.length ?? 0) + 1, turnoId: 7, anulado: false, createdAt: new Date().toISOString(), metodoCobro: null, montoCobrado: null, comision: null, ...b,
+        concepto: b.concepto || (b.tipo === "AVANCE" ? "Avance de efectivo" : ""), ...(b.tipo === "AVANCE" ? { comision: Math.round((b.montoCobrado - b.monto) * 100) / 100 } : {}) };
+      (st.movs ??= []).push(mv);
+      return r.fulfill({ json: mv });
+    }
     if (u.includes("/api/cuadre/turnos/")) return r.fulfill({ json: resumen });
+    if (/\/api\/clientes\/\d+\/abonos/.test(u)) { const b = JSON.parse(r.request().postData() || "{}"); (st.abonos ??= []).push(b); return r.fulfill({ json: { id: 99, tipo: "ABONO", ...b } }); }
+    if (/\/api\/clientes\/\d+$/.test(u)) {
+      const id = Number(u.split("/").pop()); const c = (st.clientes ?? clientesDemo()).find((x) => x.id === id);
+      return r.fulfill({ json: { cliente: c, movimientos: c && c.saldoUsd > 0 ? [{ id: 5, tipo: "CARGO", montoUsd: c.saldoUsd, ventaId: 12, metodo: "FIADO", moneda: "USD", montoOriginal: c.saldoUsd, referencia: null, nota: null, createdAt: "2026-11-09T12:00:00Z" }] : [] } });
+    }
+    if (u.includes("/api/clientes") && m === "POST") { const b = JSON.parse(r.request().postData() || "{}"); st.nuevoCliente = b; const c = { id: 50, cedula: null, telefono: null, limiteUsd: 0, activo: true, saldoUsd: 0, ultimoMovimiento: null, ...b }; (st.clientes ??= clientesDemo()).push(c); return r.fulfill({ json: c }); }
+    if (u.includes("/api/clientes")) return r.fulfill({ json: st.clientes ?? clientesDemo() });
     if (u.includes("/api/ventas") && m === "POST") { st.venta = JSON.parse(r.request().postData() || "{}"); return r.fulfill({ json: { id: 99, numeroFactura: 1 } }); }
     if (u.includes("/api/mi-negocio/caja-config")) {
       if (m === "PUT") { st.cajaConfig = JSON.parse(r.request().postData() || "{}"); (st.puts ??= []).push(st.cajaConfig!); }

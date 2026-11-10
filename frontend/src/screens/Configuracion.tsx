@@ -14,6 +14,7 @@ const METODOS: { id: MetodoId; n: string; sub: string; icon: string; color: stri
   { id: "PAGO_MOVIL", n: "Pago móvil", sub: "Transferencia inmediata", icon: "phone", color: "var(--c-bebidas)" },
   { id: "PUNTO", n: "Punto de venta", sub: "Tarjeta de débito", icon: "card", color: "var(--warn)" },
   { id: "BIOPAGO", n: "Biopago", sub: "Huella (BDV)", icon: "finger", color: "var(--c-chucherias)" },
+  { id: "FIADO", n: "Fiado", sub: "Anotar en la cuenta del cliente", icon: "user", color: "var(--c-charcuteria)" },
 ];
 
 const money = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -71,9 +72,9 @@ export function Configuracion() {
         .catch((e) => { if (mio === version.current) { pendiente.current = undefined; setMsg("No se guardó: " + (e instanceof Error ? e.message : "sin conexión")); } });
     }, 500);
   };
-  const activas = METODOS.filter((m) => c.metodos[m.id]).length;
+  const activas = METODOS.filter((m) => m.id !== "FIADO" && c.metodos[m.id]).length;
   const toggle = (id: MetodoId) => {
-    if (c.metodos[id] && activas === 1) { setMsg("Debe quedar al menos una forma de pago activa"); return; }
+    if (id !== "FIADO" && c.metodos[id] && activas === 1) { setMsg("Debe quedar al menos una forma de pago activa"); return; }
     guardar({ ...c, metodos: { ...c.metodos, [id]: !c.metodos[id] } });
   };
   const modo = (m: TasaModo) => guardar({ ...c, tasaModo: m });

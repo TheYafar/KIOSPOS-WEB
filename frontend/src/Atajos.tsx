@@ -7,7 +7,8 @@ const GRUPOS: { t: string; items: [string, string][] }[] = [
   { t: "En toda la app", items: [["Alt + 1, 2, 3…", "Cambiar de pestaña"], ["F1", "Ver estos atajos"], ["Esc", "Cerrar ventana / volver"]] },
   { t: "Vender", items: [["Escribir / F2", "Buscar producto o leer código de barras"], ["Enter", "Agregar el producto resaltado"], ["↑ ↓", "Moverse entre los resultados"], ["+ / −", "Sumar o restar al último producto"], ["Supr", "Quitar el último producto"], ["F9 · Ctrl+Enter", "Cobrar"]] },
   { t: "Cobrar", items: [["Tab", "Pasar a la siguiente forma de pago"], ["F8", "Poner el resto en la casilla actual"], ["Enter", "Cobrar y listo"], ["Esc", "Volver al ticket"]] },
-  { t: "Cierre de caja", items: [["Enter", "Pasar a la siguiente casilla"], ["F8", "Contar billetes (efectivo)"], ["Ctrl + Enter", "Cerrar el turno"]] },
+  { t: "Cierre de caja", items: [["Enter", "Pasar a la siguiente casilla"], ["F8", "Contar billetes (efectivo)"], ["Ctrl + Enter", "Cerrar el turno"], ["G · R · I · A", "Gasto · Retiro · Ingreso · Avance"]] },
+  { t: "Fiado", items: [["Escribir", "Buscar cliente"], ["Enter", "Abrir el primero / registrar abono"], ["↑ ↓ (al cobrar)", "Elegir cliente"]] },
   { t: "Entrada (PIN)", items: [["← →", "Elegir cajero"], ["0 – 9", "Escribir el PIN"], ["Retroceso", "Borrar un dígito"]] },
 ];
 

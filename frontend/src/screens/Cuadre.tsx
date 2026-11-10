@@ -5,6 +5,7 @@ import { UIcono } from "../icons";
 import { calcularArqueo, leerMonto, type FilaArqueo } from "../arqueo";
 import { conectorDisponible, imprimirTicket } from "../conector";
 import { metodoActivo } from "../config";
+import { MovimientosCaja } from "./MovimientosCaja";
 
 /** Avisa al resto de la app (barra de montos, indicador) que el turno cambió. */
 const avisarTurno = () => window.dispatchEvent(new Event("kp-turno"));
@@ -206,10 +207,14 @@ export function Cuadre() {
   ]).filter((m) => metodoActivo(m.metodo) || m.esperado !== 0); // las apagadas no se cuentan, salvo que tengan dinero
   const a = calcularArqueo(metodos, cont, tasa);
   const digital = metodos.filter((m) => m.digital).reduce((s, m) => s + m.esperado, 0);
+  // Cómo se llega a lo esperado: fondo + ventas − vuelto ± movimientos de caja y abonos.
+  const NOMBRE_MOV: Record<string, string> = { GASTO: "gastos", RETIRO: "retiros", INGRESO: "ingresos", AVANCE: "avances", ABONO: "abonos fiado" };
+  const movTexto = (moneda: "USD" | "VES") => (turno.movimientos || []).filter((x) => x.moneda === moneda && x.total > 0)
+    .map((x) => ` ${x.tipo === "INGRESO" || x.tipo === "ABONO" ? "+" : "−"} ${NOMBRE_MOV[x.tipo]} ${fmt(moneda, x.total)}`).join("");
   const detalle = (m: string) =>
-    m === "EFECTIVO_USD" ? `Fondo ${usd(turno.fondoUsd)} + ventas ${usd(turno.efectivoUsd)} − vuelto ${usd(turno.vueltoUsd)}`
-    : m === "EFECTIVO_BS" ? `Fondo ${bs(turno.fondoBs)} + ventas ${bs(turno.efectivoBs)} − vuelto ${bs(turno.vueltoBs)}`
-    : "Lo cobrado en el turno";
+    m === "EFECTIVO_USD" ? `Fondo ${usd(turno.fondoUsd)} + ventas ${usd(turno.efectivoUsd)} − vuelto ${usd(turno.vueltoUsd)}${movTexto("USD")}`
+    : m === "EFECTIVO_BS" ? `Fondo ${bs(turno.fondoBs)} + ventas ${bs(turno.efectivoBs)} − vuelto ${bs(turno.vueltoBs)}${movTexto("VES")}`
+    : (turno.comisionAvancesBs || 0) > 0 || (turno.movimientos || []).some((x) => x.tipo === "AVANCE") ? "Ventas, avances y abonos del turno" : "Lo cobrado en el turno";
 
   const siguiente = (i: number) => {
     const nx = inputs.current[i + 1];
@@ -256,7 +261,12 @@ export function Cuadre() {
         <div className="cz-kpi"><span className="k">Ventas en efectivo</span><b className="t">{usd(turno.efectivoUsd)}</b><span className="d t">{bs(turno.efectivoBs)}</span></div>
         <div className="cz-kpi"><span className="k">Pagos digitales</span><b className="t">{bs(digital)}</b><span className="d">Pago móvil + Punto + Biopago</span></div>
         <div className="cz-kpi hl"><span className="k">Esperado en gaveta</span><b className="t">{usd(turno.esperadoUsd)}</b><span className="d t">{bs(turno.esperadoBs)}</span></div>
+        {((turno.fiadoUsd || 0) > 0 || (turno.comisionAvancesBs || 0) > 0) && (
+          <div className="cz-kpi"><span className="k">Fiado · avances</span><b className="t">{usd(turno.fiadoUsd || 0)}</b><span className="d t">fiado · ganancia avances {bs(turno.comisionAvancesBs || 0)}</span></div>
+        )}
       </div>
+
+      <MovimientosCaja turnoId={turno.turnoId} tasa={tasa} onCambio={refrescar} />
 
       <div className="card arq">
         <div className="arq-head">

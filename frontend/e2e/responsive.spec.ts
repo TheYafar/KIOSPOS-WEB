@@ -5,8 +5,8 @@ import { ir, preparar, sesionCajero, sesionDueno } from "./mock";
 const tamanos = [["movil", 390, 844], ["tablet", 820, 1180], ["pc", 1920, 1080]] as const;
 const pantallas = [
   { n: "vender", ses: sesionCajero, tecla: "Alt+1" }, { n: "cierre", ses: sesionCajero, tecla: "Alt+2" },
-  { n: "config", ses: sesionCajero, tecla: "Alt+3" }, { n: "reportes", ses: sesionDueno, tecla: "Alt+1" },
-  { n: "productos", ses: sesionDueno, tecla: "Alt+2" }, { n: "mas", ses: sesionDueno, tecla: "Alt+5" },
+  { n: "fiado", ses: sesionCajero, tecla: "Alt+3" }, { n: "config", ses: sesionCajero, tecla: "Alt+4" }, { n: "reportes", ses: sesionDueno, tecla: "Alt+1" },
+  { n: "productos", ses: sesionDueno, tecla: "Alt+2" }, { n: "mas", ses: sesionDueno, tecla: "Alt+6" },
 ];
 for (const [t, w, h] of tamanos) {
   for (const p of pantallas) {
