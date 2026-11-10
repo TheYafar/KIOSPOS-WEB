@@ -68,6 +68,13 @@ public class PagoNomina {
     @Column(length = 200)
     private String nota;
 
+    /** PAGADO o ANULADO (un pago mal hecho se anula y su fiado vuelve a la cuenta). */
+    @Column(nullable = false, length = 10)
+    private String estado = "PAGADO";
+
+    @Column(name = "motivo_anulacion", length = 200)
+    private String motivoAnulacion;
+
     @Column(name = "usuario_id")
     private Long usuarioId;
 

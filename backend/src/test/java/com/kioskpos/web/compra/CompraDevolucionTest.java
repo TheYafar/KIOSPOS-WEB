@@ -46,6 +46,8 @@ class CompraDevolucionTest extends PostgresRlsTestBase {
     @Autowired private CompraService compraService;
     @Autowired private DevolucionService devolucionService;
     @Autowired private ClienteService clienteService;
+    @Autowired private com.kioskpos.web.reporte.ReporteService reporteService;
+    @Autowired private com.kioskpos.web.nomina.NominaService nominaService;
 
     @AfterEach
     void limpiar() {
@@ -247,5 +249,92 @@ class CompraDevolucionTest extends PostgresRlsTestBase {
         assertThatThrownBy(() -> en(m.negocioId(), () -> ventaService.fiarDesdeLibreta(m.dueno(), cli.id(), new BigDecimal("40"),
                 List.of(new VentaService.ItemInput(m.productoId(), new BigDecimal("100"), null, null)))))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void laGananciaUsaElCostoDelDiaDeLaVentaYRestaLasDevoluciones() {
+        M m = montar("ganancia@ejemplo.com");
+        Venta v = vender(m, "G-1", 2, null, usd("4.00")); // 2 × $2, costo $1 c/u → ganancia $2
+        var antes = en(m.negocioId(), () -> reporteService.resumenDelDia(null));
+        // Una compra sube el costo promedio: la ganancia de esa venta NO cambia.
+        en(m.negocioId(), () -> compraService.registrar(m.dueno(), new CompraService.NuevaCompra(null, null, null, null, true, null,
+                List.of(new CompraService.ItemCompra(m.productoId(), new BigDecimal("8"), new BigDecimal("1.90"), null)))));
+        var despues = en(m.negocioId(), () -> reporteService.resumenDelDia(null));
+        assertThat(despues.gananciaUsd()).isEqualByComparingTo(antes.gananciaUsd());
+        // Devolver 1 unidad: −$2 vendido y −$1 de costo → la ganancia baja $1.
+        Long linea = en(m.negocioId(), () -> devolucionService.detalle(v.getId())).lineas().get(0).detalleId();
+        en(m.negocioId(), () -> devolucionService.devolver(m.caja(), v.getId(), new DevolucionService.NuevaDevolucion(
+                List.of(new DevolucionService.ItemDevolucion(linea, BigDecimal.ONE)), "EFECTIVO_USD", null)));
+        var conDev = en(m.negocioId(), () -> reporteService.resumenDelDia(null));
+        assertThat(conDev.gananciaUsd()).isEqualByComparingTo(antes.gananciaUsd().subtract(BigDecimal.ONE));
+        assertThat(conDev.devolucionesUsd()).isEqualByComparingTo("2.00");
+    }
+
+    @Test
+    void ventaDeLaColaSinInternetSeRegistraAunqueFalteStockOCambieElPrecio() {
+        M m = montar("cola@ejemplo.com"); // stock 10, precio $2
+        long haceUnaHora = System.currentTimeMillis() - 60 * 60 * 1000L;
+        var item = new VentaService.ItemInput(m.productoId(), new BigDecimal("12"), new BigDecimal("1.50"), null); // cobró a $1,50
+        Venta v = en(m.negocioId(), () -> ventaService.registrar(m.caja(), m.permiso(), new VentaService.VentaInput("COLA-1",
+                new BigDecimal("40"), List.of(item), List.of(usd("18.00")), haceUnaHora)));
+        assertThat(v.getTotalUsd()).isEqualByComparingTo("18.00");
+        assertThat(producto(m).getStockActual()).isEqualByComparingTo("-2");
+        // En vivo sigue siendo estricto.
+        assertThatThrownBy(() -> vender(m, "VIVO-1", 1, null, usd("2.00"))).isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void anularCompraDevuelveElCostoAnterior() {
+        M m = montar("anulcosto@ejemplo.com"); // 10 a $1
+        var c = en(m.negocioId(), () -> compraService.registrar(m.dueno(), new CompraService.NuevaCompra(null, null, null, null, true, null,
+                List.of(new CompraService.ItemCompra(m.productoId(), new BigDecimal("10"), new BigDecimal("2.00"), null)))));
+        assertThat(producto(m).getCostoUsd()).isEqualByComparingTo("1.50");
+        en(m.negocioId(), () -> compraService.anular(m.dueno(), c.compra().getId()));
+        assertThat(producto(m).getCostoUsd()).isEqualByComparingTo("1.00");
+        assertThat(producto(m).getStockActual()).isEqualByComparingTo("10");
+    }
+
+    @Test
+    void anularPagoDeNominaDevuelveElFiadoALaCuenta() {
+        M m = montar("anulnomina@ejemplo.com");
+        var t = en(m.negocioId(), () -> clienteService.crear(new ClienteService.Datos("Pedro", null, null, null, null, "TRABAJADOR", new BigDecimal("50"))));
+        en(m.negocioId(), () -> ventaService.fiarDesdeLibreta(m.dueno(), t.id(), new BigDecimal("40"),
+                List.of(new VentaService.ItemInput(m.productoId(), new BigDecimal("3"), null, null)))); // $6
+        var pago = en(m.negocioId(), () -> nominaService.pagar(m.dueno(), new com.kioskpos.web.nomina.NominaService.NuevoPago(t.id(), "Semana",
+                new BigDecimal("50"), null, null, null, new BigDecimal("6"), "EFECTIVO_USD", null, null, null)));
+        assertThat(en(m.negocioId(), () -> clienteService.saldoDe(t.id()))).isEqualByComparingTo("0");
+        en(m.negocioId(), () -> nominaService.anular(m.dueno(), pago.pago().getId(), "Me equivoqué de monto"));
+        assertThat(en(m.negocioId(), () -> clienteService.saldoDe(t.id()))).isEqualByComparingTo("6.00");
+        assertThat(en(m.negocioId(), () -> nominaService.resumen()).pagadoEsteMesUsd()).isEqualByComparingTo("0");
+        assertThatThrownBy(() -> en(m.negocioId(), () -> nominaService.anular(m.dueno(), pago.pago().getId(), "otra vez")))
+                .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void noSePuedenRegistrarMasCajasDeLasContratadas() {
+        M m = montar("limitecajas@ejemplo.com"); // ya tiene 1 caja y el plan incluye 1
+        assertThatThrownBy(() -> en(m.negocioId(), () -> cajaService.registrar("Caja 2", null)))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("Tu plan incluye 1 caja");
+        assertThat(en(m.negocioId(), () -> cuadreService.resumen(m.turnoId())).fechaApertura()).isNotNull();
+    }
+
+    @Test
+    void devolverEnTresPartesDevuelveExactoLoQuePago() {
+        M m = montar("tercios@ejemplo.com"); // producto $2
+        var item = new VentaService.ItemInput(m.productoId(), new BigDecimal("3"), null, null); // $6
+        Venta v = en(m.negocioId(), () -> ventaService.registrar(m.caja(), m.permiso(), new VentaService.VentaInput("T3-1", new BigDecimal("40"),
+                List.of(item), List.of(usd("2.00"), new VentaService.PagoInput(MetodoPago.PAGO_MOVIL, Moneda.VES, new BigDecimal("160.00"), "1234")))));
+        Long linea = en(m.negocioId(), () -> devolucionService.detalle(v.getId())).lineas().get(0).detalleId();
+        BigDecimal efectivo = BigDecimal.ZERO, movil = BigDecimal.ZERO;
+        for (int i = 0; i < 3; i++) {
+            var h = en(m.negocioId(), () -> devolucionService.devolver(m.caja(), v.getId(), new DevolucionService.NuevaDevolucion(
+                    List.of(new DevolucionService.ItemDevolucion(linea, BigDecimal.ONE)), "COMO_PAGO", null)));
+            for (var r : h.reembolsos()) {
+                if (r.getMetodo().equals("EFECTIVO_USD")) efectivo = efectivo.add(r.getMonto());
+                if (r.getMetodo().equals("PAGO_MOVIL")) movil = movil.add(r.getMonto());
+            }
+        }
+        assertThat(efectivo).isEqualByComparingTo("2.00");
+        assertThat(movil).isEqualByComparingTo("160.00");
     }
 }

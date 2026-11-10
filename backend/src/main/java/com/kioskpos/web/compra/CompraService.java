@@ -178,6 +178,16 @@ public class CompraService {
                 .divide(sp.add(cantidad), 2, RoundingMode.HALF_UP);
     }
 
+    /** Inverso de {@link #costoPromedio}: el costo que tenía el producto antes de esa compra. */
+    public static BigDecimal costoSinCompra(BigDecimal stock, BigDecimal costo, BigDecimal cantidad, BigDecimal costoCompra) {
+        BigDecimal resto = stock.subtract(cantidad);
+        if (resto.signum() <= 0) {
+            return costo; // no quedó nada de antes: el costo actual es el único dato
+        }
+        BigDecimal antes = stock.multiply(costo).subtract(cantidad.multiply(costoCompra)).divide(resto, 2, RoundingMode.HALF_UP);
+        return antes.signum() > 0 ? antes : costo;
+    }
+
     @Transactional(readOnly = true)
     public List<CompraVista> listar(Long proveedorId) {
         Map<Long, String> nombres = new HashMap<>();
@@ -221,6 +231,8 @@ public class CompraService {
                 throw new IllegalStateException("Ya se vendió parte de \"" + p.getNombre()
                         + "\": no hay stock suficiente para anular la compra. Ajusta el inventario a mano.");
             }
+            // Deshace el promedio: costo antes = (stock × costo − cantidad × costo de compra) / (stock − cantidad).
+            productos.fijarCosto(p.getId(), costoSinCompra(p.getStockActual(), p.getCostoUsd(), d.getCantidad(), d.getCostoUnitarioUsd()));
             inventario.registrarMovimiento(p, "ANULA_COMPRA", d.getCantidad().negate(), p.getStockActual(),
                     p.getStockActual().subtract(d.getCantidad()), "Compra #" + id, "Compra anulada",
                     principal == null ? null : principal.usuarioId());

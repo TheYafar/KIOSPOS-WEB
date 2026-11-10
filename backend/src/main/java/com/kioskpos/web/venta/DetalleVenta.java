@@ -46,4 +46,8 @@ public class DetalleVenta {
 
     @Column(name = "subtotal_usd", nullable = false, precision = 12, scale = 2)
     private BigDecimal subtotalUsd;
+
+    /** Costo del producto AL MOMENTO de la venta (ganancia histórica). Null en ventas viejas o cobro rápido. */
+    @Column(name = "costo_unitario_usd", precision = 12, scale = 4)
+    private BigDecimal costoUnitarioUsd;
 }

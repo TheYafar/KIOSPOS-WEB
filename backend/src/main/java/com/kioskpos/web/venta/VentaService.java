@@ -144,6 +144,7 @@ public class VentaService {
         boolean enVivo = input.creadoAt() == null
                 || Duration.between(Instant.ofEpochMilli(input.creadoAt()), Instant.now())
                         .toMinutes() < MINUTOS_VENTA_EN_COLA;
+        boolean enCola = !enVivo;
         if (enVivo) negocioRepository.findById(principal.negocioId()).ifPresent(n -> {
             BigDecimal delNegocio = tasaNegocioService.efectiva(n);
             if (!TasaNegocioService.dentroDelMargen(tasa, delNegocio)) {
@@ -183,11 +184,21 @@ public class VentaService {
                 }
                 int filas = productoRepository.descontarStock(producto.getId(), cantidad);
                 if (filas == 0) {
-                    throw new IllegalStateException("Stock insuficiente de '" + producto.getNombre() + "'");
+                    if (!enCola) {
+                        throw new IllegalStateException("Stock insuficiente de '" + producto.getNombre() + "'");
+                    }
+                    // Venta que llega de la cola sin internet: el dinero YA se cobró. Se registra
+                    // igual (el stock queda en negativo y el dueño lo ve en Inventario) en vez de
+                    // perder la venta.
+                    productoRepository.sumarStock(producto.getId(), cantidad.negate());
                 }
                 d.setProductoId(producto.getId());
                 d.setNombre(producto.getNombre());
-                d.setPrecioUnitarioUsd(producto.getPrecioUsd());
+                // En vivo manda el precio del servidor; si la venta viene de la cola, el precio
+                // con el que la caja cobró (el catálogo pudo cambiar mientras estaba sin internet).
+                d.setPrecioUnitarioUsd(enCola && item.precioUsd() != null && item.precioUsd().signum() > 0
+                        ? item.precioUsd().setScale(2, RoundingMode.HALF_UP) : producto.getPrecioUsd());
+                d.setCostoUnitarioUsd(producto.getCostoUsd());
             } else {
                 // Cobro rápido: artículo sin catálogo, cobrado por monto.
                 if (item.precioUsd() == null || item.precioUsd().signum() <= 0) {

@@ -31,6 +31,15 @@ public class NominaController {
         return service.historial(trabajadorId);
     }
 
+    @PostMapping("/pagos/{id}/anular")
+    public NominaService.PagoVista anular(@AuthenticationPrincipal KioskPrincipal p, @org.springframework.web.bind.annotation.PathVariable Long id,
+                                          @RequestBody AnularRequest req) {
+        return service.anular(p, id, req.motivo());
+    }
+
+    public record AnularRequest(String motivo) {
+    }
+
     @PostMapping("/pagos")
     public NominaService.PagoVista pagar(@AuthenticationPrincipal KioskPrincipal p, @RequestBody NominaService.NuevoPago in) {
         return service.pagar(p, in);

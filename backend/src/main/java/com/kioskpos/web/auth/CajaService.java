@@ -16,13 +16,16 @@ public class CajaService {
     private final CajaRepository cajaRepository;
     private final CajaTokenRepository cajaTokenRepository;
     private final LocalRepository localRepository;
+    private final com.kioskpos.web.negocio.NegocioRepository negocioRepository;
 
     public CajaService(CajaRepository cajaRepository,
                        CajaTokenRepository cajaTokenRepository,
-                       LocalRepository localRepository) {
+                       LocalRepository localRepository,
+                       com.kioskpos.web.negocio.NegocioRepository negocioRepository) {
         this.cajaRepository = cajaRepository;
         this.cajaTokenRepository = cajaTokenRepository;
         this.localRepository = localRepository;
+        this.negocioRepository = negocioRepository;
     }
 
     @Transactional
@@ -31,6 +34,13 @@ public class CajaService {
             throw new IllegalArgumentException("El nombre de la caja es obligatorio");
         }
         Long negocioId = NegocioContext.require();
+        // El plan incluye un número de cajas: no se pueden registrar más de las contratadas.
+        int contratadas = negocioRepository.findById(negocioId).map(n -> n.getCajasContratadas() == null ? 1 : n.getCajasContratadas()).orElse(1);
+        long activas = cajaRepository.findByActivaTrue().size();
+        if (activas >= contratadas) {
+            throw new IllegalStateException("Tu plan incluye " + contratadas + (contratadas == 1 ? " caja" : " cajas")
+                    + " y ya las tienes. Para agregar otra, pide ampliar el plan (o desactiva una que no uses).");
+        }
         Long localDestino = localId != null ? localId : localPorDefecto(negocioId);
 
         Caja caja = new Caja();

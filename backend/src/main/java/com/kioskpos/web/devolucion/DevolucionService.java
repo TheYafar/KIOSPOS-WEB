@@ -213,9 +213,7 @@ public class DevolucionService {
         BigDecimal tasaVenta = v.getTasaBcv();
         List<RepartoReembolso.Parte> partes;
         switch (metodo) {
-            case "COMO_PAGO" -> partes = RepartoReembolso.repartir(
-                    v.getPagos().stream().map(p -> new RepartoReembolso.Pago(p.getMetodo().name(), p.getMoneda().name(), p.getMontoOriginal())).toList(),
-                    v.getVueltoUsd(), v.getVueltoBs(), tasaVenta, v.getTotalUsd(), total);
+            case "COMO_PAGO" -> partes = repartoComoPago(v, total, cantidades, yaDevuelto);
             case "EFECTIVO_USD" -> partes = List.of(new RepartoReembolso.Parte("EFECTIVO_USD", "USD", total));
             case "EFECTIVO_BS", "PAGO_MOVIL", "PUNTO", "BIOPAGO" -> partes = List.of(new RepartoReembolso.Parte(metodo, "VES",
                     total.multiply(tasaVenta).setScale(2, RoundingMode.HALF_UP))); // a la tasa de la venta: recibe lo que pagó
@@ -304,6 +302,34 @@ public class DevolucionService {
             reponer(d.getProductoId(), e.getValue(), "DEVOLUCION", "Venta #" + v.getNumeroFactura(), "Devolución de cliente", usuario);
         }
         return new DevolucionHecha(dev, reembolsos.findByDevolucionIdIn(List.of(dev.getId())));
+    }
+
+    /**
+     * "Como pagó" en proporción. Si con esta devolución se devuelve TODO lo que quedaba y
+     * las anteriores también fueron "como pagó", se devuelve exactamente lo que falta de
+     * cada forma (sin céntimos de más o de menos por redondeos de las veces anteriores).
+     */
+    private List<RepartoReembolso.Parte> repartoComoPago(Venta v, BigDecimal total, Map<DetalleVenta, BigDecimal> ahora,
+                                                         Map<Long, BigDecimal> yaDevuelto) {
+        List<RepartoReembolso.Pago> pagos = v.getPagos().stream()
+                .map(p -> new RepartoReembolso.Pago(p.getMetodo().name(), p.getMoneda().name(), p.getMontoOriginal())).toList();
+        boolean quedaTodoDevuelto = v.getDetalles().stream().allMatch(d ->
+                yaDevuelto.getOrDefault(d.getId(), BigDecimal.ZERO).add(ahora.getOrDefault(d, BigDecimal.ZERO)).compareTo(d.getCantidad()) >= 0);
+        List<Devolucion> previas = devoluciones.findByVentaIdOrderByIdAsc(v.getId());
+        if (!quedaTodoDevuelto || previas.isEmpty() || !previas.stream().allMatch(d -> "COMO_PAGO".equals(d.getMetodoReembolso()))) {
+            return RepartoReembolso.repartir(pagos, v.getVueltoUsd(), v.getVueltoBs(), v.getTasaBcv(), v.getTotalUsd(), total);
+        }
+        Map<String, BigDecimal> yaPagado = new HashMap<>();
+        for (DevolucionReembolso r : reembolsos.findByDevolucionIdIn(previas.stream().map(Devolucion::getId).toList())) {
+            yaPagado.merge(r.getMetodo() + ":" + r.getMoneda(), r.getMonto(), BigDecimal::add);
+        }
+        BigDecimal devueltoAntes = previas.stream().map(Devolucion::getTotalUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
+        return RepartoReembolso.repartir(pagos, v.getVueltoUsd(), v.getVueltoBs(), v.getTasaBcv(), v.getTotalUsd(), devueltoAntes.add(total))
+                .stream()
+                .map(p -> new RepartoReembolso.Parte(p.metodo(), p.moneda(),
+                        p.monto().subtract(yaPagado.getOrDefault(p.metodo() + ":" + p.moneda(), BigDecimal.ZERO))))
+                .filter(p -> p.monto().signum() > 0)
+                .toList();
     }
 
     private void reponer(Long productoId, BigDecimal cantidad, String tipo, String ref, String desc, Long usuario) {

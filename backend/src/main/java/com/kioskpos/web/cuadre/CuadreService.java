@@ -114,7 +114,7 @@ public class CuadreService {
         return new Resumen(turno.getId(), turno.getEstado(), r.fondoUsd(), r.fondoBs(),
                 r.efectivoUsd(), r.efectivoBs(), r.vueltoUsd(), r.vueltoBs(),
                 r.esperadoUsd(), r.esperadoBs(), dUsd, dBs, difUsd, difBs, r.metodos(), r.movimientos(),
-                r.fiadoUsd(), r.comisionAvancesBs());
+                r.fiadoUsd(), r.comisionAvancesBs(), turno.getFechaApertura());
     }
 
     private Resumen calcular(Turno turno) {
@@ -254,7 +254,8 @@ public class CuadreService {
                 efectivoUsd.setScale(2, RoundingMode.HALF_UP), efectivoBs.setScale(2, RoundingMode.HALF_UP),
                 vueltoUsd.setScale(2, RoundingMode.HALF_UP), vueltoBs.setScale(2, RoundingMode.HALF_UP),
                 esperadoUsd, esperadoBs, null, null, null, null, metodos, mov.lineas(),
-                fiadoUsd.setScale(2, RoundingMode.HALF_UP), comisionAvancesBs.setScale(2, RoundingMode.HALF_UP));
+                fiadoUsd.setScale(2, RoundingMode.HALF_UP), comisionAvancesBs.setScale(2, RoundingMode.HALF_UP),
+                turno.getFechaApertura());
     }
 
     /** Suma movimientos por tipo y moneda. GASTO/RETIRO/AVANCE salen; INGRESO/ABONO entran. */
@@ -315,7 +316,8 @@ public class CuadreService {
                           List<MetodoLinea> metodos,
                           List<MovLinea> movimientos,
                           BigDecimal fiadoUsd,
-                          BigDecimal comisionAvancesBs) {
+                          BigDecimal comisionAvancesBs,
+                          Instant fechaApertura) {
     }
 
     /** Total de movimientos de un tipo en una moneda (GASTO, RETIRO, INGRESO, AVANCE, ABONO, DEVOLUCION). */

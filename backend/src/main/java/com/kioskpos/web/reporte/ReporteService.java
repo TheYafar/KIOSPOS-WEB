@@ -68,7 +68,14 @@ public class ReporteService {
         if (costo == null) {
             costo = BigDecimal.ZERO;
         }
-        BigDecimal ganancia = totalUsd.subtract(costo);
+        // Las devoluciones del día restan lo devuelto y su costo (la mercancía volvió al stock).
+        Object[] dev = detalleVentaRepository.devueltoYCostoEntre(
+                java.time.LocalDateTime.ofInstant(desde, java.time.ZoneOffset.UTC),
+                java.time.LocalDateTime.ofInstant(hasta, java.time.ZoneOffset.UTC)).get(0);
+        BigDecimal devueltoUsd = dec(dev[0]);
+        BigDecimal costoDevuelto = dec(dev[1]);
+        costo = costo.subtract(costoDevuelto).max(BigDecimal.ZERO);
+        BigDecimal ganancia = totalUsd.subtract(devueltoUsd).subtract(costo);
 
         List<DesglosePago> desglose = new ArrayList<>();
         for (Object[] fila : pagoVentaRepository.desgloseEntre(desde, hasta)) {
@@ -90,12 +97,8 @@ public class ReporteService {
                 MovimientoCliente.Tipo.ABONO.name(), desde, hasta).stream()
                 .map(MovimientoCliente::getMontoUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Devoluciones del día: restan de lo vendido (la mercancía volvió al stock).
-        BigDecimal devuelto = devolucionRepository.findByCreatedAtGreaterThanEqualAndCreatedAtLessThan(desde, hasta).stream()
-                .map(com.kioskpos.web.devolucion.Devolucion::getTotalUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
-
         return new ResumenDia(d.toString(), cantidad, totalUsd, totalBs, costo, ganancia, desglose,
-                List.copyOf(movs.values()), comision, abonos, devuelto);
+                List.copyOf(movs.values()), comision, abonos, devueltoUsd);
     }
 
     /**

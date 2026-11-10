@@ -58,6 +58,9 @@ public class NominaService {
         Map<Long, PagoNomina> ultimo = new HashMap<>();
         Map<Long, BigDecimal> mes = new HashMap<>();
         for (PagoNomina p : pagos.findTop300ByOrderByCreatedAtDescIdDesc()) {
+            if (!"PAGADO".equals(p.getEstado())) {
+                continue;
+            }
             ultimo.putIfAbsent(p.getTrabajadorId(), p);
             if (!p.getCreatedAt().isBefore(inicioMes)) {
                 mes.merge(p.getTrabajadorId(), p.getNetoUsd(), BigDecimal::add);
@@ -134,6 +137,28 @@ public class NominaService {
         p.setNota(recortar(in.nota(), 200));
         p.setUsuarioId(principal == null ? null : principal.usuarioId());
         return new PagoVista(pagos.save(p), t.nombre());
+    }
+
+    /**
+     * Anula un pago mal hecho: queda en el historial como ANULADO y lo que se le había
+     * descontado de fiado vuelve a su cuenta (cargo). No toca ninguna caja.
+     */
+    @Transactional
+    public PagoVista anular(KioskPrincipal principal, Long pagoId, String motivo) {
+        PagoNomina p = pagos.findById(pagoId).orElseThrow(() -> new IllegalArgumentException("Pago no encontrado"));
+        if (!"PAGADO".equals(p.getEstado())) {
+            throw new IllegalStateException("Ese pago ya está anulado");
+        }
+        if (motivo == null || motivo.isBlank()) {
+            throw new IllegalArgumentException("Escribe por qué se anula");
+        }
+        if (p.getFiadoDescontadoUsd().signum() > 0) {
+            clientes.reponerDeuda(principal, p.getTrabajadorId(), p.getFiadoDescontadoUsd(), "Pago de nómina anulado: " + p.getPeriodo());
+        }
+        p.setEstado("ANULADO");
+        p.setMotivoAnulacion(recortar(motivo, 200));
+        String nombre = clientes.detalle(p.getTrabajadorId()).cliente().nombre();
+        return new PagoVista(pagos.save(p), nombre);
     }
 
     @Transactional(readOnly = true)

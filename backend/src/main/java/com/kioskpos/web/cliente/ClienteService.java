@@ -106,12 +106,12 @@ public class ClienteService {
     }
 
     /** Antes de cobrar fiado: cliente activo y sin pasar su límite. */
-    @Transactional(readOnly = true)
+    @Transactional
     public Cliente validarFiado(Long clienteId, BigDecimal montoUsd) {
         if (clienteId == null) {
             throw new IllegalArgumentException("Para fiar hay que elegir el cliente");
         }
-        Cliente c = buscar(clienteId);
+        Cliente c = clientes.bloquear(clienteId).orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
         if (!c.isActivo()) {
             throw new IllegalArgumentException("A " + c.getNombre() + " no se le está fiando (cliente desactivado)");
         }
@@ -230,6 +230,23 @@ public class ClienteService {
         m.setMoneda("USD");
         m.setMontoOriginal(monto);
         m.setNota(recortar(nota == null || nota.isBlank() ? "Descontado del sueldo" : nota, 200));
+        return movimientos.save(m);
+    }
+
+    /** Vuelve a cargar a la cuenta lo que se había descontado (ej. un pago de nómina anulado). */
+    @Transactional
+    public MovimientoCliente reponerDeuda(KioskPrincipal principal, Long clienteId, BigDecimal montoUsd, String nota) {
+        buscar(clienteId);
+        MovimientoCliente m = new MovimientoCliente();
+        m.setNegocioId(NegocioContext.require());
+        m.setClienteId(clienteId);
+        m.setTipo(MovimientoCliente.Tipo.CARGO.name());
+        m.setMontoUsd(montoUsd.setScale(2, RoundingMode.HALF_UP));
+        m.setUsuarioId(principal == null ? null : principal.usuarioId());
+        m.setMetodo("NOMINA_ANULADA");
+        m.setMoneda("USD");
+        m.setMontoOriginal(m.getMontoUsd());
+        m.setNota(recortar(nota, 200));
         return movimientos.save(m);
     }
 
