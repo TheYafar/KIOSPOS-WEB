@@ -254,6 +254,18 @@ public class VentaService {
     }
 
     @Transactional(readOnly = true)
+    public List<Venta> buscarPorNumero(KioskPrincipal principal, Integer numero) {
+        if (numero == null) {
+            return List.of();
+        }
+        List<Venta> l = ventaRepository.findByNumeroFacturaOrderByFechaHoraDesc(numero).stream()
+                .filter(v -> principal.cajaId() == null || principal.cajaId().equals(v.getCajaId()))
+                .toList();
+        l.forEach(v -> { v.getDetalles().size(); v.getPagos().size(); });
+        return l;
+    }
+
+    @Transactional(readOnly = true)
     public List<Venta> ventasDeCaja(Long cajaId) {
         return ventaRepository.findByCajaIdOrderByFechaHoraDesc(cajaId);
     }

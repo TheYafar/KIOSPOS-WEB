@@ -38,7 +38,10 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class DevolucionService {
 
-    private static final Set<String> METODOS = Set.of("EFECTIVO_USD", "EFECTIVO_BS", "A_CUENTA", "FUERA_DE_CAJA");
+    private static final Set<String> METODOS = Set.of("COMO_PAGO", "EFECTIVO_USD", "EFECTIVO_BS", "PAGO_MOVIL", "PUNTO",
+            "BIOPAGO", "A_CUENTA", "FUERA_DE_CAJA");
+    /** Formas de reembolso que salen de la caja (efectivo de la gaveta o lo que reporta el banco del turno). */
+    private static final Set<String> DE_CAJA = Set.of("EFECTIVO_USD", "EFECTIVO_BS", "PAGO_MOVIL", "PUNTO", "BIOPAGO", "OTRO");
 
     private final VentaRepository ventas;
     private final TurnoRepository turnos;
@@ -48,10 +51,13 @@ public class DevolucionService {
     private final CuadreService cuadre;
     private final DevolucionRepository devoluciones;
     private final DevolucionDetalleRepository detalles;
+    private final DevolucionReembolsoRepository reembolsos;
 
     public DevolucionService(VentaRepository ventas, TurnoRepository turnos, ProductoRepository productos,
                              InventarioService inventario, ClienteService clientes, CuadreService cuadre,
-                             DevolucionRepository devoluciones, DevolucionDetalleRepository detalles) {
+                             DevolucionRepository devoluciones, DevolucionDetalleRepository detalles,
+                             DevolucionReembolsoRepository reembolsos) {
+        this.reembolsos = reembolsos;
         this.ventas = ventas;
         this.turnos = turnos;
         this.productos = productos;
@@ -65,7 +71,14 @@ public class DevolucionService {
     public record ItemDevolucion(Long detalleId, BigDecimal cantidad) {
     }
 
-    public record NuevaDevolucion(List<ItemDevolucion> items, String metodoReembolso, String motivo) {
+    /** metodoReembolso: COMO_PAGO (igual que pagó, repartido), un método, A_CUENTA o FUERA_DE_CAJA. */
+    public record NuevaDevolucion(List<ItemDevolucion> items, String metodoReembolso, String motivo, String referencia) {
+        public NuevaDevolucion(List<ItemDevolucion> items, String metodoReembolso, String motivo) {
+            this(items, metodoReembolso, motivo, null);
+        }
+    }
+
+    public record DevolucionHecha(Devolucion devolucion, List<DevolucionReembolso> reembolsos) {
     }
 
     public record LineaVenta(Long detalleId, Long productoId, String nombre, BigDecimal cantidad,
@@ -79,7 +92,7 @@ public class DevolucionService {
                                     Long turnoId, boolean turnoAbierto, BigDecimal tasa, BigDecimal totalUsd,
                                     BigDecimal totalBs, BigDecimal vueltoUsd, BigDecimal vueltoBs, Long clienteId,
                                     String motivoAnulacion, List<LineaVenta> lineas, List<PagoLinea> pagos,
-                                    List<Devolucion> devoluciones, BigDecimal devueltoUsd) {
+                                    List<DevolucionHecha> devoluciones, BigDecimal devueltoUsd) {
     }
 
     @Transactional(readOnly = true)
@@ -87,6 +100,12 @@ public class DevolucionService {
         Venta v = cargar(ventaId);
         Map<Long, BigDecimal> devuelto = devueltoPorLinea(ventaId);
         List<Devolucion> devs = devoluciones.findByVentaIdOrderByIdAsc(ventaId);
+        Map<Long, List<DevolucionReembolso>> partes = new HashMap<>();
+        if (!devs.isEmpty()) {
+            for (DevolucionReembolso r : reembolsos.findByDevolucionIdIn(devs.stream().map(Devolucion::getId).toList())) {
+                partes.computeIfAbsent(r.getDevolucionId(), k -> new java.util.ArrayList<>()).add(r);
+            }
+        }
         boolean abierto = v.getTurnoId() != null && turnos.findById(v.getTurnoId())
                 .map(t -> Turno.Estado.ABIERTO.name().equals(t.getEstado())).orElse(false);
         return new DetalleVentaVista(v.getId(), v.getNumeroFactura(), v.getFechaHora(), v.getEstado(), v.getCajaId(),
@@ -96,7 +115,8 @@ public class DevolucionService {
                         d.getPrecioUnitarioUsd(), d.getSubtotalUsd(), devuelto.getOrDefault(d.getId(), BigDecimal.ZERO))).toList(),
                 v.getPagos().stream().map(p -> new PagoLinea(p.getMetodo().name(), p.getMoneda().name(), p.getMontoOriginal(),
                         p.getReferencia())).toList(),
-                devs, devs.stream().map(Devolucion::getTotalUsd).reduce(BigDecimal.ZERO, BigDecimal::add));
+                devs.stream().map(d -> new DevolucionHecha(d, partes.getOrDefault(d.getId(), List.of()))).toList(),
+                devs.stream().map(Devolucion::getTotalUsd).reduce(BigDecimal.ZERO, BigDecimal::add));
     }
 
     /** Lo ya devuelto de cada venta (para la lista de ventas). */
@@ -146,7 +166,7 @@ public class DevolucionService {
     }
 
     @Transactional
-    public Devolucion devolver(KioskPrincipal principal, Long ventaId, NuevaDevolucion in) {
+    public DevolucionHecha devolver(KioskPrincipal principal, Long ventaId, NuevaDevolucion in) {
         Venta v = cargar(ventaId);
         if (!"COMPLETADA".equals(v.getEstado())) {
             throw new IllegalStateException("No se puede devolver una venta anulada");
@@ -189,55 +209,87 @@ public class DevolucionService {
             throw new IllegalArgumentException("Elige qué productos devuelve");
         }
 
+        // ¿Cómo se devuelve el dinero? Se arma la lista de partes del reembolso.
+        BigDecimal tasaVenta = v.getTasaBcv();
+        List<RepartoReembolso.Parte> partes;
+        switch (metodo) {
+            case "COMO_PAGO" -> partes = RepartoReembolso.repartir(
+                    v.getPagos().stream().map(p -> new RepartoReembolso.Pago(p.getMetodo().name(), p.getMoneda().name(), p.getMontoOriginal())).toList(),
+                    v.getVueltoUsd(), v.getVueltoBs(), tasaVenta, v.getTotalUsd(), total);
+            case "EFECTIVO_USD" -> partes = List.of(new RepartoReembolso.Parte("EFECTIVO_USD", "USD", total));
+            case "EFECTIVO_BS", "PAGO_MOVIL", "PUNTO", "BIOPAGO" -> partes = List.of(new RepartoReembolso.Parte(metodo, "VES",
+                    total.multiply(tasaVenta).setScale(2, RoundingMode.HALF_UP))); // a la tasa de la venta: recibe lo que pagó
+            case "A_CUENTA" -> {
+                if (v.getClienteId() == null) {
+                    throw new IllegalArgumentException("Esa venta no fue fiada: devuelve como pagó o en efectivo");
+                }
+                partes = List.of(new RepartoReembolso.Parte("A_CUENTA", "USD", total));
+            }
+            default -> { // FUERA_DE_CAJA
+                if (principal == null || !(principal.rol() == RolUsuario.DUENO || principal.rol() == RolUsuario.ENCARGADO)) {
+                    throw new IllegalArgumentException("Solo el dueño o el encargado registra devoluciones fuera de caja");
+                }
+                partes = List.of(new RepartoReembolso.Parte("FUERA_DE_CAJA", "USD", total));
+            }
+        }
+        if (partes.isEmpty()) {
+            throw new IllegalArgumentException("No hay nada que reembolsar");
+        }
+
+        // Lo que sale de la caja exige el turno abierto de ESTA caja (y efectivo suficiente).
+        Long turnoId = null;
+        if (partes.stream().anyMatch(p -> DE_CAJA.contains(p.metodo()))) {
+            if (principal == null || principal.cajaId() == null) {
+                throw new IllegalArgumentException("Para devolver dinero hazlo desde una caja abierta");
+            }
+            Turno t = turnos.findFirstByCajaIdAndEstado(principal.cajaId(), Turno.Estado.ABIERTO.name())
+                    .orElseThrow(() -> new IllegalStateException("La caja está cerrada. Ábrela para devolver dinero."));
+            var r = cuadre.resumen(t.getId());
+            for (RepartoReembolso.Parte p : partes) {
+                BigDecimal hay = "EFECTIVO_USD".equals(p.metodo()) ? r.esperadoUsd() : "EFECTIVO_BS".equals(p.metodo()) ? r.esperadoBs() : null;
+                if (hay != null && p.monto().compareTo(hay) > 0) {
+                    throw new IllegalArgumentException("No hay suficiente efectivo en " + ("USD".equals(p.moneda()) ? "dólares" : "bolívares")
+                            + " en la caja para devolver (hay " + hay.toPlainString() + ")");
+                }
+            }
+            turnoId = t.getId();
+        }
+        // Lo fiado vuelve a la cuenta del cliente.
+        for (RepartoReembolso.Parte p : partes) {
+            if ("A_CUENTA".equals(p.metodo())) {
+                if (v.getClienteId() == null) {
+                    throw new IllegalArgumentException("Esa venta no tiene cliente");
+                }
+                if (clientes.saldoDe(v.getClienteId()).compareTo(p.monto()) < 0 && "A_CUENTA".equals(metodo)) {
+                    throw new IllegalArgumentException("El cliente debe menos de lo que se devuelve: devuelve como pagó o en efectivo");
+                }
+                clientes.descontarPorVenta(v.getClienteId(), p.monto(), v.getId(), "DEVOLUCION", usuario);
+            }
+        }
+
         Devolucion dev = new Devolucion();
         dev.setNegocioId(negocioId);
         dev.setVentaId(v.getId());
         dev.setUsuarioId(usuario);
         dev.setTotalUsd(total);
         dev.setMetodoReembolso(metodo);
-        dev.setTasa(v.getTasaBcv());
+        dev.setTasa(tasaVenta);
+        dev.setTurnoId(turnoId);
+        dev.setCajaId(turnoId == null ? null : principal.cajaId());
+        dev.setMontoReembolso(partes.size() == 1 ? partes.get(0).monto() : total);
         dev.setMotivo(in.motivo() == null ? null : in.motivo().trim().length() > 200 ? in.motivo().trim().substring(0, 200) : in.motivo().trim());
-
-        switch (metodo) {
-            case "EFECTIVO_USD", "EFECTIVO_BS" -> {
-                if (principal == null || principal.cajaId() == null) {
-                    throw new IllegalArgumentException("El reembolso en efectivo se hace desde una caja");
-                }
-                Turno t = turnos.findFirstByCajaIdAndEstado(principal.cajaId(), Turno.Estado.ABIERTO.name())
-                        .orElseThrow(() -> new IllegalStateException("La caja está cerrada. Ábrela para devolver efectivo."));
-                // Se devuelve a la tasa de la venta: el cliente recibe lo mismo que pagó.
-                BigDecimal monto = "EFECTIVO_USD".equals(metodo) ? total
-                        : total.multiply(v.getTasaBcv()).setScale(2, RoundingMode.HALF_UP);
-                var r = cuadre.resumen(t.getId());
-                BigDecimal hay = "EFECTIVO_USD".equals(metodo) ? r.esperadoUsd() : r.esperadoBs();
-                if (monto.compareTo(hay) > 0) {
-                    throw new IllegalArgumentException("No hay suficiente efectivo en la caja para devolver (hay "
-                            + hay.toPlainString() + ")");
-                }
-                dev.setTurnoId(t.getId());
-                dev.setCajaId(principal.cajaId());
-                dev.setMontoReembolso(monto);
-            }
-            case "A_CUENTA" -> {
-                if (v.getClienteId() == null) {
-                    throw new IllegalArgumentException("Esa venta no fue fiada: devuelve en efectivo");
-                }
-                BigDecimal saldo = clientes.saldoDe(v.getClienteId());
-                if (saldo.compareTo(total) < 0) {
-                    throw new IllegalArgumentException("El cliente debe menos ($" + saldo.setScale(2, RoundingMode.HALF_UP)
-                            + ") de lo que se devuelve: devuelve la diferencia en efectivo");
-                }
-                clientes.descontarPorVenta(v.getClienteId(), total, v.getId(), "DEVOLUCION", usuario);
-                dev.setMontoReembolso(total);
-            }
-            default -> { // FUERA_DE_CAJA
-                if (principal == null || !(principal.rol() == RolUsuario.DUENO || principal.rol() == RolUsuario.ENCARGADO)) {
-                    throw new IllegalArgumentException("Solo el dueño o el encargado registra devoluciones fuera de caja");
-                }
-                dev.setMontoReembolso(total);
-            }
-        }
         dev = devoluciones.save(dev);
+        String ref = in.referencia() == null || in.referencia().isBlank() ? null : in.referencia().trim();
+        for (RepartoReembolso.Parte p : partes) {
+            DevolucionReembolso rr = new DevolucionReembolso();
+            rr.setNegocioId(negocioId);
+            rr.setDevolucionId(dev.getId());
+            rr.setMetodo(p.metodo());
+            rr.setMoneda(p.moneda());
+            rr.setMonto(p.monto());
+            rr.setReferencia("PAGO_MOVIL".equals(p.metodo()) && ref != null ? (ref.length() > 100 ? ref.substring(0, 100) : ref) : null);
+            reembolsos.save(rr);
+        }
 
         for (Map.Entry<DetalleVenta, BigDecimal> e : cantidades.entrySet()) {
             DetalleVenta d = e.getKey();
@@ -251,7 +303,7 @@ public class DevolucionService {
             detalles.save(dd);
             reponer(d.getProductoId(), e.getValue(), "DEVOLUCION", "Venta #" + v.getNumeroFactura(), "Devolución de cliente", usuario);
         }
-        return dev;
+        return new DevolucionHecha(dev, reembolsos.findByDevolucionIdIn(List.of(dev.getId())));
     }
 
     private void reponer(Long productoId, BigDecimal cantidad, String tipo, String ref, String desc, Long usuario) {

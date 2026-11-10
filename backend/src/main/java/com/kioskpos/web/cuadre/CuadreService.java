@@ -36,12 +36,15 @@ public class CuadreService {
     private final MovimientoCajaRepository movimientoCajaRepository;
     private final MovimientoClienteRepository movimientoClienteRepository;
     private final com.kioskpos.web.devolucion.DevolucionRepository devolucionRepository;
+    private final com.kioskpos.web.devolucion.DevolucionReembolsoRepository devolucionReembolsoRepository;
 
     public CuadreService(TurnoRepository turnoRepository, VentaRepository ventaRepository,
                          MovimientoCajaRepository movimientoCajaRepository,
                          MovimientoClienteRepository movimientoClienteRepository,
-                         com.kioskpos.web.devolucion.DevolucionRepository devolucionRepository) {
+                         com.kioskpos.web.devolucion.DevolucionRepository devolucionRepository,
+                         com.kioskpos.web.devolucion.DevolucionReembolsoRepository devolucionReembolsoRepository) {
         this.devolucionRepository = devolucionRepository;
+        this.devolucionReembolsoRepository = devolucionReembolsoRepository;
         this.turnoRepository = turnoRepository;
         this.ventaRepository = ventaRepository;
         this.movimientoCajaRepository = movimientoCajaRepository;
@@ -184,12 +187,44 @@ public class CuadreService {
             }
         }
 
-        // Devoluciones reembolsadas en efectivo desde esta gaveta.
-        for (var dv : devolucionRepository.findByTurnoId(turno.getId())) {
-            if ("EFECTIVO_USD".equals(dv.getMetodoReembolso())) {
-                mov.sumar("DEVOLUCION", "USD", dv.getMontoReembolso());
-            } else if ("EFECTIVO_BS".equals(dv.getMetodoReembolso())) {
-                mov.sumar("DEVOLUCION", "VES", dv.getMontoReembolso());
+        // Devoluciones de este turno: cada parte del reembolso sale de su forma de pago
+        // (efectivo de la gaveta, o lo cobrado por punto / pago móvil / biopago / otras).
+        var devs = devolucionRepository.findByTurnoId(turno.getId());
+        java.util.Map<Long, List<com.kioskpos.web.devolucion.DevolucionReembolso>> partes = new java.util.HashMap<>();
+        if (!devs.isEmpty()) {
+            for (var rr : devolucionReembolsoRepository.findByDevolucionIdIn(devs.stream().map(d -> d.getId()).toList())) {
+                partes.computeIfAbsent(rr.getDevolucionId(), k -> new ArrayList<>()).add(rr);
+            }
+        }
+        for (var dv : devs) {
+            List<com.kioskpos.web.devolucion.DevolucionReembolso> ps = partes.get(dv.getId());
+            if (ps == null) { // devoluciones viejas (antes del reparto): solo efectivo
+                ps = new ArrayList<>();
+                if ("EFECTIVO_USD".equals(dv.getMetodoReembolso()) || "EFECTIVO_BS".equals(dv.getMetodoReembolso())) {
+                    var rr = new com.kioskpos.web.devolucion.DevolucionReembolso();
+                    rr.setMetodo(dv.getMetodoReembolso());
+                    rr.setMoneda("EFECTIVO_USD".equals(dv.getMetodoReembolso()) ? "USD" : "VES");
+                    rr.setMonto(dv.getMontoReembolso());
+                    ps.add(rr);
+                }
+            }
+            for (var rr : ps) {
+                BigDecimal m = rr.getMonto();
+                switch (rr.getMetodo()) {
+                    case "EFECTIVO_USD" -> mov.sumar("DEVOLUCION", "USD", m);
+                    case "EFECTIVO_BS" -> mov.sumar("DEVOLUCION", "VES", m);
+                    case "PUNTO" -> puntoBs = puntoBs.subtract(m);
+                    case "PAGO_MOVIL" -> pagoMovilBs = pagoMovilBs.subtract(m);
+                    case "BIOPAGO" -> biopagoBs = biopagoBs.subtract(m);
+                    case "OTRO" -> {
+                        if ("USD".equals(rr.getMoneda())) {
+                            otrosUsd = otrosUsd.subtract(m);
+                        } else {
+                            otrosBs = otrosBs.subtract(m);
+                        }
+                    }
+                    default -> { /* A_CUENTA / FUERA_DE_CAJA: no toca la caja */ }
+                }
             }
         }
 

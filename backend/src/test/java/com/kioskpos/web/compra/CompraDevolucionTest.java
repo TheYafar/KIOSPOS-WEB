@@ -171,7 +171,7 @@ class CompraDevolucionTest extends PostgresRlsTestBase {
 
         var d = en(m.negocioId(), () -> devolucionService.devolver(m.caja(), v.getId(), new DevolucionService.NuevaDevolucion(
                 List.of(new DevolucionService.ItemDevolucion(lineaId, BigDecimal.ONE)), "EFECTIVO_USD", "Vencido")));
-        assertThat(d.getMontoReembolso()).isEqualByComparingTo("2.00");
+        assertThat(d.devolucion().getMontoReembolso()).isEqualByComparingTo("2.00");
         assertThat(producto(m).getStockActual()).isEqualByComparingTo("8"); // 10 − 3 + 1
 
         var r = en(m.negocioId(), () -> cuadreService.resumen(m.turnoId()));
@@ -201,5 +201,27 @@ class CompraDevolucionTest extends PostgresRlsTestBase {
         assertThat(en(m.negocioId(), () -> clienteService.saldoDe(cli.id()))).isEqualByComparingTo("4.00");
         en(m.negocioId(), () -> devolucionService.anular(m.caja(), v.getId(), "No se llevó nada"));
         assertThat(en(m.negocioId(), () -> clienteService.saldoDe(cli.id()))).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void devolverComoPagoRegresaCadaFormaYBajaLaBarraDelTurno() {
+        M m = montar("comopago@ejemplo.com");
+        // 3 × $2 = $6: $3 en efectivo + Bs 120 por pago móvil (tasa 40 → $3).
+        var item = new VentaService.ItemInput(m.productoId(), new BigDecimal("3"), null, null);
+        Venta v = en(m.negocioId(), () -> ventaService.registrar(m.caja(), m.permiso(), new VentaService.VentaInput("CP-1",
+                new BigDecimal("40"), List.of(item), List.of(usd("3.00"),
+                new VentaService.PagoInput(MetodoPago.PAGO_MOVIL, Moneda.VES, new BigDecimal("120.00"), "1234")))));
+        Long linea = en(m.negocioId(), () -> devolucionService.detalle(v.getId())).lineas().get(0).detalleId();
+
+        var antes = en(m.negocioId(), () -> cuadreService.resumen(m.turnoId()));
+        var h = en(m.negocioId(), () -> devolucionService.devolver(m.caja(), v.getId(), new DevolucionService.NuevaDevolucion(
+                List.of(new DevolucionService.ItemDevolucion(linea, new BigDecimal("3"))), "COMO_PAGO", "Devuelve todo", "5678")));
+        assertThat(h.reembolsos()).hasSize(2);
+        var r = en(m.negocioId(), () -> cuadreService.resumen(m.turnoId()));
+        assertThat(r.esperadoUsd()).isEqualByComparingTo(antes.esperadoUsd().subtract(new BigDecimal("3")));
+        BigDecimal pm = r.metodos().stream().filter(x -> x.metodo().equals("PAGO_MOVIL")).findFirst().orElseThrow().esperado();
+        assertThat(pm).isEqualByComparingTo("0");
+        assertThat(producto(m).getStockActual()).isEqualByComparingTo("10"); // todo volvió
+        assertThat(en(m.negocioId(), () -> devolucionService.detalle(v.getId())).devoluciones().get(0).reembolsos()).hasSize(2);
     }
 }

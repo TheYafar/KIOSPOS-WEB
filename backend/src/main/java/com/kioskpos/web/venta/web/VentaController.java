@@ -81,6 +81,15 @@ public class VentaController {
         return l.stream().map(v -> VentaLista.de(v, dev.getOrDefault(v.getId(), BigDecimal.ZERO))).toList();
     }
 
+    /** Historial: buscar una venta por su número de factura (en la caja de la sesión, o en todas si es el dueño). */
+    @GetMapping("/buscar")
+    public List<VentaLista> buscar(@AuthenticationPrincipal KioskPrincipal principal,
+                                   @org.springframework.web.bind.annotation.RequestParam Integer numero) {
+        List<Venta> l = ventaService.buscarPorNumero(principal, numero);
+        var dev = devolucionService.devueltoPorVenta(l.stream().map(Venta::getId).toList());
+        return l.stream().map(v -> VentaLista.de(v, dev.getOrDefault(v.getId(), BigDecimal.ZERO))).toList();
+    }
+
     @GetMapping("/{id}/detalle")
     public com.kioskpos.web.devolucion.DevolucionService.DetalleVentaVista detalle(@PathVariable Long id) {
         return devolucionService.detalle(id);
@@ -93,7 +102,7 @@ public class VentaController {
     }
 
     @org.springframework.web.bind.annotation.PostMapping("/{id}/devolver")
-    public com.kioskpos.web.devolucion.Devolucion devolver(@AuthenticationPrincipal KioskPrincipal principal, @PathVariable Long id,
+    public com.kioskpos.web.devolucion.DevolucionService.DevolucionHecha devolver(@AuthenticationPrincipal KioskPrincipal principal, @PathVariable Long id,
                                                            @RequestBody com.kioskpos.web.devolucion.DevolucionService.NuevaDevolucion req) {
         return devolucionService.devolver(principal, id, req);
     }
@@ -103,12 +112,14 @@ public class VentaController {
 
     /** Fila de la lista de ventas: con cómo se pagó y lo ya devuelto. */
     public record VentaLista(Long id, Integer numeroFactura, Instant fechaHora, Long cajaId, BigDecimal totalUsd,
-                             BigDecimal totalBs, String estado, Long clienteId, String pagos, int items, BigDecimal devueltoUsd) {
+                             BigDecimal totalBs, String estado, Long clienteId, String pagos, int items, BigDecimal devueltoUsd,
+                             String productos) {
         static VentaLista de(Venta v, BigDecimal devuelto) {
             String pagos = v.getPagos().stream().map(p -> p.getMetodo().name()).distinct()
                     .reduce((a, b) -> a + "," + b).orElse("");
             return new VentaLista(v.getId(), v.getNumeroFactura(), v.getFechaHora(), v.getCajaId(), v.getTotalUsd(),
-                    v.getTotalBs(), v.getEstado(), v.getClienteId(), pagos, v.getDetalles().size(), devuelto);
+                    v.getTotalBs(), v.getEstado(), v.getClienteId(), pagos, v.getDetalles().size(), devuelto,
+                    v.getDetalles().stream().map(d -> d.getNombre()).reduce((a, b) -> a + ", " + b).orElse(""));
         }
     }
 
