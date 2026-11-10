@@ -363,3 +363,17 @@ el alta/venta/login (try/catch + log).
 - **Deliverability:** para no caer en spam hay que **verificar el dominio** en Resend (registros DNS SPF/DKIM)
   y usar `no-reply@tudominio.com`; antes de eso, el remitente de prueba es `onboarding@resend.dev`.
 - **Consciente:** backend NO compilado aquí (Maven bloqueado, §9); se verifica en CI.
+
+## 16. CI + tasa/configuración controladas por el servidor
+
+- **CI** (`.github/workflows/ci.yml`): en cada push/PR corre backend (`mvn verify`, Postgres real con
+  Testcontainers) y frontend (Vitest + build + Playwright e2e con API simulada en `frontend/e2e/mock.ts`).
+  Como aquí Maven está bloqueado (§9), **el backend se verifica en CI**.
+- **Config de caja del negocio en el servidor** (V10: `negocios.metodos_pago` JSON + `tasa_modo`
+  BCV/AJUSTE/MANUAL, `tasa_ajuste_tipo` PCT/BS, `tasa_ajuste`, `tasa_manual`).
+  `GET /api/mi-negocio/caja-config` (cualquier usuario, incl. cajero) devuelve también `tasaBcv` y
+  `tasaEfectiva`; `PUT` solo dueño/encargado. La PWA guarda copia local (`kp_config`) para cobrar sin internet.
+- **La tasa la decide el servidor** (`TasaNegocioService`): una venta EN VIVO debe usar la tasa del negocio
+  ±3%; una que llega de la cola sin internet (`creadoAt` > 10 min) se acepta con su tasa (ya se cobró).
+- `TasaService` no frena ventas: refresca en segundo plano si ya hay tasa y espera 5 min tras un fallo.
+  En pruebas la URL de la BCV apunta a un puerto cerrado (sin red).

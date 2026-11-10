@@ -10,6 +10,7 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -24,7 +25,8 @@ import org.springframework.stereotype.Service;
  * - Sin dependencias extra: HttpClient del JDK + Jackson (ya viene con spring-web).
  * - A prueba de fallos: si la API no responde, se mantiene el último valor conocido.
  * - Refresco perezoso con TTL: se actualiza cuando pasó el TTL y alguien pide la tasa
- *   (la caja consulta periódicamente), sin depender de @Scheduled.
+ *   (la caja consulta periódicamente), sin depender de @Scheduled. Si ya hay una tasa,
+ *   el refresco va en segundo plano (no frena ventas); si la API falla, espera 5 min.
  */
 @Service
 public class TasaService {
@@ -40,6 +42,10 @@ public class TasaService {
     private volatile Integer tasaBs;        // redondeada hacia arriba (null hasta el primer éxito)
     private volatile Instant actualizado;   // cuándo la trajimos
     private volatile String fechaFuente;    // fechaActualizacion que reporta el BCV
+    private volatile Instant ultimoIntento; // para no martillar la API si está caída
+
+    /** Tras un intento fallido, esperar esto antes de reintentar. */
+    static final Duration ESPERA_TRAS_FALLO = Duration.ofMinutes(5);
 
     public TasaService(
             @Value("${kioskpos.tasa.url:https://ve.dolarapi.com/v1/dolares/oficial}") String url,
@@ -50,15 +56,39 @@ public class TasaService {
 
     /** Devuelve la tasa vigente (refresca si está vencida o nunca se trajo). */
     public Map<String, Object> actual() {
-        if (necesitaRefresco()) {
-            refrescar();
-        }
+        asegurarFresca();
         Map<String, Object> m = new LinkedHashMap<>();
         m.put("bs", tasaBs);
         m.put("fuente", "BCV");
         m.put("fechaFuente", fechaFuente);
         m.put("actualizado", actualizado == null ? null : actualizado.toString());
         return m;
+    }
+
+    /** Tasa BCV vigente (redondeada), o null si nunca se pudo traer. */
+    public Integer bcv() {
+        asegurarFresca();
+        return tasaBs;
+    }
+
+    /**
+     * Nunca deja esperando una venta: si ya hay tasa y solo está vieja, se refresca en
+     * segundo plano. Solo espera la primera vez (aún no hay ninguna), y si la API falló
+     * hace poco no reintenta hasta pasado ESPERA_TRAS_FALLO.
+     */
+    private void asegurarFresca() {
+        if (!necesitaRefresco()) {
+            return;
+        }
+        Instant ult = ultimoIntento;
+        if (ult != null && Duration.between(ult, Instant.now()).compareTo(ESPERA_TRAS_FALLO) < 0) {
+            return;
+        }
+        if (tasaBs == null) {
+            refrescar();
+        } else {
+            CompletableFuture.runAsync(this::refrescar);
+        }
     }
 
     private boolean necesitaRefresco() {
@@ -80,6 +110,7 @@ public class TasaService {
         if (!refrescando.compareAndSet(false, true)) {
             return; // ya hay un refresco en curso
         }
+        ultimoIntento = Instant.now();
         try {
             HttpRequest req = HttpRequest.newBuilder(URI.create(url))
                     .timeout(Duration.ofSeconds(10))

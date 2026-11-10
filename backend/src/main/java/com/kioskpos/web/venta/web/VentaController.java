@@ -50,7 +50,7 @@ public class VentaController {
                 .map(p -> new VentaService.PagoInput(p.metodo(), p.moneda(), p.montoOriginal(), p.referencia()))
                 .toList();
         Venta v = ventaService.registrar(principal, permiso,
-                new VentaService.VentaInput(req.codigoUnico(), req.tasaBcv(), items, pagos));
+                new VentaService.VentaInput(req.codigoUnico(), req.tasaBcv(), items, pagos, req.creadoAt()));
         return VentaResponse.de(v);
     }
 
@@ -78,7 +78,8 @@ public class VentaController {
     }
 
     public record RegistrarVentaRequest(String codigoUnico, @NotNull BigDecimal tasaBcv,
-                                        List<ItemRequest> items, List<PagoRequest> pagos) {
+                                        List<ItemRequest> items, List<PagoRequest> pagos,
+                                        Long creadoAt) {
     }
 
     public record VentaResponse(Long id, Integer numeroFactura, Instant fechaHora,

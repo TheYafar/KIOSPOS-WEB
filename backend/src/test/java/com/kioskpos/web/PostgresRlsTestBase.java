@@ -33,5 +33,7 @@ public abstract class PostgresRlsTestBase {
         registry.add("spring.flyway.url", POSTGRES::getJdbcUrl);
         registry.add("spring.flyway.user", POSTGRES::getUsername);
         registry.add("spring.flyway.password", POSTGRES::getPassword);
+        // Las pruebas nunca salen a internet: la API de la tasa BCV apunta a un puerto cerrado.
+        registry.add("kioskpos.tasa.url", () -> "http://127.0.0.1:9/sin-red");
     }
 }

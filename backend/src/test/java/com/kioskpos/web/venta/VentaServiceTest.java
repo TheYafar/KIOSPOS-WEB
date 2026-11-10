@@ -176,4 +176,36 @@ class VentaServiceTest extends PostgresRlsTestBase {
             NegocioContext.clear();
         }
     }
+
+    private Venta cobrarConTasa(Montado m, String codigo, String tasa, Long creadoAt) {
+        var item = new VentaService.ItemInput(m.productoId(), BigDecimal.ONE, null, null);
+        var pago = new VentaService.PagoInput(MetodoPago.EFECTIVO_USD, Moneda.USD, new BigDecimal("2.00"), null);
+        try {
+            NegocioContext.set(m.negocioId());
+            return ventaService.registrar(cajaPrincipal(m), m.permiso(),
+                    new VentaService.VentaInput(codigo, new BigDecimal(tasa), List.of(item), List.of(pago), creadoAt));
+        } finally {
+            NegocioContext.clear();
+        }
+    }
+
+    @Test
+    void laTasaLaDecideElNegocioNoLaCaja() {
+        Montado m = montar("Tasa fija", "tasa1@ejemplo.com", new BigDecimal("2.00"), new BigDecimal("10"));
+        Negocio n = negocioRepository.findById(m.negocioId()).orElseThrow();
+        n.setTasaModo("MANUAL");
+        n.setTasaManual(new BigDecimal("50.00"));
+        negocioRepository.save(n);
+
+        // La del negocio (50) y dentro del ±3% (51) se aceptan.
+        assertThat(cobrarConTasa(m, "T-1", "50", null).getTotalBs()).isEqualByComparingTo("100.00");
+        assertThat(cobrarConTasa(m, "T-2", "51", null).getId()).isNotNull();
+        // Una caja con tasa vieja/manipulada (40) se rechaza en vivo.
+        assertThatThrownBy(() -> cobrarConTasa(m, "T-3", "40", null))
+                .isInstanceOf(IllegalArgumentException.class)
+                .hasMessageContaining("no coincide con la del negocio");
+        // Pero si llega de la cola sin internet (cobrada hace 2 h), ya se cobró: se acepta.
+        long haceDosHoras = System.currentTimeMillis() - 2 * 60 * 60 * 1000L;
+        assertThat(cobrarConTasa(m, "T-4", "40", haceDosHoras).getTotalBs()).isEqualByComparingTo("80.00");
+    }
 }

@@ -3,6 +3,8 @@ package com.kioskpos.web.suscripcion;
 import com.kioskpos.web.auth.security.KioskPrincipal;
 import com.kioskpos.web.negocio.Negocio;
 import com.kioskpos.web.negocio.NegocioRepository;
+import com.kioskpos.web.tasa.TasaNegocioService;
+import com.kioskpos.web.tasa.TasaService;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -28,12 +30,17 @@ public class MiNegocioController {
     private final SuscripcionService suscripcionService;
     private final PagoRepository pagoRepository;
     private final NegocioRepository negocioRepository;
+    private final TasaService tasaService;
+    private final TasaNegocioService tasaNegocioService;
 
     public MiNegocioController(SuscripcionService suscripcionService, PagoRepository pagoRepository,
-                              NegocioRepository negocioRepository) {
+                              NegocioRepository negocioRepository, TasaService tasaService,
+                              TasaNegocioService tasaNegocioService) {
         this.suscripcionService = suscripcionService;
         this.pagoRepository = pagoRepository;
         this.negocioRepository = negocioRepository;
+        this.tasaService = tasaService;
+        this.tasaNegocioService = tasaNegocioService;
     }
 
     @GetMapping("/suscripcion")
@@ -90,5 +97,65 @@ public class MiNegocioController {
     }
 
     public record ActualizarConfigRequest(String telefono, String direccion, String horariosCierre) {
+    }
+
+    // ---------- Configuración de la caja (formas de pago + tasa) ----------
+    // Es del NEGOCIO (todas sus cajas la comparten). La lee cualquier usuario (el cajero
+    // la necesita para cobrar); la cambia solo dueño/encargado (SecurityConfig).
+
+    @GetMapping("/caja-config")
+    public CajaConfig cajaConfig(@AuthenticationPrincipal KioskPrincipal principal) {
+        return aCajaConfig(negocio(principal));
+    }
+
+    @PutMapping("/caja-config")
+    public CajaConfig actualizarCajaConfig(@AuthenticationPrincipal KioskPrincipal principal,
+                                           @RequestBody ActualizarCajaConfig req) {
+        Negocio n = negocio(principal);
+        String modo = req.tasaModo() == null ? "BCV" : req.tasaModo().trim().toUpperCase();
+        if (!List.of("BCV", "AJUSTE", "MANUAL").contains(modo)) {
+            throw new IllegalArgumentException("Modo de tasa inválido");
+        }
+        String tipo = req.ajusteTipo() == null ? "PCT" : req.ajusteTipo().trim().toUpperCase();
+        if (!List.of("PCT", "BS").contains(tipo)) {
+            throw new IllegalArgumentException("Tipo de aumento inválido");
+        }
+        BigDecimal ajuste = req.ajuste() == null ? BigDecimal.ZERO : req.ajuste();
+        BigDecimal manual = req.tasaManual() == null ? BigDecimal.ZERO : req.tasaManual();
+        if (ajuste.signum() < 0 || manual.signum() < 0) {
+            throw new IllegalArgumentException("La tasa y el aumento no pueden ser negativos");
+        }
+        if ("PCT".equals(tipo) && ajuste.compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new IllegalArgumentException("El aumento no puede pasar de 100%");
+        }
+        if (req.metodosPago() != null && req.metodosPago().length() > 20_000) {
+            throw new IllegalArgumentException("Configuración de formas de pago demasiado grande");
+        }
+        n.setTasaModo(modo);
+        n.setTasaAjusteTipo(tipo);
+        n.setTasaAjuste(ajuste);
+        n.setTasaManual(manual);
+        n.setMetodosPago(req.metodosPago());
+        negocioRepository.save(n);
+        return aCajaConfig(n);
+    }
+
+    private Negocio negocio(KioskPrincipal principal) {
+        return negocioRepository.findById(principal.negocioId())
+                .orElseThrow(() -> new IllegalArgumentException("Negocio no encontrado"));
+    }
+
+    private CajaConfig aCajaConfig(Negocio n) {
+        return new CajaConfig(n.getMetodosPago(), n.getTasaModo(), n.getTasaAjusteTipo(), n.getTasaAjuste(),
+                n.getTasaManual(), tasaService.bcv(), tasaNegocioService.efectiva(n));
+    }
+
+    /** metodosPago: JSON opaco de la PWA (qué formas están activas + monedas extra). */
+    public record CajaConfig(String metodosPago, String tasaModo, String ajusteTipo, BigDecimal ajuste,
+                             BigDecimal tasaManual, Integer tasaBcv, BigDecimal tasaEfectiva) {
+    }
+
+    public record ActualizarCajaConfig(String metodosPago, String tasaModo, String ajusteTipo,
+                                       BigDecimal ajuste, BigDecimal tasaManual) {
     }
 }

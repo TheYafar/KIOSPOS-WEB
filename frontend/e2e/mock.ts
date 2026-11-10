@@ -15,7 +15,23 @@ export const productos = [
   { id: 3, codigoBarras: "7591003", nombre: "Arroz Mary", precioUsd: 2.5, costoUsd: 1.5, stockActual: 0, stockMinimo: 2, categoria: "Víveres", esPesable: false, unidadMedida: "UND", activo: true },
 ];
 
-export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: any; cierre?: any; tasa?: number | null; }
+/** Config de caja del negocio tal como la guarda el servidor (PUT /api/mi-negocio/caja-config). */
+export interface CajaCfg { metodosPago: string | null; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number; }
+export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: any; cierre?: any; tasa?: number | null; cajaConfig?: CajaCfg; puts?: CajaCfg[]; }
+
+/** Config del servidor a partir de la de la PWA (para armar escenarios). */
+export const cfgServidor = (c: { metodos?: object; extras?: object[]; tasaModo?: string; ajusteTipo?: string; ajuste?: number; tasaManual?: number }): CajaCfg => ({
+  metodosPago: JSON.stringify({ metodos: c.metodos || {}, extras: c.extras || [] }),
+  tasaModo: (c.tasaModo || "bcv").toUpperCase(), ajusteTipo: (c.ajusteTipo || "pct").toUpperCase(), ajuste: c.ajuste || 0, tasaManual: c.tasaManual || 0,
+});
+
+/** Igual que TasaNegocioService.calcular del servidor. */
+function efectiva(c: CajaCfg, bcv: number | null): number | null {
+  if (c.tasaModo === "MANUAL") return c.tasaManual > 0 ? c.tasaManual : null;
+  if (!bcv) return null;
+  if (c.tasaModo === "AJUSTE" && c.ajuste > 0) return Math.ceil(bcv + (c.ajusteTipo === "BS" ? c.ajuste : (bcv * c.ajuste) / 100) - 1e-9);
+  return bcv;
+}
 
 export const sesionCajero = { token: "x", rol: "CAJERO", usuarioId: 3, negocioId: 1, cajaId: 1, nombre: "test2" };
 export const sesionDueno = { token: "x", rol: "DUENO", usuarioId: 1, negocioId: 1, cajaId: null, nombre: "ingri" };
@@ -41,6 +57,12 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     if (u.includes("/cerrar")) { st.cierre = JSON.parse(r.request().postData() || "{}"); st.turnoAbierto = false; return r.fulfill({ json: { ...resumen, estado: "CERRADO", declaradoUsd: st.cierre.declaradoUsd, declaradoBs: st.cierre.declaradoBs, diferenciaUsd: st.cierre.declaradoUsd - 62, diferenciaBs: st.cierre.declaradoBs - 9000 } }); }
     if (u.includes("/api/cuadre/turnos/")) return r.fulfill({ json: resumen });
     if (u.includes("/api/ventas") && m === "POST") { st.venta = JSON.parse(r.request().postData() || "{}"); return r.fulfill({ json: { id: 99, numeroFactura: 1 } }); }
+    if (u.includes("/api/mi-negocio/caja-config")) {
+      if (m === "PUT") { st.cajaConfig = JSON.parse(r.request().postData() || "{}"); (st.puts ??= []).push(st.cajaConfig!); }
+      const c = st.cajaConfig ?? { metodosPago: null, tasaModo: "BCV", ajusteTipo: "PCT", ajuste: 0, tasaManual: 0 };
+      const bcv = st.tasa === undefined ? 900 : st.tasa;
+      return r.fulfill({ json: { ...c, tasaBcv: bcv, tasaEfectiva: efectiva(c, bcv) } });
+    }
     if (u.includes("/api/mi-negocio/config")) return r.fulfill({ json: { nombre: "Bodega", telefono: null, direccion: null, cajasContratadas: 1, horariosCierre: null } });
     if (u.includes("/api/mi-negocio/suscripcion")) return r.fulfill({ json: { negocioId: 1, nombre: "Bodega", plan: "BASICO", estadoEfectivo: "ACTIVA", puedeCobrar: true, pagoHasta: "2026-12-10", diasVencido: 0, mesesPendientes: 0, deuda: 0, mensaje: "" } });
     if (/\/api\/(usuarios|cajas|reportes\/cierres|mi-negocio\/pagos|admin\/pagos-pendientes)/.test(u)) return r.fulfill({ json: [] });

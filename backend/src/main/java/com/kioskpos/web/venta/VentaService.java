@@ -3,11 +3,15 @@ package com.kioskpos.web.venta;
 import com.kioskpos.web.auth.security.KioskPrincipal;
 import com.kioskpos.web.cuadre.Turno;
 import com.kioskpos.web.cuadre.TurnoRepository;
+import com.kioskpos.web.negocio.NegocioRepository;
 import com.kioskpos.web.permiso.PermisoService;
 import com.kioskpos.web.producto.Producto;
 import com.kioskpos.web.producto.ProductoRepository;
+import com.kioskpos.web.tasa.TasaNegocioService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import org.springframework.stereotype.Service;
@@ -30,14 +34,21 @@ public class VentaService {
     private final PermisoService permisoService;
     private final TurnoRepository turnoRepository;
 
+    private final NegocioRepository negocioRepository;
+    private final TasaNegocioService tasaNegocioService;
+
     public VentaService(VentaRepository ventaRepository,
                         ProductoRepository productoRepository,
                         PermisoService permisoService,
-                        TurnoRepository turnoRepository) {
+                        TurnoRepository turnoRepository,
+                        NegocioRepository negocioRepository,
+                        TasaNegocioService tasaNegocioService) {
         this.ventaRepository = ventaRepository;
         this.productoRepository = productoRepository;
         this.permisoService = permisoService;
         this.turnoRepository = turnoRepository;
+        this.negocioRepository = negocioRepository;
+        this.tasaNegocioService = tasaNegocioService;
     }
 
     public record ItemInput(Long productoId, BigDecimal cantidad, BigDecimal precioUsd, String nombre) {
@@ -46,9 +57,16 @@ public class VentaService {
     public record PagoInput(MetodoPago metodo, Moneda moneda, BigDecimal montoOriginal, String referencia) {
     }
 
+    /** creadoAt: cuándo se cobró en la caja (epoch ms). Viene en las ventas de la cola sin internet. */
     public record VentaInput(String codigoUnico, BigDecimal tasaBcv,
-                             List<ItemInput> items, List<PagoInput> pagos) {
+                             List<ItemInput> items, List<PagoInput> pagos, Long creadoAt) {
+        public VentaInput(String codigoUnico, BigDecimal tasaBcv, List<ItemInput> items, List<PagoInput> pagos) {
+            this(codigoUnico, tasaBcv, items, pagos, null);
+        }
     }
+
+    /** Una venta cobrada hace más que esto llegó de la cola: el dinero ya se recibió con su tasa. */
+    static final long MINUTOS_VENTA_EN_COLA = 10;
 
     @Transactional
     public Venta registrar(KioskPrincipal principal, String permisoToken, VentaInput input) {
@@ -69,6 +87,20 @@ public class VentaService {
         if (tasa == null || tasa.signum() <= 0) {
             throw new IllegalArgumentException("La tasa del día debe ser mayor a 0");
         }
+        // El servidor manda (CLAUDE.md §2): la tasa la decide el negocio, no la caja.
+        // Una venta EN VIVO debe usar la tasa del negocio (±3%). Una que llega de la cola
+        // sin internet ya se cobró: se acepta con su tasa para no perder el registro.
+        boolean enVivo = input.creadoAt() == null
+                || Duration.between(Instant.ofEpochMilli(input.creadoAt()), Instant.now())
+                        .toMinutes() < MINUTOS_VENTA_EN_COLA;
+        if (enVivo) negocioRepository.findById(principal.negocioId()).ifPresent(n -> {
+            BigDecimal delNegocio = tasaNegocioService.efectiva(n);
+            if (!TasaNegocioService.dentroDelMargen(tasa, delNegocio)) {
+                throw new IllegalArgumentException("La tasa usada (Bs " + tasa.stripTrailingZeros().toPlainString()
+                        + ") no coincide con la del negocio (Bs " + delNegocio.stripTrailingZeros().toPlainString()
+                        + "). Recarga la caja para tomar la tasa actual.");
+            }
+        });
 
         Venta venta = new Venta();
         venta.setNegocioId(principal.negocioId());

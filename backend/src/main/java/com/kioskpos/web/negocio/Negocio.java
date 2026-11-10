@@ -61,6 +61,23 @@ public class Negocio {
     @Column(name = "horarios_cierre", length = 200)
     private String horariosCierre;
 
+    /** Formas de pago activas + monedas extra, en JSON (lo define el frontend). */
+    @Column(name = "metodos_pago", columnDefinition = "TEXT")
+    private String metodosPago;
+
+    /** Cómo se calcula la tasa con la que se cobra: BCV, AJUSTE (BCV + aumento) o MANUAL. */
+    @Column(name = "tasa_modo", nullable = false, length = 10)
+    private String tasaModo = "BCV";
+
+    @Column(name = "tasa_ajuste_tipo", nullable = false, length = 5)
+    private String tasaAjusteTipo = "PCT";
+
+    @Column(name = "tasa_ajuste", nullable = false, precision = 10, scale = 2)
+    private java.math.BigDecimal tasaAjuste = java.math.BigDecimal.ZERO;
+
+    @Column(name = "tasa_manual", nullable = false, precision = 14, scale = 2)
+    private java.math.BigDecimal tasaManual = java.math.BigDecimal.ZERO;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
 }

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { renovarPermiso, sincronizar, tasaBcvServidor } from "./api";
+import { getCajaConfig, renovarPermiso, sincronizar, tasaBcvServidor } from "./api";
 import { cerrarSesion, getSesion, getTasa, setTasa, type Sesion } from "./session";
-import { getBcv, setBcv, tasaEfectiva } from "./config";
+import { aplicarDelServidor, getBcv, setBcv, tasaEfectiva } from "./config";
 import { Login } from "./screens/Login";
 import { Shell } from "./screens/Shell";
 import { SuperAdmin } from "./screens/SuperAdmin";
@@ -35,6 +35,24 @@ export function App() {
     window.addEventListener("kp-config", onCfg);
     return () => { vivo = false; clearInterval(id); window.removeEventListener("online", sync); window.removeEventListener("kp-config", onCfg); };
   }, []);
+
+  // Con sesión: la config de caja (formas de pago + tasa) la manda el servidor.
+  // Se trae al entrar, cada 15 min y al reconectar; sin internet queda la copia del equipo.
+  useEffect(() => {
+    if (!sesion || sesion.rol === "SUPER_ADMIN") return;
+    let vivo = true;
+    const traer = () => getCajaConfig().then((r) => {
+      if (!vivo) return;
+      const e = aplicarDelServidor(r);
+      if (e > 0) setTasa(String(e));
+      setTick((x) => x + 1);
+    }).catch(() => { /* sin conexión: copia del equipo */ });
+    traer();
+    const id = setInterval(traer, 15 * 60 * 1000);
+    window.addEventListener("online", traer);
+    window.addEventListener("kp-config-recargar", traer);
+    return () => { vivo = false; clearInterval(id); window.removeEventListener("online", traer); window.removeEventListener("kp-config-recargar", traer); };
+  }, [sesion]);
 
   // Al entrar una caja: renueva el permiso cada pocos minutos y sincroniza la cola.
   useEffect(() => {

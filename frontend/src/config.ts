@@ -1,5 +1,6 @@
-// Configuración de la caja (en este equipo): qué formas de pago se usan y cómo se
-// calcula la tasa del dólar a partir de la BCV automática.
+// Configuración de la caja: qué formas de pago se usan y cómo se calcula la tasa del
+// dólar a partir de la BCV automática. Es del NEGOCIO y vive en el servidor (la comparten
+// todas sus cajas); aquí queda una copia en el equipo para cobrar sin internet.
 
 export type MetodoId = "EFECTIVO_USD" | "EFECTIVO_BS" | "PAGO_MOVIL" | "PUNTO" | "BIOPAGO";
 export type TasaModo = "bcv" | "ajuste" | "manual";
@@ -43,6 +44,38 @@ export function getConfig(): ConfigCaja {
 export function setConfig(c: ConfigCaja): void {
   try { localStorage.setItem(KEY, JSON.stringify(c)); } catch { /* sin storage */ }
   window.dispatchEvent(new Event("kp-config"));
+}
+
+// ---- Copia del servidor <-> equipo ----
+interface CfgServidor { metodosPago: string | null; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number; tasaBcv: number | null; tasaEfectiva: number | null; }
+
+/** Convierte la config del servidor a la de la PWA (sin metodosPago → todas activas). */
+export function desdeServidor(r: CfgServidor): ConfigCaja {
+  let mp: { metodos?: Partial<Record<MetodoId, boolean>>; extras?: MetodoExtra[] } = {};
+  try { mp = r.metodosPago ? JSON.parse(r.metodosPago) : {}; } catch { mp = {}; }
+  const modo = (r.tasaModo || "BCV").toLowerCase();
+  return {
+    metodos: { ...DEFAULT_CONFIG.metodos, ...(mp.metodos || {}) },
+    extras: Array.isArray(mp.extras) ? mp.extras : [],
+    tasaModo: modo === "ajuste" || modo === "manual" ? modo : "bcv",
+    ajusteTipo: (r.ajusteTipo || "PCT").toLowerCase() === "bs" ? "bs" : "pct",
+    ajuste: Number(r.ajuste) || 0,
+    tasaManual: Number(r.tasaManual) || 0,
+  };
+}
+export function aServidor(c: ConfigCaja) {
+  return {
+    metodosPago: JSON.stringify({ metodos: c.metodos, extras: c.extras }),
+    tasaModo: c.tasaModo.toUpperCase(), ajusteTipo: c.ajusteTipo.toUpperCase(),
+    ajuste: c.ajuste, tasaManual: c.tasaManual,
+  };
+}
+/** Guarda en el equipo lo que dice el servidor (y su BCV). Devuelve la tasa con que se cobra. */
+export function aplicarDelServidor(r: CfgServidor): number {
+  if (r.tasaBcv && r.tasaBcv > 0) setBcv(r.tasaBcv);
+  setConfig(desdeServidor(r));
+  const e = Number(r.tasaEfectiva) || 0;
+  return e > 0 ? e : tasaEfectiva(getBcv());
 }
 
 /** Última tasa BCV que trajo el servidor (sin ajustes). */

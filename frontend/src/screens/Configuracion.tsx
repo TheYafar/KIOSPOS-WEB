@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { UIcono } from "../icons";
-import { bcvActualizada, getBcv, getConfig, setConfig, tasaEfectiva, type ConfigCaja, type MetodoExtra, type MetodoId, type TasaModo } from "../config";
+import { putCajaConfig } from "../api";
+import { getSesion } from "../session";
+import { aServidor, aplicarDelServidor, bcvActualizada, getBcv, getConfig, setConfig, tasaEfectiva, type ConfigCaja, type MetodoExtra, type MetodoId, type TasaModo } from "../config";
 
-// Configuración (por ahora): formas de pago activas y tasa del dólar con la que se cobra.
-// Se guarda en este equipo y aplica al instante.
+// Configuración del NEGOCIO: formas de pago activas y tasa del dólar con la que se cobra.
+// Vive en el servidor y la comparten todas las cajas. Solo el dueño o el encargado la
+// cambian; el cajero la ve (y la caja guarda una copia para cobrar sin internet).
 
 const METODOS: { id: MetodoId; n: string; sub: string; icon: string; color: string }[] = [
   { id: "EFECTIVO_USD", n: "Efectivo $", sub: "Billetes en dólares", icon: "cash", color: "var(--primary)" },
@@ -21,6 +24,22 @@ export function Configuracion() {
   const [ajTxt, setAjTxt] = useState(c.ajuste ? String(c.ajuste).replace(".", ",") : "");
   const [manTxt, setManTxt] = useState(c.tasaManual ? String(c.tasaManual).replace(".", ",") : "");
   const [msg, setMsg] = useState("");
+  const rol = getSesion()?.rol;
+  const puede = rol === "DUENO" || rol === "ENCARGADO";
+  const pendiente = useRef<number | undefined>(undefined);
+  const version = useRef(0);
+  // Si llega una versión nueva del servidor (otra caja o el dueño la cambió), se refleja aquí.
+  useEffect(() => {
+    const on = () => {
+      if (pendiente.current !== undefined) return; // hay cambios propios sin guardar todavía
+      const n = getConfig();
+      setC(n);
+      setAjTxt(n.ajuste ? String(n.ajuste).replace(".", ",") : "");
+      setManTxt(n.tasaManual ? String(n.tasaManual).replace(".", ",") : "");
+    };
+    window.addEventListener("kp-config", on);
+    return () => { window.removeEventListener("kp-config", on); window.clearTimeout(pendiente.current); };
+  }, []);
   const [nx, setNx] = useState<{ nombre: string; tipo: MetodoExtra["tipo"]; simbolo: string; tasa: string }>({ nombre: "", tipo: "USD", simbolo: "", tasa: "" });
   const bcv = getBcv();
   const bcvAt = bcvActualizada();
@@ -35,7 +54,23 @@ export function Configuracion() {
   const cambiarExtra = (id: string, cambio: Partial<MetodoExtra>) => guardar({ ...c, extras: c.extras.map((x) => (x.id === id ? { ...x, ...cambio } : x)) });
   const borrarExtra = (id: string) => guardar({ ...c, extras: c.extras.filter((x) => x.id !== id) });
 
-  const guardar = (n: ConfigCaja) => { setC(n); setConfig(n); setMsg("Guardado ✓"); window.setTimeout(() => setMsg(""), 1800); };
+  // Aplica al instante en este equipo y se guarda en el servidor (con una pausa corta
+  // para no mandar una petición por cada tecla).
+  const guardar = (n: ConfigCaja) => {
+    if (!puede) return;
+    const mio = ++version.current;
+    window.clearTimeout(pendiente.current);
+    pendiente.current = -1; // marca "hay cambios propios" antes de avisar (no pisar lo que se escribe)
+    setC(n); setConfig(n); setMsg("Guardando…");
+    pendiente.current = window.setTimeout(() => {
+      putCajaConfig(aServidor(n))
+        .then((r) => {
+          if (mio !== version.current) return; // ya hay un cambio más nuevo en camino
+          pendiente.current = undefined; aplicarDelServidor(r); setMsg("Guardado ✓"); window.setTimeout(() => setMsg(""), 1800);
+        })
+        .catch((e) => { if (mio === version.current) { pendiente.current = undefined; setMsg("No se guardó: " + (e instanceof Error ? e.message : "sin conexión")); } });
+    }, 500);
+  };
   const activas = METODOS.filter((m) => c.metodos[m.id]).length;
   const toggle = (id: MetodoId) => {
     if (c.metodos[id] && activas === 1) { setMsg("Debe quedar al menos una forma de pago activa"); return; }
@@ -49,8 +84,9 @@ export function Configuracion() {
   return (
     <div className="caja">
       <div className="scroll pad cfg">
-        <div className="cfg-head"><div><h2>Configuración</h2><p>Se guarda en este equipo y aplica al instante.</p></div>{msg && <span className={"pill " + (msg.startsWith("Guardado") ? "ok" : "late")}>{msg}</span>}</div>
-        <div className="cfg-grid">
+        <div className="cfg-head"><div><h2>Configuración</h2><p>{puede ? "Aplica al instante en todas las cajas del negocio." : "La configura el dueño o el encargado. Aquí puedes verla."}</p></div>{msg && <span className={"pill " + (msg.startsWith("Guardado") ? "ok" : msg.startsWith("Guardando") ? "info" : "late")}>{msg}</span>}</div>
+        {!puede && <div className="cfg-ro" role="note"><UIcono k="lock" sw={2} />Solo lectura: pide al dueño o encargado que cambie las formas de pago o la tasa.</div>}
+        <fieldset className="cfg-grid cfg-fs" disabled={!puede}>
           <section className="card cfg-sec">
             <h3 className="h3">Formas de pago</h3>
             <p className="hint">Las que apagues no aparecen al cobrar ni en la barra de montos. Si una apagada tiene dinero en el turno, igual sale en el cierre.</p>
@@ -65,7 +101,7 @@ export function Configuracion() {
             </div>
 
             <h3 className="h3 cfg-sub">Otras monedas y formas de pago</h3>
-            <p className="hint">Agrega con qué más cobras: Zelle, Binance, euros, pesos… Aparecen al cobrar. Más adelante también se podrán manejar desde el panel del administrador.</p>
+            <p className="hint">Agrega con qué más cobras: Zelle, Binance, euros, pesos… Aparecen al cobrar en todas las cajas.</p>
             {c.extras.length > 0 && (
               <div className="cfg-list">
                 {c.extras.map((x) => (
@@ -82,7 +118,7 @@ export function Configuracion() {
                 ))}
               </div>
             )}
-            <div className="cfg-add">
+            {puede && <div className="cfg-add">
               <input className="inp" placeholder="Nombre (ej. Zelle)" value={nx.nombre} onChange={(e) => setNx({ ...nx, nombre: e.target.value })} aria-label="Nombre de la forma de pago"
                 onKeyDown={(e) => { if (e.key === "Enter") agregarExtra(); }} />
               <div className="seg cfg-tipo">
@@ -97,7 +133,8 @@ export function Configuracion() {
                 </div>
               )}
               <button className="btn primary press" onClick={agregarExtra}><UIcono k="plus" sw={2.2} />Agregar forma de pago</button>
-            </div>
+            </div>}
+            {!puede && c.extras.length === 0 && <p className="hint">No hay otras formas de pago.</p>}
           </section>
 
           <section className="card cfg-sec">
@@ -145,7 +182,7 @@ export function Configuracion() {
               </div>
             )}
           </section>
-        </div>
+        </fieldset>
       </div>
     </div>
   );

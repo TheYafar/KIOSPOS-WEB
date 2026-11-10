@@ -1224,6 +1224,12 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
 .cfg { gap:14px; }
 .cfg-head { display:flex; justify-content:space-between; align-items:center; gap:12px; }
 .cfg-head h2 { margin:0; font-size:18px; } .cfg-head p { margin:2px 0 0; font-size:13px; color:var(--text-3); }
+.cfg-fs { border:0; margin:0; padding:0; min-width:0; }
+.cfg-fs:disabled .cfg-sec { opacity:.78; }
+.cfg-fs:disabled button, .cfg-fs:disabled input { cursor:not-allowed; }
+.cfg-ro { display:flex; align-items:center; gap:10px; margin-bottom:14px; padding:12px 14px; border-radius:12px; font-weight:600; font-size:14px;
+  background:color-mix(in srgb, var(--warn) 12%, var(--surface)); color:var(--text); border:1px solid color-mix(in srgb, var(--warn) 35%, transparent); }
+.cfg-ro svg { width:20px; height:20px; color:var(--warn); flex:none; }
 .cfg-grid { display:grid; grid-template-columns:minmax(0,1fr); gap:14px; align-items:start; }
 @media (min-width:1100px) { .cfg-grid { grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); } }
 .cfg-sec { display:flex; flex-direction:column; gap:12px; }

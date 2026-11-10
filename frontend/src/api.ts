@@ -160,7 +160,8 @@ export async function sincronizar(): Promise<ResultadoSync> {
       const resp = await fetch("/api/ventas", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...auth(), "X-Permiso": getPermiso() },
-        body: JSON.stringify(venta.payload)
+        // creadoAt: cuándo se cobró. Si llega tarde (cola sin internet), el servidor respeta su tasa.
+        body: JSON.stringify({ ...(venta.payload as object), creadoAt: venta.creadoAt })
       });
       if (resp.ok) {
         await quitar(venta.codigoUnico);
@@ -252,6 +253,16 @@ export interface ConfigNegocio { nombre: string; telefono: string | null; direcc
 export async function getConfigNegocio(): Promise<ConfigNegocio> { return parse(await fetch("/api/mi-negocio/config", { headers: auth() })); }
 export async function putConfigNegocio(body: { telefono?: string; direccion?: string; horariosCierre?: string }): Promise<ConfigNegocio> {
   return parse(await fetch("/api/mi-negocio/config", { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+// ---------- Config de caja del negocio (formas de pago + tasa) — la comparten todas sus cajas ----------
+export interface CajaConfigServidor {
+  metodosPago: string | null; // JSON { metodos, extras } de la PWA
+  tasaModo: "BCV" | "AJUSTE" | "MANUAL"; ajusteTipo: "PCT" | "BS"; ajuste: number; tasaManual: number;
+  tasaBcv: number | null; tasaEfectiva: number | null;
+}
+export async function getCajaConfig(): Promise<CajaConfigServidor> { return parse(await fetch("/api/mi-negocio/caja-config", { headers: auth() })); }
+export async function putCajaConfig(body: { metodosPago: string; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number }): Promise<CajaConfigServidor> {
+  return parse(await fetch("/api/mi-negocio/caja-config", { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
 }
 export async function adminSuspender(id: number): Promise<void> { await parse(await fetch(`/api/admin/negocios/${id}/suspender`, { method: "POST", headers: auth() })); }
 export async function adminReactivar(id: number): Promise<void> { await parse(await fetch(`/api/admin/negocios/${id}/reactivar`, { method: "POST", headers: auth() })); }

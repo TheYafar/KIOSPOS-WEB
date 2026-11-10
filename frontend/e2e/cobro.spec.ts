@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { ir, preparar, sesionCajero, type Estado } from "./mock";
+import { cfgServidor, ir, preparar, sesionCajero, sesionDueno, type Estado } from "./mock";
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
@@ -44,10 +44,10 @@ test("el botón explica por qué no deja cobrar (referencia del pago móvil)", a
 });
 
 test("formas de pago apagadas no salen y las monedas extra se cobran como OTRO", async ({ page }) => {
-  const st: Estado = { turnoAbierto: true };
-  const config = { metodos: { EFECTIVO_USD: true, EFECTIVO_BS: true, PAGO_MOVIL: true, PUNTO: false, BIOPAGO: false },
-    extras: [{ id: "eur", nombre: "Euros", tipo: "OTRA", simbolo: "€", tasaUsd: 1.1, activo: true }], tasaModo: "bcv", ajusteTipo: "pct", ajuste: 0, tasaManual: 0 };
-  await preparar(page, st, { "kioskpos.sesion": sesionCajero, kp_config: config });
+  // La config la manda el servidor (es del negocio, la comparten todas las cajas).
+  const st: Estado = { turnoAbierto: true, cajaConfig: cfgServidor({ metodos: { EFECTIVO_USD: true, EFECTIVO_BS: true, PAGO_MOVIL: true, PUNTO: false, BIOPAGO: false },
+    extras: [{ id: "eur", nombre: "Euros", tipo: "OTRA", simbolo: "€", tasaUsd: 1.1, activo: true }] }) };
+  await preparar(page, st, { "kioskpos.sesion": sesionCajero });
   await ir(page); await abrirCobro(page);
   await expect(page.locator(".cb3-nm b")).toHaveText(["Efectivo $", "Efectivo Bs", "Pago móvil", "Euros"]);
   await boton(page, "Euros").click();
@@ -57,13 +57,29 @@ test("formas de pago apagadas no salen y las monedas extra se cobran como OTRO",
   expect(st.venta.pagos).toEqual([{ metodo: "OTRO", moneda: "USD", montoOriginal: 2.75, referencia: "Euros € 2,50" }]);
 });
 
-test("el aumento de la tasa en Configuración se usa al cobrar", async ({ page }) => {
-  await preparar(page, { turnoAbierto: true }, { "kioskpos.sesion": sesionCajero });
+test("el dueño sube la tasa y se guarda en el servidor", async ({ page }) => {
+  const st: Estado = { turnoAbierto: false };
+  await preparar(page, st, { "kioskpos.sesion": sesionDueno });
   await ir(page);
-  await page.keyboard.press("Alt+3");
+  await page.keyboard.press("Alt+4");
   await page.getByRole("button", { name: "BCV + aumento" }).click();
-  await page.getByLabel("Aumento sobre la BCV").fill("2");
-  await expect(page.locator(".cfg-prev")).toContainText("Bs 918,00");
+  await page.getByLabel("Aumento sobre la BCV").pressSequentially("2,5", { delay: 120 });
+  await expect(page.getByLabel("Aumento sobre la BCV")).toHaveValue("2,5"); // la coma no se pierde al guardar
+  await expect(page.locator(".cfg-prev")).toContainText("Bs 923,00"); // 900 + 2,5% = 922,5 -> 923
+  await expect(page.locator(".cfg-head .pill")).toHaveText("Guardado ✓");
+  expect(st.cajaConfig).toMatchObject({ tasaModo: "AJUSTE", ajusteTipo: "PCT", ajuste: 2.5 });
+  expect(st.puts!.length).toBeLessThanOrEqual(3); // no manda una petición por tecla
+});
+
+test("la caja cobra con la tasa del negocio y el cajero no puede cambiarla", async ({ page }) => {
+  const st: Estado = { turnoAbierto: true, cajaConfig: cfgServidor({ tasaModo: "ajuste", ajuste: 2 }) };
+  await preparar(page, st, { "kioskpos.sesion": sesionCajero });
+  await ir(page);
+  await expect(page.locator(".hpill b.t")).toHaveText("Bs 918");
   await abrirCobro(page);
   await expect(page.locator(".co-tot small")).toHaveText("Bs 2.524,50"); // 2,75 × 918
+  await page.keyboard.press("Escape");
+  await page.keyboard.press("Alt+3");
+  await expect(page.locator(".cfg-ro")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Usar la BCV" })).toBeDisabled();
 });
