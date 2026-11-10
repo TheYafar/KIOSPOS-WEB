@@ -37,6 +37,9 @@ const numOf = (s: string) => {
 };
 const aTexto = (n: number) => (n <= 0 ? "" : n.toFixed(2).replace(".", ","));
 
+/** Límite de fiado: el propio, o el sueldo si es un trabajador sin límite (igual que el servidor). */
+const limiteDe = (c: ClienteFiado) => (c.limiteUsd > 0 ? c.limiteUsd : c.tipo === "TRABAJADOR" ? c.sueldoUsd || 0 : 0);
+
 export interface ResumenPago { payLine: string; change: string; changeNote: string; }
 
 export function Cobro({ total, tasa, err, onBack, onConfirm }: {
@@ -79,7 +82,7 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   const fiadoMal = fiadoUsd <= 0 ? ""
     : !cliente ? "Elige a quién le fías"
     : fiadoUsd > total + 0.005 ? "Lo fiado no puede pasar del total"
-    : cliente.limiteUsd > 0 && cliente.saldoUsd + fiadoUsd > cliente.limiteUsd + 0.005 ? "Pasa el límite de fiado de " + cliente.nombre + " (" + usd(cliente.limiteUsd) + ")"
+    : limiteDe(cliente) > 0 && cliente.saldoUsd + fiadoUsd > limiteDe(cliente) + 0.005 ? "Pasa el límite de fiado de " + cliente.nombre + " (" + usd(limiteDe(cliente)) + ")"
     : "";
 
   // El motivo REAL por el que no se puede cobrar (antes decía "Faltan $0,00" aunque faltara la referencia).

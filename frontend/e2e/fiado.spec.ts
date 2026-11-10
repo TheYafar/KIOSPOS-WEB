@@ -43,7 +43,7 @@ test("cobrar fiado: elegir cliente con el teclado y la venta lleva clienteId", a
   const card = page.locator(".cb3-card", { has: page.locator('.cb3-nm b:text-is("Fiado")') });
   await card.getByRole("button", { name: "Elegir cliente" }).click();
   await expect(page.getByLabel("Buscar cliente para fiar")).toBeFocused();
-  await expect(page.locator(".cli-pick-row")).toHaveCount(2);
+  await expect(page.locator(".cli-pick-row")).toHaveCount(3);
   await page.keyboard.type("josé");
   await expect(page.locator(".cli-pick-row")).toHaveCount(1);
   await page.keyboard.press("Enter");
@@ -82,4 +82,35 @@ test("pantalla Fiado: ver quién debe y registrar un abono en Bs", async ({ page
   await page.getByRole("button", { name: "Registrar abono" }).click();
   await expect(page.locator(".pinmsg.ok")).toContainText("Abono de Bs 7.200,00");
   expect(st.abonos![0]).toEqual({ metodo: "EFECTIVO_BS", monto: 7200, tasa: 900 });
+});
+
+test("trabajadores: el fiado no pasa del sueldo y el dueño lo descuenta de la nómina", async ({ page }) => {
+  const st: Estado = { turnoAbierto: true };
+  await preparar(page, st, { "kioskpos.sesion": sesionDueno });
+  await ir(page);
+  await page.keyboard.press("Alt+5");
+  await expect(page.locator(".cli-row")).toHaveCount(2); // clientes, no el trabajador
+  await page.getByRole("button", { name: "Trabajadores" }).click();
+  await expect(page.locator(".cli-row")).toHaveCount(1);
+  await expect(page.locator(".cli-row")).toContainText("sueldo $ 15,00");
+  await page.locator(".cli-row", { hasText: "Luis" }).click();
+  await expect(page.locator(".cli-saldo")).toContainText("le quedaría $ 3,00");
+  page.once("dialog", (d) => d.accept());
+  await page.getByRole("button", { name: "Descontar $ 12,00" }).click();
+  await expect(page.locator(".pinmsg.ok")).toContainText("Descontado del sueldo");
+  expect(st.descuento).toEqual({ id: 3, montoUsd: 12, nota: null });
+});
+
+test("al cobrar, a un trabajador no se le fía más que su sueldo", async ({ page }) => {
+  const st: Estado = { turnoAbierto: true, clientes: [{ id: 3, nombre: "Luis (empleado)", cedula: null, telefono: null, limiteUsd: 0, activo: true, saldoUsd: 13, ultimoMovimiento: null, tipo: "TRABAJADOR", sueldoUsd: 15 }] };
+  await preparar(page, st, { "kioskpos.sesion": sesionCajero });
+  await ir(page); await abrirCobro(page);
+  const card = page.locator(".cb3-card", { has: page.locator('.cb3-nm b:text-is("Fiado")') });
+  await card.getByRole("button", { name: "Elegir cliente" }).click();
+  await expect(page.locator(".cli-pick-row .cli-badge")).toHaveText("Trabajador");
+  await page.locator(".cli-pick-row", { hasText: "Luis" }).click(); // debe $13 + $2,75 > sueldo $15
+  await expect(page.locator(".cb3-go")).toHaveText(/Pasa el límite de fiado de Luis \(empleado\) \(\$ 15,00\)/);
+  await page.getByLabel("Monto en Fiado").fill("2");
+  await page.getByLabel("Monto en Efectivo $").fill("0,75");
+  await expect(page.locator(".cb3-go")).toBeEnabled();
 });

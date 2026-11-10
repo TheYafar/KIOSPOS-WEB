@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
-import { abonarCliente, actualizarCliente, crearCliente, detalleCliente, listarClientes, type ClienteFiado, type MovCliente } from "../api";
+import { abonarCliente, actualizarCliente, crearCliente, descontarSueldo, detalleCliente, listarClientes, type ClienteFiado, type MovCliente } from "../api";
 import { getSesion, getTasa } from "../session";
 import { UIcono } from "../icons";
 import { leerMonto } from "../arqueo";
 
-// Fiado: la libreta de clientes. Quién debe, cuánto, desde cuándo, y recibir abonos.
-// El cajero puede anotar clientes y cobrar abonos; el límite de fiado lo pone el dueño.
+// Fiado: la libreta de clientes y de TRABAJADORES del local. Quién debe, cuánto, desde
+// cuándo, y recibir abonos. Lo que se lleva un trabajador baja el stock (es una venta
+// fiada) y el dueño se lo descuenta del sueldo. El cajero anota clientes y cobra abonos;
+// el límite, los trabajadores y los descuentos de sueldo los maneja el dueño.
 
 const money = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const usd = (n: number) => "$ " + money(n);
@@ -26,27 +28,34 @@ export function Clientes() {
   const [nuevo, setNuevo] = useState(false);
   const [abierto, setAbierto] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
+  const [tipo, setTipo] = useState<"CLIENTE" | "TRABAJADOR">("CLIENTE");
   const buscar = useRef<HTMLInputElement>(null);
   const cargar = () => listarClientes().then((l) => { setLista(l); setErr(""); }).catch((e) => setErr((e as Error).message)).finally(() => setCargando(false));
   useEffect(() => { cargar(); if (window.matchMedia("(min-width:1024px)").matches) buscar.current?.focus(); }, []);
 
   const f = q.trim().toLowerCase();
-  const vis = lista.filter((c) => !f || c.nombre.toLowerCase().includes(f) || (c.cedula || "").toLowerCase().includes(f) || (c.telefono || "").includes(f));
-  const deben = lista.filter((c) => c.saldoUsd > 0);
+  const delTipo = lista.filter((c) => (c.tipo || "CLIENTE") === tipo);
+  const vis = delTipo.filter((c) => !f || c.nombre.toLowerCase().includes(f) || (c.cedula || "").toLowerCase().includes(f) || (c.telefono || "").includes(f));
+  const deben = delTipo.filter((c) => c.saldoUsd > 0);
+  const trabajadores = tipo === "TRABAJADOR";
   const total = deben.reduce((s, c) => s + c.saldoUsd, 0);
 
   return (
     <div className="caja">
       <div className="scroll pad cli">
         <div className="cli-head">
-          <div><h2>Fiado</h2><p>Quién te debe y cuánto. Toca un cliente para cobrarle.</p></div>
-          <button className="btn primary press" onClick={() => setNuevo(true)}><UIcono k="plus" sw={2.2} />Nuevo cliente</button>
+          <div><h2>Fiado</h2><p>{trabajadores ? "Lo que se llevan tus trabajadores: se descuenta del sueldo." : "Quién te debe y cuánto. Toca un cliente para cobrarle."}</p></div>
+          {(!trabajadores || esJefe()) && <button className="btn primary press" onClick={() => setNuevo(true)}><UIcono k="plus" sw={2.2} />{trabajadores ? "Nuevo trabajador" : "Nuevo cliente"}</button>}
+        </div>
+        <div className="seg cli-tipo" role="tablist" aria-label="Clientes o trabajadores">
+          <button className={!trabajadores ? "on" : ""} onClick={() => setTipo("CLIENTE")}>Clientes</button>
+          <button className={trabajadores ? "on" : ""} onClick={() => setTipo("TRABAJADOR")}>Trabajadores</button>
         </div>
         <div className="inv-stats">
           <div className="inv-stat"><span className="ibox" style={{ background: "var(--bad-soft)", color: "var(--bad)" }}><UIcono k="cash" /></span>
-            <div><span className="k">Te deben</span><span className="v t">{usd(total)}</span><span className="d t">{bs(total * (Number(getTasa()) || 0))}</span></div></div>
+            <div><span className="k">{trabajadores ? "Deben tus trabajadores" : "Te deben"}</span><span className="v t">{usd(total)}</span><span className="d t">{bs(total * (Number(getTasa()) || 0))}</span></div></div>
           <div className="inv-stat"><span className="ibox" style={{ background: "var(--accent-soft)", color: "var(--warn)" }}><UIcono k="user" /></span>
-            <div><span className="k">Clientes que deben</span><span className="v t">{deben.length}</span><span className="d">de {lista.length} anotados</span></div></div>
+            <div><span className="k">{trabajadores ? "Trabajadores que deben" : "Clientes que deben"}</span><span className="v t">{deben.length}</span><span className="d">de {delTipo.length} anotados</span></div></div>
         </div>
         <label className="search cli-search">
           <UIcono k="search" sw={2} />
@@ -64,45 +73,63 @@ export function Clientes() {
                 <span className="cli-sal">
                   {c.saldoUsd > 0 ? <b className="t mg-bad">{usd(c.saldoUsd)}</b> : <b className="t cli-cero">Al día</b>}
                   {c.limiteUsd > 0 && <small className={pasado ? "mg-bad" : ""}>límite {usd(c.limiteUsd)}</small>}
+                  {c.tipo === "TRABAJADOR" && (c.sueldoUsd || 0) > 0 && <small>sueldo {usd(c.sueldoUsd || 0)}</small>}
                 </span>
               </button>
             );
           })}
         </div>
-        {!cargando && lista.length === 0 && !err && <p className="noresult">Aún no hay clientes. Anota el primero con “Nuevo cliente” o al cobrar con Fiado.</p>}
-        {lista.length > 0 && vis.length === 0 && <p className="noresult">Nadie coincide con “{q}”.</p>}
+        {!cargando && delTipo.length === 0 && !err && <p className="noresult">{trabajadores
+          ? (esJefe() ? "Anota a tus trabajadores con su sueldo: lo que se lleven fiado se descuenta del sueldo." : "El dueño anota a los trabajadores.")
+          : "Aún no hay clientes. Anota el primero con “Nuevo cliente” o al cobrar con Fiado."}</p>}
+        {delTipo.length > 0 && vis.length === 0 && <p className="noresult">Nadie coincide con “{q}”.</p>}
       </div>
-      {nuevo && <FormCliente onClose={() => setNuevo(false)} onSaved={(c) => { setNuevo(false); cargar(); setAbierto(c.id); }} />}
+      {nuevo && <FormCliente trabajador={trabajadores} onClose={() => setNuevo(false)} onSaved={(c) => { setNuevo(false); cargar(); setAbierto(c.id); }} />}
       {abierto != null && <DetalleCliente id={abierto} onClose={() => { setAbierto(null); cargar(); }} />}
     </div>
   );
 }
 
-export function FormCliente({ cliente, nombreInicial, onClose, onSaved }: { cliente?: ClienteFiado; nombreInicial?: string; onClose: () => void; onSaved: (c: ClienteFiado) => void }) {
+export function FormCliente({ cliente, nombreInicial, trabajador, onClose, onSaved }: { cliente?: ClienteFiado; nombreInicial?: string; trabajador?: boolean; onClose: () => void; onSaved: (c: ClienteFiado) => void }) {
   const [nombre, setNombre] = useState(cliente?.nombre || nombreInicial || "");
   const [cedula, setCedula] = useState(cliente?.cedula || "");
   const [tel, setTel] = useState(cliente?.telefono || "");
   const [lim, setLim] = useState(cliente && cliente.limiteUsd > 0 ? String(cliente.limiteUsd).replace(".", ",") : "");
   const [activo, setActivo] = useState(cliente?.activo ?? true);
+  const [esTrab, setEsTrab] = useState(cliente ? cliente.tipo === "TRABAJADOR" : !!trabajador);
+  const [sueldo, setSueldo] = useState(cliente && (cliente.sueldoUsd || 0) > 0 ? String(cliente.sueldoUsd).replace(".", ",") : "");
   const [err, setErr] = useState("");
   const jefe = esJefe();
   const guardar = async () => {
     if (!nombre.trim()) { setErr("Escribe el nombre"); return; }
     try {
-      const body = { nombre: nombre.trim(), cedula: cedula.trim() || undefined, telefono: tel.trim() || undefined, ...(jefe ? { limiteUsd: leerMonto(lim) ?? 0 } : {}) };
+      const body = { nombre: nombre.trim(), cedula: cedula.trim() || undefined, telefono: tel.trim() || undefined,
+        ...(jefe ? { limiteUsd: leerMonto(lim) ?? 0, tipo: esTrab ? "TRABAJADOR" : "CLIENTE", sueldoUsd: esTrab ? leerMonto(sueldo) ?? 0 : 0 } : {}) };
       onSaved(cliente ? await actualizarCliente(cliente.id, { ...body, activo }) : await crearCliente(body));
     } catch (e) { setErr((e as Error).message); }
   };
   return (
     <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card" onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Enter") { e.preventDefault(); guardar(); } else if (e.key === "Escape") { e.preventDefault(); onClose(); } }}>
-        <div className="modal-head"><h2>{cliente ? "Editar cliente" : "Nuevo cliente"}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="modal-head"><h2>{cliente ? "Editar datos" : esTrab ? "Nuevo trabajador" : "Nuevo cliente"}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
         <div className="modal-body">
-          <label className="lbl">Nombre<input autoFocus className="inp" value={nombre} maxLength={120} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: María la vecina" aria-label="Nombre del cliente" /></label>
+          <label className="lbl">Nombre<input autoFocus className="inp" value={nombre} maxLength={120} onChange={(e) => setNombre(e.target.value)} placeholder={esTrab ? "Ej: Luis (empleado)" : "Ej: María la vecina"} aria-label="Nombre del cliente" /></label>
           <div className="two">
             <label className="lbl">Cédula <span className="opt">(opcional)</span><input className="inp" value={cedula} onChange={(e) => setCedula(e.target.value)} placeholder="V-12345678" aria-label="Cédula" /></label>
             <label className="lbl">Teléfono <span className="opt">(opcional)</span><input className="inp" inputMode="tel" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="0412-1234567" aria-label="Teléfono" /></label>
           </div>
+          {jefe && (
+            <button className="cfg-row press" role="switch" aria-checked={esTrab} onClick={() => setEsTrab(!esTrab)}>
+              <span className="cfg-tx"><b>Trabaja en el local</b><small>Lo que se lleve fiado se le descuenta del sueldo.</small></span>
+              <span className={"sw" + (esTrab ? " on" : "")}><i /></span>
+            </button>
+          )}
+          {jefe && esTrab && (
+            <label className="lbl">Sueldo ($)
+              <div className="inpw"><i>$</i><input className="inp t pre" inputMode="decimal" value={sueldo} onChange={(e) => setSueldo(e.target.value.replace(/[^\d.,]/g, ""))} placeholder="Ej: 150" aria-label="Sueldo del trabajador" /></div>
+              <span className="hint">Sin límite propio, no puede deber más que su sueldo.</span>
+            </label>
+          )}
           {jefe ? (
             <label className="lbl">Límite de fiado <span className="opt">(vacío = sin límite)</span>
               <div className="inpw"><i>$</i><input className="inp t pre" inputMode="decimal" value={lim} onChange={(e) => setLim(e.target.value.replace(/[^\d.,]/g, ""))} placeholder="Sin límite" aria-label="Límite de fiado" /></div>
@@ -136,6 +163,7 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [enviando, setEnviando] = useState(false);
+  const [desc, setDesc] = useState("");
   const tasa = Number(getTasa()) || 0;
   const cargar = () => detalleCliente(id).then(setD).catch((e) => setErr((e as Error).message));
   useEffect(() => { cargar(); }, [id]);
@@ -155,6 +183,15 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
     } catch (e) { setErr((e as Error).message); }
     finally { setEnviando(false); }
   };
+  const trab = c.tipo === "TRABAJADOR";
+  const descontar = async () => {
+    const mUsd = leerMonto(desc) ?? c.saldoUsd;
+    if (!window.confirm(`¿Descontar ${usd(mUsd)} del sueldo de ${c.nombre}?`)) return;
+    setEnviando(true); setErr(""); setOk("");
+    try { await descontarSueldo(c.id, mUsd); setOk("Descontado del sueldo: " + usd(mUsd) + " ✓"); setDesc(""); await cargar(); }
+    catch (e) { setErr((e as Error).message); }
+    finally { setEnviando(false); }
+  };
   const tel = (c.telefono || "").replace(/\D/g, "");
   const wa = tel ? "https://wa.me/" + (tel.startsWith("0") ? "58" + tel.slice(1) : tel) + "?text=" + encodeURIComponent(`Hola ${c.nombre}, te recordamos que tienes una cuenta pendiente de ${usd(c.saldoUsd)} (${bs(c.saldoUsd * tasa)} a la tasa de hoy). ¡Gracias!`) : "";
 
@@ -168,6 +205,7 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
             <b className="t">{usd(c.saldoUsd)}</b>
             {c.saldoUsd > 0 && <small className="t">{bs(c.saldoUsd * tasa)} a la tasa de hoy</small>}
             {c.limiteUsd > 0 && <small>Límite {usd(c.limiteUsd)}</small>}
+            {trab && (c.sueldoUsd || 0) > 0 && <small>Sueldo {usd(c.sueldoUsd || 0)} · le quedaría {usd(Math.max(0, (c.sueldoUsd || 0) - c.saldoUsd))}</small>}
             {!c.activo && <span className="pill late">No se le fía</span>}
           </div>
           <div className="cli-acc">
@@ -175,9 +213,20 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
             <button className="btn2 press" onClick={() => setEditar(true)}><UIcono k="user" />Editar datos</button>
           </div>
 
+          {trab && c.saldoUsd > 0 && esJefe() && (
+            <div className="cli-abono">
+              <h3 className="h3">Descontar del sueldo</h3>
+              <div className="cli-abono-in">
+                <div className="inpw"><i>$</i><input className="inp t" style={{ paddingLeft: 30 }} inputMode="decimal" placeholder={money(c.saldoUsd)}
+                  value={desc} onChange={(e) => setDesc(e.target.value.replace(/[^\d.,]/g, ""))} aria-label="Monto a descontar del sueldo" /></div>
+                <button className="btn primary press" disabled={enviando} onClick={descontar}>Descontar {usd(leerMonto(desc) ?? c.saldoUsd)}</button>
+              </div>
+              <span className="hint">No toca la caja: queda anotado como descuento de nómina. Vacío = todo lo que debe.</span>
+            </div>
+          )}
           {c.saldoUsd > 0 && (
             <div className="cli-abono">
-              <h3 className="h3">Recibir abono</h3>
+              <h3 className="h3">{trab ? "O recibir un pago" : "Recibir abono"}</h3>
               <div className="seg cli-met">
                 {METODOS_ABONO.map((x) => <button key={x.id} className={metodo === x.id ? "on" : ""} onClick={() => { setMetodo(x.id); setMonto(""); }}>{x.n}</button>)}
               </div>
@@ -202,7 +251,7 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
             {d.movimientos.map((x) => (
               <div key={x.id} className="cli-mov">
                 <span className={"pill " + (x.tipo === "CARGO" ? "late" : "ok")}>{x.tipo === "CARGO" ? "Fiado" : "Abono"}</span>
-                <span className="cli-mov-tx">{x.tipo === "CARGO" ? (x.ventaId ? "Venta #" + x.ventaId : "Venta") : (METODOS_ABONO.find((y) => y.id === x.metodo)?.n || x.metodo) + (x.moneda === "VES" && x.montoOriginal ? " · " + bs(x.montoOriginal) : "") + (x.referencia ? " · ref " + x.referencia : "")}
+                <span className="cli-mov-tx">{x.tipo === "CARGO" ? (x.ventaId ? "Venta #" + x.ventaId : "Venta") : (METODOS_ABONO.find((y) => y.id === x.metodo)?.n || ({ NOMINA: "Descontado del sueldo", ANULACION: "Venta anulada", DEVOLUCION: "Devolución" } as Record<string, string>)[x.metodo || ""] || x.metodo) + (x.moneda === "VES" && x.montoOriginal ? " · " + bs(x.montoOriginal) : "") + (x.referencia ? " · ref " + x.referencia : "")}
                   <small>{new Date(x.createdAt).toLocaleString("es-VE", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</small></span>
                 <b className={"t " + (x.tipo === "CARGO" ? "mg-bad" : "mg-ok")}>{x.tipo === "CARGO" ? "+" : "−"} {usd(x.montoUsd)}</b>
               </div>
@@ -246,7 +295,7 @@ export function ElegirCliente({ onElegir, onClose }: { onElegir: (c: ClienteFiad
           <div className="cli-pick">
             {vis.slice(0, 30).map((c, i) => (
               <button key={c.id} className={"cli-pick-row press" + (i === sel ? " sel" : "")} onClick={() => onElegir(c)}>
-                <b>{c.nombre}</b><small>{c.cedula || c.telefono || ""}</small>
+                <b>{c.nombre}{c.tipo === "TRABAJADOR" && <span className="pill info cli-badge">Trabajador</span>}</b><small>{c.cedula || c.telefono || ""}</small>
                 <span className={"t " + (c.saldoUsd > 0 ? "mg-bad" : "")}>{c.saldoUsd > 0 ? "debe " + usd(c.saldoUsd) : "al día"}</span>
               </button>
             ))}

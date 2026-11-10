@@ -428,3 +428,14 @@ el alta/venta/login (try/catch + log).
 - **PWA:** pestaña **Ventas** (`screens/Ventas.tsx`) en caja y dueño; **Compras** dentro de Productos
   (`screens/Compras.tsx`: facturas + proveedores). Barra de pestañas deslizable en móvil y la app con menú
   ocupa exactamente la pantalla (`.app:has(> .shell)`).
+
+## 20. Devoluciones "como pagó" + fiado de trabajadores
+
+- **Devolver** (`RepartoReembolso`, V14 `devolucion_reembolsos`): `COMO_PAGO` reparte lo devuelto entre las
+  formas en que pagó el cliente, en proporción y sin contar el vuelto (lo fiado vuelve a su cuenta); o todo por
+  `EFECTIVO_USD/EFECTIVO_BS/PAGO_MOVIL/PUNTO/BIOPAGO`. El cuadre resta cada parte de su forma. Mismo cálculo en
+  la PWA (`frontend/src/reembolso.ts`). Historial: `GET /api/ventas/buscar?numero=`. En Ventas: "Solo este" por
+  producto o "Devolver toda la venta". La barra de abajo del turno muestra lo neto (− vuelto − devuelto).
+- **Fiado de trabajadores** (V15 `clientes.tipo` CLIENTE/TRABAJADOR + `sueldo_usd`): lo que se lleva un
+  trabajador es una venta fiada (baja stock); sin límite propio no puede deber más que su sueldo; el dueño hace
+  `POST /api/clientes/{id}/descuento-sueldo` (abono `NOMINA`, no toca caja). Pestaña Fiado: Clientes | Trabajadores.

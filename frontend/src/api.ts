@@ -268,7 +268,8 @@ export async function compraPagada(id: number, valor: boolean): Promise<void> { 
 export async function anularCompra(id: number): Promise<void> { await parse(await fetch(`/api/compras/${id}/anular`, { method: "POST", headers: auth() })); }
 
 // ---------- Fiado (clientes) ----------
-export interface ClienteFiado { id: number; nombre: string; cedula: string | null; telefono: string | null; limiteUsd: number; activo: boolean; saldoUsd: number; ultimoMovimiento: string | null; }
+export interface ClienteFiado { id: number; nombre: string; cedula: string | null; telefono: string | null; limiteUsd: number; activo: boolean; saldoUsd: number; ultimoMovimiento: string | null;
+  tipo?: "CLIENTE" | "TRABAJADOR"; sueldoUsd?: number; }
 export interface MovCliente { id: number; tipo: "CARGO" | "ABONO"; montoUsd: number; ventaId: number | null; metodo: string | null; moneda: string | null; montoOriginal: number | null; referencia: string | null; nota: string | null; createdAt: string; }
 export async function listarClientes(q?: string): Promise<ClienteFiado[]> {
   return parse(await fetch("/api/clientes" + (q ? "?q=" + encodeURIComponent(q) : ""), { headers: auth() }));
@@ -276,11 +277,15 @@ export async function listarClientes(q?: string): Promise<ClienteFiado[]> {
 export async function detalleCliente(id: number): Promise<{ cliente: ClienteFiado; movimientos: MovCliente[] }> {
   return parse(await fetch(`/api/clientes/${id}`, { headers: auth() }));
 }
-export async function crearCliente(body: { nombre: string; cedula?: string; telefono?: string; limiteUsd?: number }): Promise<ClienteFiado> {
+export async function crearCliente(body: { nombre: string; cedula?: string; telefono?: string; limiteUsd?: number; tipo?: string; sueldoUsd?: number }): Promise<ClienteFiado> {
   return parse(await fetch("/api/clientes", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
 }
-export async function actualizarCliente(id: number, body: { nombre: string; cedula?: string | null; telefono?: string | null; limiteUsd?: number; activo?: boolean }): Promise<ClienteFiado> {
+export async function actualizarCliente(id: number, body: { nombre: string; cedula?: string | null; telefono?: string | null; limiteUsd?: number; activo?: boolean; tipo?: string; sueldoUsd?: number }): Promise<ClienteFiado> {
   return parse(await fetch(`/api/clientes/${id}`, { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+/** El dueño descuenta del sueldo de un trabajador lo que debe (sin monto = todo). */
+export async function descontarSueldo(id: number, montoUsd?: number, nota?: string): Promise<MovCliente> {
+  return parse(await fetch(`/api/clientes/${id}/descuento-sueldo`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ montoUsd: montoUsd ?? null, nota: nota || null }) }));
 }
 export async function abonarCliente(id: number, body: { metodo: string; monto: number; tasa?: number; referencia?: string; nota?: string }): Promise<MovCliente> {
   return parse(await fetch(`/api/clientes/${id}/abonos`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));

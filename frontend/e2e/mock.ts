@@ -19,7 +19,7 @@ export const productos = [
 export interface CajaCfg { metodosPago: string | null; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number; }
 export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: any; cierre?: any; tasa?: number | null; cajaConfig?: CajaCfg; puts?: CajaCfg[];
   movs?: any[]; clientes?: any[]; abonos?: any[]; nuevoCliente?: any;
-  anulada?: any; devuelta?: any; compra?: any; }
+  anulada?: any; devuelta?: any; compra?: any; descuento?: any; }
 
 export const ventasDemo = [
   { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
@@ -38,6 +38,7 @@ const detalleDemo = (id: number) => ({
 export const clientesDemo = () => [
   { id: 1, nombre: "María Pérez", cedula: "V12345678", telefono: "04121234567", limiteUsd: 10, activo: true, saldoUsd: 8, ultimoMovimiento: "2026-11-09T12:00:00Z" },
   { id: 2, nombre: "José Rojas", cedula: null, telefono: null, limiteUsd: 0, activo: true, saldoUsd: 0, ultimoMovimiento: null },
+  { id: 3, nombre: "Luis (empleado)", cedula: null, telefono: null, limiteUsd: 0, activo: true, saldoUsd: 12, ultimoMovimiento: null, tipo: "TRABAJADOR", sueldoUsd: 15 },
 ];
 
 /** Config del servidor a partir de la de la PWA (para armar escenarios). */
@@ -85,6 +86,7 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
       return r.fulfill({ json: mv });
     }
     if (u.includes("/api/cuadre/turnos/")) return r.fulfill({ json: resumen });
+    if (/\/api\/clientes\/\d+\/descuento-sueldo/.test(u)) { st.descuento = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { id: 98, tipo: "ABONO" } }); }
     if (/\/api\/clientes\/\d+\/abonos/.test(u)) { const b = JSON.parse(r.request().postData() || "{}"); (st.abonos ??= []).push(b); return r.fulfill({ json: { id: 99, tipo: "ABONO", ...b } }); }
     if (/\/api\/clientes\/\d+$/.test(u)) {
       const id = Number(u.split("/").pop()); const c = (st.clientes ?? clientesDemo()).find((x) => x.id === id);

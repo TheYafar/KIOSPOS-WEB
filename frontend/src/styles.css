@@ -1425,3 +1425,5 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
 /* En los modales nada se aplasta: si no cabe, el cuerpo se desplaza. */
 .modal-body > * { flex-shrink:0; }
 .vt-todo-btn { height:40px; }
+.cli-badge { margin-left:6px; font-size:10.5px; padding:1px 6px; vertical-align:middle; }
+.cli-tipo { flex:none; align-self:flex-start; width:min(100%, 360px); }
