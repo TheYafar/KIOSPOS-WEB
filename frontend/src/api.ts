@@ -227,14 +227,17 @@ export async function anularMovimiento(id: number): Promise<MovimientoCaja> {
 }
 
 // ---------- Ventas del día: anular y devolver ----------
-export interface VentaFila { id: number; numeroFactura: number; fechaHora: string; cajaId: number; totalUsd: number; totalBs: number; estado: "COMPLETADA" | "ANULADA"; clienteId: number | null; pagos: string; items: number; devueltoUsd: number; }
+export interface VentaFila { id: number; numeroFactura: number; fechaHora: string; cajaId: number; totalUsd: number; totalBs: number; estado: "COMPLETADA" | "ANULADA"; clienteId: number | null; pagos: string; items: number; devueltoUsd: number; productos?: string; }
 export interface LineaVentaDet { detalleId: number; productoId: number | null; nombre: string; cantidad: number; precioUsd: number; subtotalUsd: number; devuelto: number; }
 export interface DevolucionReg { id: number; totalUsd: number; metodoReembolso: string; montoReembolso: number; motivo: string | null; createdAt: string; }
 export interface VentaDetalle {
   id: number; numeroFactura: number; fechaHora: string; estado: "COMPLETADA" | "ANULADA"; cajaId: number; turnoId: number | null; turnoAbierto: boolean;
   tasa: number; totalUsd: number; totalBs: number; vueltoUsd: number; vueltoBs: number; clienteId: number | null; motivoAnulacion: string | null;
-  lineas: LineaVentaDet[]; pagos: { metodo: string; moneda: string; monto: number; referencia: string | null }[]; devoluciones: DevolucionReg[]; devueltoUsd: number;
+  lineas: LineaVentaDet[]; pagos: { metodo: string; moneda: string; monto: number; referencia: string | null }[];
+  devoluciones: { devolucion: DevolucionReg; reembolsos: ReembolsoParte[] }[]; devueltoUsd: number;
 }
+export interface ReembolsoParte { metodo: string; moneda: "USD" | "VES"; monto: number; referencia: string | null; }
+export async function buscarVenta(numero: number): Promise<VentaFila[]> { return parse(await fetch("/api/ventas/buscar?numero=" + numero, { headers: auth() })); }
 export async function ventasDelDia(fecha?: string): Promise<VentaFila[]> {
   return parse(await fetch("/api/ventas" + (fecha ? "?fecha=" + fecha : ""), { headers: auth() }));
 }
@@ -242,7 +245,7 @@ export async function detalleVenta(id: number): Promise<VentaDetalle> { return p
 export async function anularVenta(id: number, motivo: string): Promise<void> {
   await parse(await fetch(`/api/ventas/${id}/anular`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ motivo }) }));
 }
-export async function devolverVenta(id: number, body: { items: { detalleId: number; cantidad: number }[]; metodoReembolso: string; motivo?: string }): Promise<DevolucionReg> {
+export async function devolverVenta(id: number, body: { items: { detalleId: number; cantidad: number }[]; metodoReembolso: string; motivo?: string; referencia?: string }): Promise<{ devolucion: DevolucionReg; reembolsos: ReembolsoParte[] }> {
   return parse(await fetch(`/api/ventas/${id}/devolver`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
 }
 

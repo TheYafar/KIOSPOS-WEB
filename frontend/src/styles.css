@@ -1411,3 +1411,17 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
 .pp.pasos { text-align:left; white-space:normal; display:block; }
 /* ".done" también es la pantalla de venta lista: aquí no se centra. */
 .pp-item.done { flex:none; overflow:visible; justify-content:flex-start; align-items:center; text-align:left; flex-wrap:nowrap; flex-direction:row; padding:10px; min-height:0; gap:12px; }
+/* Historial de ventas y reembolso "como pagó" */
+.vt-bar { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+.vt-num { flex:1 1 240px; }
+.vt-ir { border:0; background:var(--primary); color:var(--on-primary); font:inherit; font-weight:700; font-size:13px; padding:7px 12px; border-radius:9px; cursor:pointer; }
+.vt-dias { flex:none; } .vt-cal { width:auto; flex:none; }
+.vt-todo-btn { align-self:flex-start; }
+.vt-reemb { gap:6px; } .vt-reemb > span { font-weight:600; }
+.vt-parte { display:flex; justify-content:space-between; width:100%; font-size:15px; } .vt-parte b { font-size:18px; color:var(--bad); }
+.vt-devs { display:flex; flex-direction:column; gap:6px; }
+.vt-dv { display:flex; align-items:center; gap:8px; flex-wrap:wrap; } .vt-dv small { color:var(--text-2); }
+.tb-dev b { color:var(--bad); }
+/* En los modales nada se aplasta: si no cabe, el cuerpo se desplaza. */
+.modal-body > * { flex-shrink:0; }
+.vt-todo-btn { height:40px; }

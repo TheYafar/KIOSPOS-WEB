@@ -32,7 +32,7 @@ const detalleDemo = (id: number) => ({
     ? [{ detalleId: 101, productoId: 2, nombre: "Coca-Cola 2L", cantidad: 1, precioUsd: 1.75, subtotalUsd: 1.75, devuelto: 0 }, { detalleId: 102, productoId: 1, nombre: "Harina PAN", cantidad: 1, precioUsd: 1, subtotalUsd: 1, devuelto: 0 }]
     : [{ detalleId: 201, productoId: 3, nombre: "Arroz Mary", cantidad: 3, precioUsd: 2, subtotalUsd: 6, devuelto: 1 }],
   pagos: [{ metodo: id === 11 ? "EFECTIVO_USD" : "PAGO_MOVIL", moneda: id === 11 ? "USD" : "VES", monto: id === 11 ? 2.75 : 5400, referencia: null }],
-  devoluciones: id === 11 ? [] : [{ id: 1, totalUsd: 2, metodoReembolso: "EFECTIVO_USD", montoReembolso: 2, motivo: null, createdAt: "" }], devueltoUsd: id === 11 ? 0 : 2,
+  devoluciones: id === 11 ? [] : [{ devolucion: { id: 1, totalUsd: 2, metodoReembolso: "EFECTIVO_USD", montoReembolso: 2, motivo: null, createdAt: "" }, reembolsos: [{ metodo: "EFECTIVO_USD", moneda: "USD", monto: 2, referencia: null }] }], devueltoUsd: id === 11 ? 0 : 2,
 });
 
 export const clientesDemo = () => [

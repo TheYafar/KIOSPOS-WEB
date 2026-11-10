@@ -154,8 +154,12 @@ function TurnoBar({ turno, onIr }: { turno: TurnoResumen | null; onIr: () => voi
     if (!metodoActivo(id) && monto === 0) return;
     items.push({ id, n, v: (moneda === "USD" ? "$ " : "Bs ") + money(monto), usd: moneda === "USD" ? monto : monto / tasa });
   };
-  add("EFECTIVO_USD", "Efectivo $", turno.efectivoUsd, "USD");
-  add("EFECTIVO_BS", "Efectivo Bs", turno.efectivoBs, "VES");
+  // Neto de ventas: lo cobrado − el vuelto − lo devuelto en efectivo (las devoluciones
+  // por pago móvil/punto ya vienen restadas del servidor en cada método).
+  const dev = (m: "USD" | "VES") => (turno.movimientos || []).filter((x) => x.tipo === "DEVOLUCION" && x.moneda === m).reduce((s, x) => s + x.total, 0);
+  const r2 = (n: number) => Math.round(n * 100) / 100;
+  add("EFECTIVO_USD", "Efectivo $", r2(turno.efectivoUsd - turno.vueltoUsd - dev("USD")), "USD");
+  add("EFECTIVO_BS", "Efectivo Bs", r2(turno.efectivoBs - turno.vueltoBs - dev("VES")), "VES");
   add("PAGO_MOVIL", "Pago móvil", dig("PAGO_MOVIL"), "VES");
   add("PUNTO", "Punto", dig("PUNTO"), "VES");
   add("BIOPAGO", "Biopago", dig("BIOPAGO"), "VES");
@@ -168,6 +172,7 @@ function TurnoBar({ turno, onIr }: { turno: TurnoResumen | null; onIr: () => voi
       <div className="tb-items">
         {items.map((x) => <span key={x.id} className="tb-it"><small>{x.n}</small><b className="t">{x.v}</b></span>)}
       </div>
+      {(dev("USD") > 0 || dev("VES") > 0) && <span className="tb-it tb-dev"><small>Devuelto</small><b className="t">{[dev("USD") > 0 ? "$ " + money(dev("USD")) : "", dev("VES") > 0 ? "Bs " + money(dev("VES")) : ""].filter(Boolean).join(" · ")}</b></span>}
       <span className="tb-tot"><small>Total cobrado</small><b className="t">≈ $ {money(total)}</b></span>
     </div>
   );

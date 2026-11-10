@@ -33,9 +33,37 @@ test("devolución parcial: no deja pasar de lo que queda y reembolsa en efectivo
   await expect(page.locator(".cli-saldo")).toContainText("$ 4,00");
   await page.getByRole("button", { name: "Efectivo Bs" }).click();
   await expect(page.locator(".cli-saldo")).toContainText("Bs 3.600,00"); // a la tasa de la venta (900)
-  await page.getByRole("button", { name: /^Devolver Bs/ }).click();
+  await page.getByRole("button", { name: "Devolver $ 4,00" }).click();
   await expect(page.locator(".pinmsg.ok")).toHaveText("Devolución registrada ✓");
   expect(st.devuelta).toEqual({ id: 12, items: [{ detalleId: 201, cantidad: 2 }], metodoReembolso: "EFECTIVO_BS" });
+});
+
+test("buscar por factura y devolver toda la venta como pagó (mitad $ y mitad pago móvil)", async ({ page }) => {
+  const st: Estado = { turnoAbierto: true };
+  await preparar(page, st, { "kioskpos.sesion": sesionCajero });
+  await page.route("**/api/ventas/buscar*", (r) => r.fulfill({ json: [{ id: 14, numeroFactura: 9, fechaHora: "2026-11-08T14:05:00Z", cajaId: 1, totalUsd: 6, totalBs: 5400, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD,PAGO_MOVIL", items: 2, devueltoUsd: 0, productos: "Harina PAN, Coca-Cola 2L" }] }));
+  await page.route("**/api/ventas/14/detalle", (r) => r.fulfill({ json: {
+    id: 14, numeroFactura: 9, fechaHora: "2026-11-08T14:05:00Z", estado: "COMPLETADA", cajaId: 1, turnoId: 3, turnoAbierto: false, tasa: 900, totalUsd: 6, totalBs: 5400,
+    vueltoUsd: 1, vueltoBs: 0, clienteId: null, motivoAnulacion: null,
+    lineas: [{ detalleId: 301, productoId: 1, nombre: "Harina PAN", cantidad: 2, precioUsd: 1, subtotalUsd: 2, devuelto: 0 }, { detalleId: 302, productoId: 2, nombre: "Coca-Cola 2L", cantidad: 2, precioUsd: 2, subtotalUsd: 4, devuelto: 0 }],
+    pagos: [{ metodo: "EFECTIVO_USD", moneda: "USD", monto: 4, referencia: null }, { metodo: "PAGO_MOVIL", moneda: "VES", monto: 2700, referencia: "1111" }], devoluciones: [], devueltoUsd: 0 } }));
+  await ir(page);
+  await page.keyboard.press("Alt+3");
+  await page.getByLabel("Buscar por número de factura").fill("9");
+  await page.keyboard.press("Enter");
+  await expect(page.getByRole("heading", { name: "Venta #9" })).toBeVisible(); // un solo resultado: se abre sola
+  await page.getByRole("button", { name: "Devolver productos" }).click();
+  // Solo un producto: la Coca-Cola ($4) → como pagó: $2 efectivo (pagó $4 − $1 de vuelto = $3) y Bs 1.800 de pago móvil
+  await page.getByRole("button", { name: "Más Coca-Cola 2L" }).click();
+  await page.getByRole("button", { name: "Más Coca-Cola 2L" }).click();
+  await expect(page.locator(".vt-parte")).toHaveText(["Efectivo $$ 2,00", "Pago móvilBs 1.800,00"]);
+  // Toda la venta: $6 → $3 + Bs 2.700
+  await page.getByRole("button", { name: "Devolver toda la venta" }).click();
+  await expect(page.locator(".vt-parte")).toHaveText(["Efectivo $$ 3,00", "Pago móvilBs 2.700,00"]);
+  await page.getByLabel("Referencia del reembolso").fill("4455");
+  await page.getByRole("button", { name: "Devolver $ 6,00" }).click();
+  await expect(page.locator(".pinmsg.ok")).toHaveText("Devolución registrada ✓");
+  expect(st.devuelta).toEqual({ id: 14, items: [{ detalleId: 301, cantidad: 2 }, { detalleId: 302, cantidad: 2 }], metodoReembolso: "COMO_PAGO", referencia: "4455" });
 });
 
 test("registrar una compra: busca el producto, calcula el costo promedio y la manda", async ({ page }) => {
