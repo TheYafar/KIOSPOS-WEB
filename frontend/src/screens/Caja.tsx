@@ -5,6 +5,7 @@ import { Icono, UIcono, catInfo } from "../icons";
 import { Cobro, type ResumenPago } from "./Cobro";
 import { CantidadPesable, cantTxt } from "./Pesable";
 import { planSuspendido } from "../plan";
+import { Recargas } from "./Recargas";
 
 interface Item { producto: Producto; qty: number; }
 
@@ -33,6 +34,7 @@ export function Caja() {
   const [cat, setCat] = useState("all");
   const [carrito, setCarrito] = useState<Map<number, Item>>(new Map());
   const [view, setView] = useState<"caja" | "ticket" | "checkout" | "done">("caja");
+  const [recargas, setRecargas] = useState(false);
   const [done, setDone] = useState<Done | null>(null);
   const [err, setErr] = useState("");
   const [selIdx, setSelIdx] = useState(0); // producto resaltado con ↑↓ al buscar
@@ -130,6 +132,7 @@ export function Caja() {
         e.preventDefault(); if (carrito.size > 0) abrirCobro(); return;
       }
       if (e.key === "F2") { e.preventDefault(); buscarRef.current?.focus(); buscarRef.current?.select(); return; }
+      if (e.key === "F4") { e.preventDefault(); if (!planSuspendido()) setRecargas(true); return; }
       if (escribiendo && !enBuscar) return;
       const sinTexto = !enBuscar || q === "";
       if ((e.key === "+" || e.key === "-") && sinTexto && !e.ctrlKey && !e.metaKey) {
@@ -239,6 +242,8 @@ export function Caja() {
           else if (e.key === "ArrowUp") { e.preventDefault(); setSelIdx((i) => Math.max(0, i - 1)); }
           else if (e.key === "Escape") { e.preventDefault(); setQ(""); }
         }} /></div>
+      <button className="btn2 press rec-btn" onClick={() => setRecargas(true)} disabled={planSuspendido()} title="Recarga de saldo (F4)"><UIcono k="phone" sw={1.9} /><span>Recarga</span> <kbd className="kb">F4</kbd></button>
+      {recargas && <Recargas onClose={() => setRecargas(false)} />}
     </div>
   );
   const chips = (

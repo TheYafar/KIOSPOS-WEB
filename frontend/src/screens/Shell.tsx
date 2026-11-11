@@ -188,8 +188,10 @@ function TurnoBar({ turno, onIr }: { turno: TurnoResumen | null; onIr: () => voi
   // por pago móvil/punto ya vienen restadas del servidor en cada método).
   const dev = (m: "USD" | "VES") => (turno.movimientos || []).filter((x) => x.tipo === "DEVOLUCION" && x.moneda === m).reduce((s, x) => s + x.total, 0);
   const r2 = (n: number) => Math.round(n * 100) / 100;
-  add("EFECTIVO_USD", "Efectivo $", r2(turno.efectivoUsd - turno.vueltoUsd - dev("USD")), "USD");
-  add("EFECTIVO_BS", "Efectivo Bs", r2(turno.efectivoBs - turno.vueltoBs - dev("VES")), "VES");
+  // Las recargas cobradas en efectivo también entran a la gaveta.
+  const rec = (m: "USD" | "VES") => (turno.movimientos || []).filter((x) => x.tipo === "RECARGA" && x.moneda === m).reduce((s, x) => s + x.total, 0);
+  add("EFECTIVO_USD", "Efectivo $", r2(turno.efectivoUsd - turno.vueltoUsd - dev("USD") + rec("USD")), "USD");
+  add("EFECTIVO_BS", "Efectivo Bs", r2(turno.efectivoBs - turno.vueltoBs - dev("VES") + rec("VES")), "VES");
   add("PAGO_MOVIL", "Pago móvil", dig("PAGO_MOVIL"), "VES");
   add("PUNTO", "Punto", dig("PUNTO"), "VES");
   add("BIOPAGO", "Biopago", dig("BIOPAGO"), "VES");

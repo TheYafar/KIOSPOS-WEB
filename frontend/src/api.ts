@@ -141,7 +141,13 @@ export async function importarCsv(csv: string): Promise<{ creados: number; actua
 
 export interface DesglosePago { metodo: string; moneda: string; montoOriginal: number; equivalenteUsd: number; }
 export interface ReporteDia { fecha: string; cantidadVentas: number; totalUsd: number; totalBs: number; costoUsd: number; gananciaUsd: number; pagos: DesglosePago[];
-  movimientos?: { tipo: string; moneda: string; total: number; cantidad: number }[]; comisionAvancesBs?: number; abonosFiadoUsd?: number; devolucionesUsd?: number; }
+  movimientos?: { tipo: string; moneda: string; total: number; cantidad: number }[]; comisionAvancesBs?: number; abonosFiadoUsd?: number; devolucionesUsd?: number;
+  hasta?: string; cantidadRecargas?: number; recargasBs?: number; comisionRecargasBs?: number;
+  masVendidos?: { productoId: number | null; nombre: string; cantidad: number; vendidoUsd: number; gananciaUsd: number }[];
+  porDia?: { fecha: string; cantidadVentas: number; totalUsd: number; gananciaUsd: number }[]; }
+export async function reporteRango(desde: string, hasta: string): Promise<ReporteDia> {
+  return parse(await fetch(`/api/reportes/rango?desde=${desde}&hasta=${hasta}`, { headers: auth() }));
+}
 export async function reporteDia(fecha?: string): Promise<ReporteDia> {
   return parse(await fetch("/api/reportes/dia" + (fecha ? "?fecha=" + fecha : ""), { headers: auth() }));
 }
@@ -229,8 +235,20 @@ export interface TurnoResumen {
   comisionAvancesBs?: number;
   /** Cuándo se abrió el turno (ISO). Sirve para avisar si quedó abierto de otro día. */
   fechaApertura?: string;
+  recargasBs?: number;
+  comisionRecargasBs?: number;
 }
-export interface MovLinea { tipo: "GASTO" | "RETIRO" | "INGRESO" | "AVANCE" | "ABONO" | "DEVOLUCION"; moneda: "USD" | "VES"; total: number; cantidad: number; }
+
+// ---------- Recargas de saldo ----------
+export type Operadora = "MOVISTAR" | "DIGITEL" | "MOVILNET" | "CANTV" | "SIMPLE_TV" | "INTER" | "OTRA";
+export interface RecargaV { id: number; turnoId: number; operadora: Operadora; numero: string; montoBs: number; metodoCobro: string; moneda: "USD" | "VES";
+  montoCobrado: number; tasa: number; comisionBs: number; referencia: string | null; anulada: boolean; createdAt: string; }
+export async function registrarRecarga(body: { operadora: Operadora; numero: string; montoBs: number; metodoCobro: string; montoCobrado: number; tasa: number; referencia?: string }): Promise<RecargaV> {
+  return parse(await fetch("/api/recargas", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+export async function recargasTurno(turnoId: number): Promise<RecargaV[]> { return parse(await fetch("/api/recargas?turnoId=" + turnoId, { headers: auth() })); }
+export async function anularRecarga(id: number): Promise<RecargaV> { return parse(await fetch(`/api/recargas/${id}/anular`, { method: "POST", headers: auth() })); }
+export interface MovLinea { tipo: "GASTO" | "RETIRO" | "INGRESO" | "AVANCE" | "ABONO" | "DEVOLUCION" | "RECARGA"; moneda: "USD" | "VES"; total: number; cantidad: number; }
 
 // ---------- Movimientos de caja (gastos, retiros, ingresos, avances) ----------
 export type TipoMov = "GASTO" | "RETIRO" | "INGRESO" | "AVANCE";

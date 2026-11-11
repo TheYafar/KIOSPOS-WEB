@@ -21,7 +21,8 @@ export interface CajaCfg { metodosPago: string | null; tasaModo: string; ajusteT
 export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: any; cierre?: any; tasa?: number | null; cajaConfig?: CajaCfg; puts?: CajaCfg[];
   movs?: any[]; clientes?: any[]; abonos?: any[]; nuevoCliente?: any;
   anulada?: any; devuelta?: any; compra?: any; descuento?: any; fiado?: any; producto?: any; categoria?: any; nomina?: any;
-  ventaFalla?: string; turnoDesde?: string; nominaHist?: any[]; nominaAnulada?: any; }
+  ventaFalla?: string; turnoDesde?: string; nominaHist?: any[]; nominaAnulada?: any;
+  recargas?: any[]; rango?: any; configNeg?: any; }
 
 export const ventasDemo = [
   { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
@@ -36,6 +37,21 @@ const detalleDemo = (id: number) => ({
   pagos: [{ metodo: id === 11 ? "EFECTIVO_USD" : "PAGO_MOVIL", moneda: id === 11 ? "USD" : "VES", monto: id === 11 ? 2.75 : 5400, referencia: null }],
   devoluciones: id === 11 ? [] : [{ devolucion: { id: 1, totalUsd: 2, metodoReembolso: "EFECTIVO_USD", montoReembolso: 2, motivo: null, createdAt: "" }, reembolsos: [{ metodo: "EFECTIVO_USD", moneda: "USD", monto: 2, referencia: null }] }], devueltoUsd: id === 11 ? 0 : 2,
 });
+
+/** Reporte por rango: un día por cada fecha entre desde y hasta, con dos productos top. */
+export function rangoDemo(u: string) {
+  const q = new URL(u).searchParams, desde = q.get("desde")!, hasta = q.get("hasta")!;
+  const dias: any[] = [];
+  for (let d = new Date(desde + "T12:00:00Z"); d.toISOString().slice(0, 10) <= hasta; d.setUTCDate(d.getUTCDate() + 1)) {
+    const i = dias.length; dias.push({ fecha: d.toISOString().slice(0, 10), cantidadVentas: 3 + i, totalUsd: 10 + i * 2, gananciaUsd: 3 + i });
+  }
+  const total = dias.reduce((s, x) => s + x.totalUsd, 0), gan = dias.reduce((s, x) => s + x.gananciaUsd, 0);
+  return { fecha: desde, hasta, cantidadVentas: dias.reduce((s, x) => s + x.cantidadVentas, 0), totalUsd: total, totalBs: total * 900, costoUsd: total - gan, gananciaUsd: gan,
+    pagos: [{ metodo: "EFECTIVO_USD", moneda: "USD", montoOriginal: total, equivalenteUsd: total }], movimientos: [], comisionAvancesBs: 0, abonosFiadoUsd: 0, devolucionesUsd: 0,
+    cantidadRecargas: 4, recargasBs: 1200, comisionRecargasBs: 120,
+    masVendidos: [{ productoId: 1, nombre: "Harina PAN", cantidad: 30, vendidoUsd: 30, gananciaUsd: 9 }, { productoId: 2, nombre: "Coca-Cola 2L", cantidad: 8, vendidoUsd: 14, gananciaUsd: 6 }],
+    porDia: dias.length > 1 ? dias : [] };
+}
 
 export const clientesDemo = () => [
   { id: 1, nombre: "María Pérez", cedula: "V12345678", telefono: "04121234567", limiteUsd: 10, activo: true, saldoUsd: 8, ultimoMovimiento: "2026-11-09T12:00:00Z" },
@@ -107,6 +123,19 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     if (/\/api\/ventas\/\d+\/anular/.test(u)) { st.anulada = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { id: 11, estado: "ANULADA" } }); }
     if (/\/api\/ventas\/\d+\/devolver/.test(u)) { st.devuelta = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { id: 2 } }); }
     if (u.includes("/api/ventas") && m === "GET") return r.fulfill({ json: ventasDemo });
+    if (u.includes("/api/recargas") && m === "POST" && !u.includes("/anular")) {
+      const b = JSON.parse(r.request().postData() || "{}");
+      const enBs = b.metodoCobro === "EFECTIVO_USD" ? Math.round(b.montoCobrado * b.tasa * 100) / 100 : b.montoCobrado;
+      const rec = { id: (st.recargas?.length ?? 0) + 1, turnoId: 7, anulada: false, createdAt: new Date().toISOString(), referencia: null, moneda: b.metodoCobro === "EFECTIVO_USD" ? "USD" : "VES", comisionBs: Math.round((enBs - b.montoBs) * 100) / 100, ...b };
+      (st.recargas ??= []).push(rec); return r.fulfill({ json: rec });
+    }
+    if (/\/api\/recargas\/\d+\/anular/.test(u)) { const id = Number(u.split("/").slice(-2)[0]); const x = st.recargas?.find((y) => y.id === id); if (x) x.anulada = true; return r.fulfill({ json: x ?? {} }); }
+    if (u.includes("/api/recargas")) return r.fulfill({ json: [...(st.recargas ?? [])].reverse() });
+    if (u.includes("/api/reportes/rango")) { st.rango = u; return r.fulfill({ json: rangoDemo(u) }); }
+    if (u.includes("/api/mi-negocio/config")) {
+      if (m === "PUT") st.configNeg = JSON.parse(r.request().postData() || "{}");
+      return r.fulfill({ json: { nombre: "Bodega Cocoa", telefono: null, direccion: null, cajasContratadas: 1, horariosCierre: null, rif: null, mensajeTicket: null, ...(st.configNeg ?? {}) } });
+    }
     if (/\/api\/nomina\/pagos\/\d+\/anular/.test(u)) {
       st.nominaAnulada = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") };
       const h = st.nominaHist?.find((x) => x.pago.id === st.nominaAnulada.id);

@@ -86,7 +86,7 @@ class ReporteServiceTest extends PostgresRlsTestBase {
             ventaService.registrar(caja, permiso,
                     new VentaService.VentaInput("R-2", new BigDecimal("40.00"), List.of(item), List.of(pago)));
 
-            var r = reporteService.resumenDelDia(LocalDate.now());
+            var r = reporteService.resumenDelDia(LocalDate.now(java.time.ZoneId.of("America/Caracas")));
             assertThat(r.cantidadVentas()).isEqualTo(2);
             assertThat(r.totalUsd()).isEqualByComparingTo("20.00");
             assertThat(r.costoUsd()).isEqualByComparingTo("12.00");
@@ -106,7 +106,7 @@ class ReporteServiceTest extends PostgresRlsTestBase {
                 .registrarNegocioConDueno("La Esquina", "Pedro", "rep2@ejemplo.com", "clave-secreta").negocioId();
         try {
             NegocioContext.set(otro);
-            var r = reporteService.resumenDelDia(LocalDate.now());
+            var r = reporteService.resumenDelDia(LocalDate.now(java.time.ZoneId.of("America/Caracas")));
             assertThat(r.cantidadVentas()).isZero();
             assertThat(r.totalUsd()).isEqualByComparingTo("0");
         } finally {
