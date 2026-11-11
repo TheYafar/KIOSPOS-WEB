@@ -41,7 +41,7 @@ public class SuscripcionService {
     }
 
     public SituacionNegocio situacion(Negocio n) {
-        LocalDate hoy = LocalDate.now();
+        LocalDate hoy = com.kioskpos.web.Fechas.hoy();
         PlanCatalogo.Plan plan = PlanCatalogo.plan(n.getPlan());
         int cajas = n.getCajasContratadas() == null ? 1 : n.getCajasContratadas();
         BigDecimal precio = plan.mensualidad(cajas);
@@ -163,9 +163,9 @@ public class SuscripcionService {
         Negocio negocio = negocioRepository.findById(pago.getNegocioId())
                 .orElseThrow(() -> new IllegalArgumentException("Negocio no encontrado"));
 
-        LocalDate base = negocio.getPagoHasta() != null && negocio.getPagoHasta().isAfter(LocalDate.now())
+        LocalDate base = negocio.getPagoHasta() != null && negocio.getPagoHasta().isAfter(com.kioskpos.web.Fechas.hoy())
                 ? negocio.getPagoHasta()
-                : LocalDate.now();
+                : com.kioskpos.web.Fechas.hoy();
         negocio.setPagoHasta(base.plusMonths(pago.getMeses()));
         // Con el primer pago deja de estar en prueba (ya tiene días de gracia como cliente).
         negocio.setEnPrueba(false);

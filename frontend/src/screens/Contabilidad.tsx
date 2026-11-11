@@ -1,3 +1,4 @@
+import { hoyVe } from "../dia";
 import { TEXTO_SYNC, useDocServidor } from "../contabilidad-sync";
 import { useEffect, useMemo, useState } from "react";
 import { cierresDia, reporteDia, type CierreDia, type ReporteDia } from "../api";
@@ -117,7 +118,7 @@ export function Contabilidad() {
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = "contabilidad-" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.href = url; a.download = "contabilidad-" + hoyVe() + ".csv";
     document.body.appendChild(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(url), 1500);
   };

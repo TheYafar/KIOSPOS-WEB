@@ -115,7 +115,7 @@ public class CompraService {
         c.setNegocioId(negocioId);
         c.setProveedorId(in.proveedorId());
         c.setNumeroFactura(recortar(in.numeroFactura(), 40));
-        c.setFecha(in.fecha() == null ? LocalDate.now() : in.fecha());
+        c.setFecha(in.fecha() == null ? com.kioskpos.web.Fechas.hoy() : in.fecha());
         c.setTasa(in.tasa());
         c.setPagada(in.pagada() == null || in.pagada());
         c.setNota(recortar(in.nota(), 200));

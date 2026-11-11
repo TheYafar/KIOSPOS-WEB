@@ -58,7 +58,7 @@ class SuscripcionPermisoTest extends PostgresRlsTestBase {
     @Test
     void escaleraDeCorteSegunDiasVencido() {
         Long neg = nuevoNegocio("Cocoa", "esc@ejemplo.com");
-        LocalDate hoy = LocalDate.now();
+        LocalDate hoy = com.kioskpos.web.Fechas.hoy();
 
         // Al día -> ACTIVA, cobra.
         ponerPagoHasta(neg, hoy.plusDays(10));
@@ -92,7 +92,7 @@ class SuscripcionPermisoTest extends PostgresRlsTestBase {
         }
 
         // Al día -> se emite permiso.
-        ponerPagoHasta(neg, LocalDate.now().plusDays(10));
+        ponerPagoHasta(neg, com.kioskpos.web.Fechas.hoy().plusDays(10));
         var permiso = permisoService.renovar(neg, cajaId);
         assertThat(permiso.permiso()).isNotBlank();
         permisoService.exigirPermisoVigente(permiso.permiso(), neg, cajaId); // no lanza
@@ -102,12 +102,12 @@ class SuscripcionPermisoTest extends PostgresRlsTestBase {
                 .isInstanceOf(PermisoDenegadoException.class);
 
         // Vencido más allá de la gracia -> se niega la renovación.
-        ponerPagoHasta(neg, LocalDate.now().minusDays(30));
+        ponerPagoHasta(neg, com.kioskpos.web.Fechas.hoy().minusDays(30));
         assertThatThrownBy(() -> permisoService.renovar(neg, cajaId))
                 .isInstanceOf(PermisoDenegadoException.class);
 
         // Suspensión manual -> también se niega, aunque estuviera al día.
-        ponerPagoHasta(neg, LocalDate.now().plusDays(10));
+        ponerPagoHasta(neg, com.kioskpos.web.Fechas.hoy().plusDays(10));
         suscripcionService.suspender(neg);
         assertThatThrownBy(() -> permisoService.renovar(neg, cajaId))
                 .isInstanceOf(PermisoDenegadoException.class);
@@ -116,7 +116,7 @@ class SuscripcionPermisoTest extends PostgresRlsTestBase {
     @Test
     void aprobarPagoEmpujaPagoHastaYReactivaElCobro() {
         Long neg = nuevoNegocio("Cocoa", "pago@ejemplo.com");
-        ponerPagoHasta(neg, LocalDate.now().minusDays(40)); // bien vencido, solo consulta
+        ponerPagoHasta(neg, com.kioskpos.web.Fechas.hoy().minusDays(40)); // bien vencido, solo consulta
         assertThat(suscripcionService.puedeCobrar(neg)).isFalse();
 
         var pago = suscripcionService.reportarPago(neg, new BigDecimal("25.00"), "USD", "Pago móvil", "REF-1", 1);
@@ -125,7 +125,7 @@ class SuscripcionPermisoTest extends PostgresRlsTestBase {
         suscripcionService.aprobarPago(pago.getId(), 1L);
         var sit = suscripcionService.situacion(neg);
         assertThat(sit.puedeCobrar()).isTrue();
-        assertThat(sit.pagoHasta()).isAfterOrEqualTo(LocalDate.now());
+        assertThat(sit.pagoHasta()).isAfterOrEqualTo(com.kioskpos.web.Fechas.hoy());
     }
 
     @Test
@@ -138,7 +138,7 @@ class SuscripcionPermisoTest extends PostgresRlsTestBase {
 
         // Venció ayer: suspendido de una vez (quien ya pagó tendría 15 días de aviso).
         Negocio n = negocioRepository.findById(neg).orElseThrow();
-        n.setPagoHasta(LocalDate.now().minusDays(1));
+        n.setPagoHasta(com.kioskpos.web.Fechas.hoy().minusDays(1));
         negocioRepository.save(n);
         var vencida = suscripcionService.situacion(neg);
         assertThat(vencida.estadoEfectivo()).isEqualTo("SUSPENDIDA");

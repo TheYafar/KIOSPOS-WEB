@@ -1,14 +1,13 @@
+import { diaVe, hace } from "./dia";
 import type { ReporteDia } from "./api";
 
 /** Días de un período en el calendario de Venezuela: hoy, últimos 7 días o el mes en curso. */
 export type Periodo = "hoy" | "semana" | "mes";
 export function rangoDe(p: Periodo, ahora = new Date()): { desde: string; hasta: string } {
-  const hoy = ahora.toLocaleDateString("en-CA", { timeZone: "America/Caracas" });
+  const hoy = diaVe(ahora);
   if (p === "hoy") return { desde: hoy, hasta: hoy };
   if (p === "mes") return { desde: hoy.slice(0, 8) + "01", hasta: hoy };
-  const d = new Date(hoy + "T12:00:00Z");
-  d.setUTCDate(d.getUTCDate() - 6);
-  return { desde: d.toISOString().slice(0, 10), hasta: hoy };
+  return { desde: hace(6, ahora), hasta: hoy };
 }
 
 const num = (n: number | undefined) => (n ?? 0).toFixed(2).replace(".", ",");

@@ -1,3 +1,4 @@
+import { hace, hoyVe } from "../dia";
 import { useEffect, useState } from "react";
 import { anularVenta, buscarVenta, detalleVenta, devolverVenta, ventasDelDia, type VentaDetalle, type VentaFila } from "../api";
 import { repartir, type Parte } from "../reembolso";
@@ -13,9 +14,9 @@ import { leerMonto } from "../arqueo";
 const money = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const usd = (n: number) => "$ " + money(n);
 const bs = (n: number) => "Bs " + money(n);
-const diaIso = (d: Date) => new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
-const hoy = () => diaIso(new Date());
-const ayer = () => diaIso(new Date(Date.now() - 86400000));
+// El día del negocio es el de Venezuela (igual que el servidor), aunque el equipo tenga otra zona.
+const hoy = () => hoyVe();
+const ayer = () => hace(1);
 const NOMBRE: Record<string, string> = { EFECTIVO_USD: "Efectivo $", EFECTIVO_BS: "Efectivo Bs", PAGO_MOVIL: "Pago móvil", PUNTO: "Punto", BIOPAGO: "Biopago", OTRO: "Otra", FIADO: "Fiado",
   A_CUENTA: "A su fiado", FUERA_DE_CAJA: "Fuera de caja", COMO_PAGO: "Como pagó" };
 const fmtParte = (p: { metodo: string; moneda: string; monto: number }) => (NOMBRE[p.metodo] || p.metodo) + " " + (p.moneda === "USD" ? usd(p.monto) : bs(p.monto));

@@ -1,3 +1,4 @@
+import { hoyVe } from "../dia";
 import { useEffect, useMemo, useState } from "react";
 import { anularCompra, compraPagada, detalleCompra, guardarProveedor, listarCompras, listarProductos, listarProveedores, registrarCompra,
   type CompraVista, type Producto, type ProveedorV } from "../api";
@@ -10,7 +11,7 @@ import { leerMonto } from "../arqueo";
 
 const money = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const usd = (n: number) => "$ " + money(n);
-const hoy = () => new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+const hoy = () => hoyVe();
 /** Igual que CompraService.costoPromedio del servidor. */
 export const costoPromedio = (stock: number, costo: number, cant: number, nuevo: number) =>
   stock <= 0 || costo <= 0 ? Math.round(nuevo * 100) / 100 : Math.round(((stock * costo + cant * nuevo) / (stock + cant)) * 100) / 100;

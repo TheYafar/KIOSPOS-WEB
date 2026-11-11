@@ -43,7 +43,7 @@ public class NegocioRegistroService {
         negocio.setNombre(nombreNegocio.trim());
         negocio.setEstado("ACTIVA");
         // Arranca con una semana de prueba: puede cobrar desde el primer día.
-        negocio.setPagoHasta(java.time.LocalDate.now().plusDays(DIAS_PRUEBA));
+        negocio.setPagoHasta(com.kioskpos.web.Fechas.hoy().plusDays(DIAS_PRUEBA));
         negocio.setEnPrueba(true);
         negocio = negocioRepository.save(negocio);
 
