@@ -1,11 +1,19 @@
 server {
-  listen 80;
+  listen ${PORT};
   server_name _;
   root /usr/share/nginx/html;
 
-  # La API va al backend (servicio "backend" en la red de docker-compose).
+  # Resuelve BACKEND_HOST en cada petición (no solo al arrancar nginx), con el DNS
+  # real del contenedor (Docker embebido en local, el de Railway en la nube) — así si
+  # el backend todavía no existía cuando arrancó nginx, igual funciona en cuanto exista.
+  resolver ${RESOLVER} valid=10s;
+
+  # La API va al backend. BACKEND_HOST por defecto es "backend:8080" (nombre del
+  # servicio en docker-compose); en Railway se pone al nombre/puerto de ESE servicio
+  # (ver RAILWAY.md).
   location /api/ {
-    proxy_pass http://backend:8080;
+    set $backend "${BACKEND_HOST}";
+    proxy_pass http://$backend;
     proxy_set_header Host $host;
     proxy_set_header X-Real-IP $remote_addr;
     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -14,7 +22,8 @@ server {
 
   # Salud del backend para el monitoreo (UptimeRobot, ops/monitor.sh). Solo esta ruta de /actuator.
   location = /actuator/health {
-    proxy_pass http://backend:8080;
+    set $backend "${BACKEND_HOST}";
+    proxy_pass http://$backend;
   }
 
   # PWA: el service worker no se cachea para que siempre tome la última versión.

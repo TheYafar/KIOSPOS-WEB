@@ -524,3 +524,28 @@ el alta/venta/login (try/catch + log).
   `ops/probar-respaldo.sh` (domingos, restaura en Postgres temporal) avisan por Telegram (`ops/avisar.sh`,
   `TELEGRAM_TOKEN`/`TELEGRAM_CHAT_ID`). nginx expone `/actuator/health`.
 
+
+## 26. Despliegue en Railway + clave real del rol de runtime en bases administradas
+
+- **Railway** (`RAILWAY.md`): 3 servicios en un proyecto — Postgres (plugin administrado),
+  `backend` (Dockerfile, root `backend/`) y `frontend` (Dockerfile, root `frontend/`).
+  Sin Caddy (Railway da HTTPS solo en su subdominio). El frontend llega al backend por
+  **red privada** de Railway (`BACKEND_HOST=<servicio>.railway.internal:${{backend.PORT}}`),
+  no por su dominio público.
+- **nginx del frontend ahora es un template** (`frontend/nginx.conf.template` +
+  `frontend/docker-entrypoint.sh`, reemplaza al `nginx.conf` estático): arma la config en
+  caliente en cada arranque con `PORT` (default 80) y `BACKEND_HOST` (default
+  `backend:8080`, igual que antes para `docker-compose.prod.yml`) vía `envsubst`, y usa
+  `resolver` con el DNS del propio contenedor (de `/etc/resolv.conf`) para resolver
+  `BACKEND_HOST` en caliente — así si el backend todavía no existía al arrancar nginx
+  (orden de arranque de Railway), igual conecta en cuanto el backend esté listo.
+- **Bug real encontrado al preparar esto:** en una base ADMINISTRADA (Render, Railway,
+  Vultr), el rol de runtime `kioskpos_app` se creaba con la clave de DESARROLLO
+  `kioskpos_app_dev` **para siempre** — `db/init/02-app-password.sh` (que la pone real
+  desde `DB_APP_PASSWORD`) solo corre con el Postgres oficial de Docker
+  (`docker-entrypoint-initdb.d`), nunca en una base administrada, donde no controlas el
+  contenedor de Postgres. Arreglado: `beforeMigrate.sql` ahora también hace
+  `ALTER ROLE kioskpos_app PASSWORD '${kioskposAppPassword}'` (placeholder de Flyway,
+  `spring.flyway.placeholders.kioskposAppPassword` = `DB_APP_PASSWORD` en
+  `application.yml`) en CADA arranque, no solo al crear el rol — sincroniza la clave real
+  en cualquier despliegue, sin tocar el flujo de Docker local (mismo valor, es un no-op).

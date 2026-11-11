@@ -4,18 +4,25 @@
 --
 -- Crea el rol de runtime `kioskpos_app` (con el que la app sirve requests, sin
 -- privilegios de superusuario para que Row Level Security no se pueda saltar) si
--- aún no existe. Reemplaza al script manual db/init/01-create-app-role.sql en
--- despliegues con base ADMINISTRADA (Render, Vultr, etc.) donde ese init no corre
--- solo. En dev/pruebas el init ya lo creó, así que aquí no hace nada.
+-- aún no existe, y SIEMPRE sincroniza su clave con ${kioskposAppPassword}
+-- (= DB_APP_PASSWORD, placeholder de Flyway). Reemplaza al script manual
+-- db/init/01-create-app-role.sql + 02-app-password.sh en despliegues con base
+-- ADMINISTRADA (Render, Railway, Vultr, etc.) donde esos init no corren solos:
+-- sin esto, una base administrada se quedaba con la clave de desarrollo
+-- 'kioskpos_app_dev' para siempre. En Docker local el init ya la puso igual,
+-- así que este ALTER es un no-op (misma clave).
 --
 -- Corre antes de que el pool de runtime (Hikari) intente conectarse, así que el
--- backend ya encuentra el rol listo y arranca sin el paso manual de psql.
+-- backend ya encuentra el rol listo (y con su clave real) y arranca sin el paso
+-- manual de psql.
 -- ==============================================================================
 
 DO $$
 BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'kioskpos_app') THEN
-        CREATE ROLE kioskpos_app LOGIN PASSWORD 'kioskpos_app_dev';
+        CREATE ROLE kioskpos_app LOGIN PASSWORD '${kioskposAppPassword}';
+    ELSE
+        ALTER ROLE kioskpos_app PASSWORD '${kioskposAppPassword}';
     END IF;
 END
 $$;

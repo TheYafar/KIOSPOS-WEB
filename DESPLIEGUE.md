@@ -3,6 +3,10 @@
 Todo corre con Docker: **Postgres + backend (Spring Boot) + frontend (nginx)**. El
 frontend sirve la PWA y hace de proxy de `/api` al backend.
 
+> **¿Vas a usar Railway?** Guía aparte, paso a paso: **[RAILWAY.md](RAILWAY.md)**. Ahí
+> son 3 servicios (Postgres administrado + backend + frontend) en vez de un VPS con
+> `docker-compose`; Railway te da el HTTPS y el link público solo.
+
 ## Local / servidor (cualquier máquina con Docker)
 
 ```bash

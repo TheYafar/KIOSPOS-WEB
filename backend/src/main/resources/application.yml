@@ -39,6 +39,11 @@ spring:
     password: ${DB_ADMIN_PASSWORD:kioskpos_admin_dev}
     locations: classpath:db/migration
     baseline-on-migrate: false
+    # beforeMigrate.sql usa este placeholder para poner/actualizar la clave REAL del rol
+    # de runtime (kioskpos_app) en bases ADMINISTRADAS (Render, Railway, Vultr) donde
+    # db/init/02-app-password.sh no corre (ese script es solo para el Postgres de Docker).
+    placeholders:
+      kioskposAppPassword: ${DB_APP_PASSWORD:kioskpos_app_dev}
 
   # Correo transaccional por SMTP. Con Resend: host smtp.resend.com, user "resend",
   # pass = tu API key de Resend. Agnóstico del proveedor (cambias estas variables y
