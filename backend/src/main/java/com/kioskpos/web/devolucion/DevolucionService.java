@@ -153,7 +153,7 @@ public class DevolucionService {
         }
         Long usuario = principal == null ? null : principal.usuarioId();
         for (DetalleVenta d : v.getDetalles()) {
-            reponer(d.getProductoId(), d.getCantidad(), "ANULA_VENTA", "Venta #" + v.getNumeroFactura(), "Venta anulada", usuario);
+            reponer(d.getProductoId(), d.getCantidad().multiply(unidadesDe(d)), "ANULA_VENTA", "Venta #" + v.getNumeroFactura(), "Venta anulada", usuario);
         }
         BigDecimal fiado = fiadoDe(v);
         if (v.getClienteId() != null && fiado.signum() > 0) {
@@ -299,7 +299,7 @@ public class DevolucionService {
             dd.setCantidad(e.getValue());
             dd.setMontoUsd(d.getPrecioUnitarioUsd().multiply(e.getValue()).setScale(2, RoundingMode.HALF_UP));
             detalles.save(dd);
-            reponer(d.getProductoId(), e.getValue(), "DEVOLUCION", "Venta #" + v.getNumeroFactura(), "Devolución de cliente", usuario);
+            reponer(d.getProductoId(), e.getValue().multiply(unidadesDe(d)), "DEVOLUCION", "Venta #" + v.getNumeroFactura(), "Devolución de cliente", usuario);
         }
         return new DevolucionHecha(dev, reembolsos.findByDevolucionIdIn(List.of(dev.getId())));
     }
@@ -330,6 +330,11 @@ public class DevolucionService {
                         p.monto().subtract(yaPagado.getOrDefault(p.metodo() + ":" + p.moneda(), BigDecimal.ZERO))))
                 .filter(p -> p.monto().signum() > 0)
                 .toList();
+    }
+
+    /** Una caja de 20 devuelta repone 20 unidades al stock. */
+    private static BigDecimal unidadesDe(DetalleVenta d) {
+        return d.getUnidades() == null ? BigDecimal.ONE : d.getUnidades();
     }
 
     private void reponer(Long productoId, BigDecimal cantidad, String tipo, String ref, String desc, Long usuario) {

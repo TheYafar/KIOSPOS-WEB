@@ -50,4 +50,8 @@ public class DetalleVenta {
     /** Costo del producto AL MOMENTO de la venta (ganancia histórica). Null en ventas viejas o cobro rápido. */
     @Column(name = "costo_unitario_usd", precision = 12, scale = 4)
     private BigDecimal costoUnitarioUsd;
+
+    /** Unidades del producto que trae cada cosa vendida en esta línea (1 = suelto; 20 = caja de 20). */
+    @Column(nullable = false, precision = 12, scale = 3)
+    private BigDecimal unidades = BigDecimal.ONE;
 }

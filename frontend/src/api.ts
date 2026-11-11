@@ -114,6 +114,17 @@ export async function listarProductos(q?: string): Promise<Producto[]> {
   return parse(await fetch(url, { headers: auth() }));
 }
 
+// ---------- Presentaciones / bloques (caja, media caja, saco...) ----------
+/** Un bloque de un producto: "Caja" trae 20 a $5,00. La unidad suelta es el producto mismo. */
+export interface Presentacion { id: number; productoId: number; nombre: string; cantidad: number; precioUsd: number; codigoBarras: string | null; }
+export interface DatosPresentacion { nombre: string; cantidad: number; precioUsd: number; codigoBarras?: string | null; }
+export async function listarPresentaciones(): Promise<Presentacion[]> {
+  return parse(await fetch("/api/inventario/presentaciones", { headers: auth() }));
+}
+export async function guardarPresentaciones(productoId: number, lista: DatosPresentacion[]): Promise<Presentacion[]> {
+  return parse(await fetch(`/api/inventario/productos/${productoId}/presentaciones`, { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(lista) }));
+}
+
 export interface DatosProducto {
   codigoBarras: string; nombre: string; precioUsd: number; costoUsd?: number;
   categoria?: string; stockInicial?: number; esPesable?: boolean; unidadMedida?: string; stockMinimo?: number;
@@ -167,7 +178,7 @@ export async function cierresDia(fecha?: string): Promise<CierreDia[]> {
 
 // ---------- Cobro (con cola offline) ----------
 
-export interface LineaCobro { productoId?: number | null; cantidad: number; precioUsd?: number; nombre?: string; }
+export interface LineaCobro { productoId?: number | null; cantidad: number; precioUsd?: number; nombre?: string; presentacionId?: number; }
 export { listar as ventasEnCola, quitar as descartarDeCola, marcar as marcarEnCola } from "./outbox";
 export interface PagoCobro {
   metodo: "EFECTIVO_USD" | "EFECTIVO_BS" | "PUNTO" | "PAGO_MOVIL" | "BIOPAGO" | "OTRO" | "FIADO";

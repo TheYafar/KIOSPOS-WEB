@@ -40,6 +40,7 @@ public class VentaService {
     private final TasaNegocioService tasaNegocioService;
     private final ClienteService clienteService;
     private final com.kioskpos.web.suscripcion.SuscripcionService suscripcionService;
+    private final com.kioskpos.web.inventario.PresentacionRepository presentacionRepository;
 
     public VentaService(VentaRepository ventaRepository,
                         ProductoRepository productoRepository,
@@ -48,8 +49,10 @@ public class VentaService {
                         NegocioRepository negocioRepository,
                         TasaNegocioService tasaNegocioService,
                         ClienteService clienteService,
-                        com.kioskpos.web.suscripcion.SuscripcionService suscripcionService) {
+                        com.kioskpos.web.suscripcion.SuscripcionService suscripcionService,
+                        com.kioskpos.web.inventario.PresentacionRepository presentacionRepository) {
         this.suscripcionService = suscripcionService;
+        this.presentacionRepository = presentacionRepository;
         this.ventaRepository = ventaRepository;
         this.productoRepository = productoRepository;
         this.permisoService = permisoService;
@@ -59,7 +62,14 @@ public class VentaService {
         this.clienteService = clienteService;
     }
 
-    public record ItemInput(Long productoId, BigDecimal cantidad, BigDecimal precioUsd, String nombre) {
+    /**
+     * presentacionId: si se vende un bloque (caja, media caja, saco...), cantidad = cuántos
+     * bloques; el stock baja cantidad × lo que trae el bloque y el precio es el del bloque.
+     */
+    public record ItemInput(Long productoId, BigDecimal cantidad, BigDecimal precioUsd, String nombre, Long presentacionId) {
+        public ItemInput(Long productoId, BigDecimal cantidad, BigDecimal precioUsd, String nombre) {
+            this(productoId, cantidad, precioUsd, nombre, null);
+        }
     }
 
     public record PagoInput(MetodoPago metodo, Moneda moneda, BigDecimal montoOriginal, String referencia) {
@@ -114,12 +124,28 @@ public class VentaService {
             }
             Producto p = productoRepository.findById(it.productoId())
                     .orElseThrow(() -> new IllegalArgumentException("Producto no encontrado"));
-            total = total.add(p.getPrecioUsd().multiply(it.cantidad()).setScale(2, RoundingMode.HALF_UP));
+            BigDecimal precio = it.presentacionId() == null ? p.getPrecioUsd() : presentacionDe(p, it.presentacionId()).getPrecioUsd();
+            total = total.add(precio.multiply(it.cantidad()).setScale(2, RoundingMode.HALF_UP));
         }
         total = total.setScale(2, RoundingMode.HALF_UP);
-        List<ItemInput> lineas = items.stream().map(it -> new ItemInput(it.productoId(), it.cantidad(), null, null)).toList();
+        List<ItemInput> lineas = items.stream().map(it -> new ItemInput(it.productoId(), it.cantidad(), null, null, it.presentacionId())).toList();
         return registrarValidada(principal, new VentaInput(java.util.UUID.randomUUID().toString(), tasa, lineas,
                 List.of(new PagoInput(MetodoPago.FIADO, Moneda.USD, total, null)), null, clienteId));
+    }
+
+    private com.kioskpos.web.inventario.Presentacion presentacionDe(Producto producto, Long presentacionId) {
+        var pres = presentacionRepository.findById(presentacionId)
+                .orElseThrow(() -> new IllegalArgumentException("La presentación de '" + producto.getNombre() + "' ya no existe. Recarga la caja."));
+        if (!pres.getProductoId().equals(producto.getId())) {
+            throw new IllegalArgumentException("La presentación no es de '" + producto.getNombre() + "'");
+        }
+        return pres;
+    }
+
+    /** "Cigarros Belmont (Caja x20)": lo que se lee en el ticket y en la factura. */
+    static String nombreConBloque(String producto, com.kioskpos.web.inventario.Presentacion p) {
+        String n = producto + " (" + p.getNombre() + " x" + p.getCantidad().stripTrailingZeros().toPlainString() + ")";
+        return n.length() > 150 ? n.substring(0, 150) : n;
     }
 
     private Venta registrarValidada(KioskPrincipal principal, VentaInput input) {
@@ -182,7 +208,11 @@ public class VentaService {
                 if (!producto.isActivo()) {
                     throw new IllegalArgumentException("El producto '" + producto.getNombre() + "' está inactivo");
                 }
-                int filas = productoRepository.descontarStock(producto.getId(), cantidad);
+                // Bloque (caja, media caja...): cantidad = bloques; el stock baja en unidades.
+                com.kioskpos.web.inventario.Presentacion pres = item.presentacionId() == null ? null : presentacionDe(producto, item.presentacionId());
+                BigDecimal unidades = pres == null ? BigDecimal.ONE : pres.getCantidad();
+                BigDecimal mueve = cantidad.multiply(unidades);
+                int filas = productoRepository.descontarStock(producto.getId(), mueve);
                 if (filas == 0) {
                     if (!enCola) {
                         throw new IllegalStateException("Stock insuficiente de '" + producto.getNombre() + "'");
@@ -190,15 +220,17 @@ public class VentaService {
                     // Venta que llega de la cola sin internet: el dinero YA se cobró. Se registra
                     // igual (el stock queda en negativo y el dueño lo ve en Inventario) en vez de
                     // perder la venta.
-                    productoRepository.sumarStock(producto.getId(), cantidad.negate());
+                    productoRepository.sumarStock(producto.getId(), mueve.negate());
                 }
                 d.setProductoId(producto.getId());
-                d.setNombre(producto.getNombre());
+                d.setNombre(pres == null ? producto.getNombre() : nombreConBloque(producto.getNombre(), pres));
+                d.setUnidades(unidades);
                 // En vivo manda el precio del servidor; si la venta viene de la cola, el precio
                 // con el que la caja cobró (el catálogo pudo cambiar mientras estaba sin internet).
+                BigDecimal delServidor = pres == null ? producto.getPrecioUsd() : pres.getPrecioUsd();
                 d.setPrecioUnitarioUsd(enCola && item.precioUsd() != null && item.precioUsd().signum() > 0
-                        ? item.precioUsd().setScale(2, RoundingMode.HALF_UP) : producto.getPrecioUsd());
-                d.setCostoUnitarioUsd(producto.getCostoUsd());
+                        ? item.precioUsd().setScale(2, RoundingMode.HALF_UP) : delServidor);
+                d.setCostoUnitarioUsd(producto.getCostoUsd() == null ? null : producto.getCostoUsd().multiply(unidades));
             } else {
                 // Cobro rápido: artículo sin catálogo, cobrado por monto.
                 if (item.precioUsd() == null || item.precioUsd().signum() <= 0) {

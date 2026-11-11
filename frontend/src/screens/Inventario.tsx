@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { actualizarProducto, ajustarStock, borrarCategoria, crearCategoria, crearProducto, importarCsv, listarCategorias, listarProductos, renombrarCategoria, type Categoria, type Producto } from "../api";
+import { actualizarProducto, ajustarStock, borrarCategoria, crearCategoria, crearProducto, guardarPresentaciones, importarCsv, listarCategorias, listarPresentaciones, listarProductos, renombrarCategoria, type Categoria, type Producto } from "../api";
+import { EditorBloques, filasDe, leerBloques, type FilaBloque } from "./Bloques";
 import { cantTxt } from "./Pesable";
 import { Icono, UIcono, catInfo } from "../icons";
 
@@ -106,6 +107,13 @@ function FormProducto({ p, cats, onClose, onSaved }: { p?: Producto; cats: Categ
   const [pesable, setPesable] = useState(p?.esPesable ?? false);
   const [unidad, setUnidad] = useState(p?.esPesable ? (p.unidadMedida || "KG").toUpperCase() : "KG");
   const [err, setErr] = useState("");
+  // Bloques (caja, media caja, saco...): se cargan los que ya tiene y se guardan junto al producto.
+  const [bloques, setBloques] = useState<FilaBloque[]>([]);
+  const [teniaBloques, setTeniaBloques] = useState(false);
+  useEffect(() => {
+    if (!p) return;
+    listarPresentaciones().then((l) => { const m = l.filter((b) => b.productoId === p.id); setBloques(filasDe(m)); setTeniaBloques(m.length > 0); }).catch(() => {});
+  }, [p?.id]);
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const catFinal = nuevaCat != null ? nuevaCat.trim() : categoria;
   const ok = f.codigoBarras.trim() && f.nombre.trim() && num(f.precioUsd) > 0 && catFinal;
@@ -113,7 +121,13 @@ function FormProducto({ p, cats, onClose, onSaved }: { p?: Producto; cats: Categ
     if (!ok) return;
     const d = { codigoBarras: f.codigoBarras.trim(), nombre: f.nombre.trim(), precioUsd: num(f.precioUsd), costoUsd: num(f.costoUsd), categoria: catFinal,
       stockMinimo: num(f.stockMinimo), esPesable: pesable, unidadMedida: pesable ? unidad : "UND" };
-    try { if (p) await actualizarProducto(p.id, d); else await crearProducto({ ...d, stockInicial: num(f.stockInicial) }); onSaved(); }
+    const bl = leerBloques(bloques);
+    if (!bl.ok) { setErr(bl.error); return; }
+    try {
+      const guardado = p ? await actualizarProducto(p.id, d) : await crearProducto({ ...d, stockInicial: num(f.stockInicial) });
+      if (bl.lista.length > 0 || teniaBloques) await guardarPresentaciones(guardado.id ?? p!.id, bl.lista);
+      onSaved();
+    }
     catch (e) { setErr((e as Error).message); }
   };
   const u = pesable ? UNIDAD_C[unidad] : "";
@@ -161,6 +175,7 @@ function FormProducto({ p, cats, onClose, onSaved }: { p?: Producto; cats: Categ
             <label className="lbl">Avisar cuando quede{pesable ? " (" + u + ")" : ""}<input className="inp" inputMode="decimal" value={f.stockMinimo} onChange={set("stockMinimo")} placeholder="0" aria-label="Stock mínimo" /></label>
           </div>
           {p && <span className="hint">El stock se cambia con “Ajustar” (entra / sale / fijar).</span>}
+          <EditorBloques filas={bloques} setFilas={setBloques} producto={{ precioUsd: num(f.precioUsd), esPesable: pesable, unidadMedida: unidad }} />
           {err && <p className="pinmsg err">{err}</p>}
         </div>
         <div className="modal-foot"><button className="btn primary big press" disabled={!ok} onClick={guardar}>Guardar</button></div>

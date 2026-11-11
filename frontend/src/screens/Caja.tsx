@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { cobrar, facturaDe, getTasa, listarProductos, type PagoCobro, type Producto } from "../api";
+import { cobrar, facturaDe, getTasa, listarPresentaciones, listarProductos, type PagoCobro, type Presentacion, type Producto } from "../api";
+import { ElegirBloque, comoProducto } from "./Bloques";
 import { conectorDisponible, imprimirTicket } from "../conector";
 import { Icono, UIcono, catInfo } from "../icons";
 import { Cobro, type ResumenPago } from "./Cobro";
@@ -9,7 +10,9 @@ import { Recargas } from "./Recargas";
 import { useAtras } from "../atras";
 import { numFactura } from "./Factura";
 
-interface Item { producto: Producto; qty: number; }
+// Un bloque (caja, media caja) va como "producto virtual" con id negativo; base y bloque
+// dicen qué producto y qué presentación se mandan al servidor.
+interface Item { producto: Producto; qty: number; base?: Producto; bloque?: Presentacion; }
 
 const money = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const usd = (n: number) => "$ " + money(n);
@@ -47,8 +50,12 @@ export function Caja() {
 
   // Catálogo siempre fresco: al entrar, cada 2 minutos, al volver a la ventana y al
   // reconectar. Así la caja cobra con los precios que tiene el servidor.
+  const [bloques, setBloques] = useState<Presentacion[]>(() => { try { return JSON.parse(localStorage.getItem("kp_bloques") || "[]"); } catch { return []; } });
   useEffect(() => {
-    const cargar = () => listarProductos().then(setProductos).catch(() => { /* sin conexión: se queda el último */ });
+    // Bloques: copia local para seguir vendiendo cajas sin internet.
+    const cargarBloques = () => listarPresentaciones().then((l) => { setBloques(l); try { localStorage.setItem("kp_bloques", JSON.stringify(l)); } catch { /* sin espacio */ } }).catch(() => {});
+    const cargar = () => { cargarBloques(); return listarProductos().then(setProductos).catch(() => { /* sin conexión: se queda el último */ }); };
+    cargarBloques();
     listarProductos().then(setProductos).catch((e) => setErr((e as Error).message));
     const id = setInterval(cargar, 2 * 60 * 1000);
     const alVolver = () => { if (document.visibilityState === "visible") cargar(); };
@@ -62,12 +69,18 @@ export function Caja() {
       let cambio = false;
       const n = new Map(c);
       for (const [id, it] of c) {
+        if (it.bloque && it.base) {
+          const p = productos.find((x) => x.id === it.base!.id);
+          const b = bloques.find((x) => x.id === it.bloque!.id) || it.bloque;
+          if (p) { const v = comoProducto(p, b); if (v.precioUsd !== it.producto.precioUsd || v.stockActual !== it.producto.stockActual) { n.set(id, { ...it, producto: v, base: p, bloque: b }); cambio = true; } }
+          continue;
+        }
         const p = productos.find((x) => x.id === id);
         if (p && (p.precioUsd !== it.producto.precioUsd || p.stockActual !== it.producto.stockActual)) { n.set(id, { ...it, producto: p }); cambio = true; }
       }
       return cambio ? n : c;
     });
-  }, [productos]);
+  }, [productos, bloques]);
 
   const cats = useMemo(() => {
     const map = new Map<string, number>();
@@ -93,6 +106,14 @@ export function Caja() {
     if (qty <= 0) c.delete(p.id); else c.set(p.id, { producto: p, qty });
     setCarrito(c);
   };
+  const [elegirBloque, setElegirBloque] = useState<Producto | null>(null);
+  const bloquesDe = (id: number) => bloques.filter((b) => b.productoId === id);
+  const addBloque = (p: Producto, b: Presentacion) => {
+    const c = new Map(carrito); const it = c.get(-b.id);
+    c.set(-b.id, { producto: comoProducto(p, b), base: p, bloque: b, qty: (it?.qty ?? 0) + 1 }); setCarrito(c);
+  };
+  /** Tocar un producto: si tiene bloques, se pregunta si va suelto o en caja/media caja. */
+  const tocar = (p: Producto) => { if (bloquesDe(p.id).length > 0) setElegirBloque(p); else add(p); };
   const add = (p: Producto) => {
     if (p.esPesable) { setPesar({ p, inicial: carrito.get(p.id)?.qty }); return; }
     const c = new Map(carrito); const it = c.get(p.id);
@@ -118,9 +139,13 @@ export function Caja() {
   const ultimo = () => { const ks = [...carrito.keys()]; return ks.length ? ks[ks.length - 1] : null; };
   const agregarDesdeBusqueda = () => {
     const t = q.trim();
+    // El código de barras de una caja la agrega directo como caja.
+    const bq = t ? bloques.find((b) => b.codigoBarras === t) : undefined;
+    const base = bq && productos.find((p) => p.id === bq.productoId);
+    if (bq && base) { if (base.stockActual >= bq.cantidad) addBloque(base, bq); setQ(""); setSelIdx(0); return; }
     const exacto = t ? productos.find((p) => p.codigoBarras === t) : undefined;
     const p = exacto || filtrados[Math.min(selIdx, filtrados.length - 1)];
-    if (p && p.stockActual > 0) { add(p); setQ(""); setSelIdx(0); }
+    if (p && p.stockActual > 0) { if (exacto) add(p); else tocar(p); setQ(""); setSelIdx(0); }
   };
   useEffect(() => { setSelIdx(0); }, [q, cat]);
   useEffect(() => {
@@ -162,7 +187,9 @@ export function Caja() {
     try {
       // Se manda también el precio con que se cobró: si la venta se queda en la cola sin
       // internet y el catálogo cambia mientras tanto, el servidor respeta lo que se cobró.
-      const its = [...carrito.values()].map((i) => ({ productoId: i.producto.id, cantidad: i.qty, precioUsd: i.producto.precioUsd }));
+      const its = [...carrito.values()].map((i) => i.bloque && i.base
+        ? { productoId: i.base.id, presentacionId: i.bloque.id, cantidad: i.qty, precioUsd: i.producto.precioUsd }
+        : { productoId: i.producto.id, cantidad: i.qty, precioUsd: i.producto.precioUsd });
       const codigo = await cobrar(its, pagos, clienteId, { totalUsd: total, productos: [...carrito.values()].map((i) => i.producto.nombre).join(", ").slice(0, 120) });
       window.dispatchEvent(new Event("kp-turno"));
       setDone({ total, totalBs, payLine: resumen.payLine, change: resumen.change, changeNote: resumen.changeNote, receipt: recibo(resumen.payLine, resumen.change, facturaDe(codigo)), factura: facturaDe(codigo), credito: resumen.credito });
@@ -269,9 +296,9 @@ export function Caja() {
   const tarjeta = (p: Producto) => {
     const info = catInfo(p.categoria); const qn = carrito.get(p.id)?.qty ?? 0; const out = p.stockActual <= 0;
     return (
-      <button key={p.id} className={"pcard press" + (qn > 0 ? " in-ticket" : "") + (out ? " soldout" : "") + (q && filtrados[selIdx]?.id === p.id ? " kbsel" : "")} style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }} onClick={() => add(p)} disabled={out}>
+      <button key={p.id} className={"pcard press" + (qn > 0 ? " in-ticket" : "") + (out ? " soldout" : "") + (q && filtrados[selIdx]?.id === p.id ? " kbsel" : "")} style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }} onClick={() => tocar(p)} disabled={out}>
         <div className="pc-top"><span className="tile"><Icono k={info.icon} /></span>{qn > 0 && <span className="pc-badge t">×{qn}</span>}</div>
-        <div className="pc-name">{p.nombre}</div>
+        <div className="pc-name">{p.nombre}{bloquesDe(p.id).length > 0 && <> <span className="blq-tag">+ {bloquesDe(p.id).map((b) => b.nombre).join(" / ")}</span></>}</div>
         <div className="pc-price"><strong className="t">{usd(p.precioUsd)}</strong>{out ? <span className="pill danger">Agotado</span> : <span className="bs t">{bs(r2(p.precioUsd * tasa))}</span>}</div>
       </button>
     );
@@ -281,9 +308,9 @@ export function Caja() {
   const fila = (p: Producto) => {
     const info = catInfo(p.categoria); const qn = carrito.get(p.id)?.qty ?? 0; const out = p.stockActual <= 0;
     return (
-      <button key={p.id} className={"prod press" + (out ? " out" : "") + (q && filtrados[selIdx]?.id === p.id ? " kbsel" : "")} style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }} onClick={() => add(p)} disabled={out}>
+      <button key={p.id} className={"prod press" + (out ? " out" : "") + (q && filtrados[selIdx]?.id === p.id ? " kbsel" : "")} style={{ ["--c" as string]: info.cat ? `var(--c-${info.cat})` : "var(--text-3)" }} onClick={() => tocar(p)} disabled={out}>
         <span className="pi"><Icono k={info.icon} />{qn > 0 && <span className="badge t">{qn}</span>}</span>
-        <span className="pn">{p.nombre}</span>
+        <span className="pn">{p.nombre}{bloquesDe(p.id).length > 0 && <> <span className="blq-tag">+ {bloquesDe(p.id)[0].nombre}</span></>}</span>
         <span className="pp t"><b>{usd(p.precioUsd)}</b><small>{out ? "Agotado" : bs(r2(p.precioUsd * tasa))}</small></span>
       </button>
     );
@@ -314,6 +341,10 @@ export function Caja() {
     );
   };
 
+  const bloqueModal = elegirBloque && (
+    <ElegirBloque producto={elegirBloque} bloques={bloquesDe(elegirBloque.id)} onClose={() => setElegirBloque(null)}
+      onElegir={(b) => { const p = elegirBloque; setElegirBloque(null); if (b) addBloque(p, b); else add(p); }} />
+  );
   const pesarModal = pesar && (
     <CantidadPesable producto={pesar.p} tasa={tasa} inicial={pesar.inicial} onClose={() => setPesar(null)}
       onOk={(cant) => { fijar(pesar.p, cant); setPesar(null); setQ(""); setSelIdx(0); }} />
@@ -323,7 +354,7 @@ export function Caja() {
   if (isDesktop) {
     return (
       <div className="caja-wrap">
-        {pesarModal}
+        {pesarModal}{bloqueModal}
         <div className="caja desk">
           {searchrow}
           {chips}
@@ -365,7 +396,7 @@ export function Caja() {
   // ----- TELÉFONO (pantalla 05): lista + barra flotante + hoja -----
   return (
     <div className="caja">
-      {pesarModal}
+      {pesarModal}{bloqueModal}
       {searchrow}
       {chips}
       <div className="prods">

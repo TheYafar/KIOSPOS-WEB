@@ -35,11 +35,11 @@ public class ClienteController {
     public FiadoHecho fiar(@AuthenticationPrincipal KioskPrincipal p, @PathVariable Long id, @RequestBody FiarRequest req) {
         var v = ventaService.fiarDesdeLibreta(p, id, req.tasa(),
                 req.items() == null ? List.of() : req.items().stream()
-                        .map(i -> new com.kioskpos.web.venta.VentaService.ItemInput(i.productoId(), i.cantidad(), null, null)).toList());
+                        .map(i -> new com.kioskpos.web.venta.VentaService.ItemInput(i.productoId(), i.cantidad(), null, null, i.presentacionId())).toList());
         return new FiadoHecho(v.getId(), v.getNumeroFactura(), v.getTotalUsd(), v.getTotalBs());
     }
 
-    public record ItemFiar(Long productoId, java.math.BigDecimal cantidad) {
+    public record ItemFiar(Long productoId, java.math.BigDecimal cantidad, Long presentacionId) {
     }
 
     public record FiarRequest(java.math.BigDecimal tasa, List<ItemFiar> items) {

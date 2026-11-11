@@ -25,11 +25,27 @@ public class InventarioController {
 
     private final InventarioService inventarioService;
     private final com.kioskpos.web.inventario.CategoriaService categoriaService;
+    private final com.kioskpos.web.inventario.PresentacionService presentacionService;
 
     public InventarioController(InventarioService inventarioService,
-                                com.kioskpos.web.inventario.CategoriaService categoriaService) {
+                                com.kioskpos.web.inventario.CategoriaService categoriaService,
+                                com.kioskpos.web.inventario.PresentacionService presentacionService) {
         this.inventarioService = inventarioService;
         this.categoriaService = categoriaService;
+        this.presentacionService = presentacionService;
+    }
+
+    // ---- Presentaciones / bloques (leer: todos, la caja las necesita; guardar: dueño o encargado) ----
+
+    @GetMapping("/presentaciones")
+    public List<com.kioskpos.web.inventario.PresentacionService.PresentacionVista> presentaciones() {
+        return presentacionService.listarTodas();
+    }
+
+    @PutMapping("/productos/{id}/presentaciones")
+    public List<com.kioskpos.web.inventario.PresentacionService.PresentacionVista> guardarPresentaciones(
+            @PathVariable Long id, @RequestBody List<com.kioskpos.web.inventario.PresentacionService.PresentacionInput> lista) {
+        return presentacionService.guardar(id, lista);
     }
 
     // ---- Categorías (leer: todos; crear/renombrar/borrar: dueño o encargado por SecurityConfig) ----

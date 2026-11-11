@@ -549,3 +549,28 @@ el alta/venta/login (try/catch + log).
   `spring.flyway.placeholders.kioskposAppPassword` = `DB_APP_PASSWORD` en
   `application.yml`) en CADA arranque, no solo al crear el rol — sincroniza la clave real
   en cualquier despliegue, sin tocar el flujo de Docker local (mismo valor, es un no-op).
+
+## 27. Crédito (antes "Fiado"), botón Atrás, factura por número y productos por bloques
+
+- **Nombre:** en la interfaz y el ticket "Fiado" pasó a **"Crédito"** (solo textos; el método `FIADO`, la API y
+  los ids de pestaña siguen iguales).
+- **Botón Atrás** (`frontend/src/atras.ts` + `Shell.tsx`): la pestaña vive en la URL (`#/reportes`, `#/fiado`…),
+  Atrás vuelve a la anterior; cualquier `.modal`/`.overlay` abierta se cierra con Atrás (sin dejar entradas de
+  más); el cobro de la Caja usa `useAtras`.
+- **Crédito a empleados + factura:** al cobrar, la pantalla final y el ticket muestran el **N° de factura** que
+  da el servidor (`api.ts facturaDe(codigoUnico)`; sin internet: "se numera al enviarse"). El selector de
+  crédito filtra Todos/Clientes/**Empleados**. En Crédito, **Buscar factura** (`screens/Factura.tsx`, usa
+  `GET /api/ventas/buscar?numero=` + `/detalle`) muestra productos, fecha, caja, total, pagos y a quién quedó el
+  crédito; cada compra a crédito en la cuenta tiene **Ver factura**.
+- **Productos por bloques** (V25 `producto_presentaciones` con RLS, `inventario/PresentacionService`):
+  Cigarros → "Caja" trae 20 a $5, "Media caja" 10 a $2,60; suelto = el producto. Para peso/medida la cantidad
+  puede ser decimal (saco de 25 kg). `GET /api/inventario/presentaciones`, `PUT /api/inventario/productos/{id}/
+  presentaciones` (lista completa, solo dueño/encargado). Venta: `items[].presentacionId`; la línea guarda
+  `cantidad` = bloques, precio del bloque, nombre "Producto (Caja x20)" y **`detalle_ventas.unidades`** (V25):
+  el stock se mueve `cantidad × unidades` al vender, **anular** y **devolver**; el costo de la línea es
+  costo × unidades (ganancia correcta). PWA: editor en Inventario → Editar (`screens/Bloques.tsx`, sugerencias
+  Caja/Media caja/Bulto/Paquete, avisa el ahorro), y en la Caja tocar un producto con bloques abre "¿Cómo se lo
+  lleva?" (teclas 1..n); el código de barras de un bloque lo agrega directo. Copia local `kp_bloques` para vender
+  sin internet. Prueba: `PresentacionVentaTest` (CI) + `e2e/bloques.spec.ts`, `e2e/factura.spec.ts`.
+- **Pendiente:** "Dar a crédito" desde el perfil del cliente todavía vende solo por unidad (la venta normal con
+  crédito sí admite bloques).

@@ -24,7 +24,8 @@ export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: a
   ventaFalla?: string; turnoDesde?: string; nominaHist?: any[]; nominaAnulada?: any;
   recargas?: any[]; rango?: any; configNeg?: any;
   contab?: Record<string, { contenido: string; version: number }>; contabPuts?: number;
-  prueba?: boolean; planCambio?: any; sesionVencida?: boolean; }
+  prueba?: boolean; planCambio?: any; sesionVencida?: boolean;
+  bloques?: any[]; bloquesPut?: { productoId: number; lista: any[] }; }
 
 export const ventasDemo = [
   { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
@@ -103,6 +104,12 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     if (u.includes("/api/inventario/categorias")) {
       if (m !== "GET") { st.categoria = { metodo: m, ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { nombre: "x", productos: 0 } }); }
       return r.fulfill({ json: [{ nombre: "Bebidas", productos: 1 }, { nombre: "Charcutería", productos: 1 }, { nombre: "General", productos: 0 }, { nombre: "Víveres", productos: 2 }] });
+    }
+    if (u.includes("/api/inventario/presentaciones")) return r.fulfill({ json: st.bloques ?? [] });
+    if (/\/api\/inventario\/productos\/\d+\/presentaciones/.test(u)) {
+      const productoId = Number(u.split("/").slice(-2)[0]); const lista = JSON.parse(r.request().postData() || "[]");
+      st.bloquesPut = { productoId, lista };
+      return r.fulfill({ json: lista.map((b: any, i: number) => ({ id: 100 + i, productoId, ...b })) });
     }
     if (u.includes("/api/inventario/productos") && (m === "POST" || m === "PUT")) { st.producto = { metodo: m, ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: productos[0] }); }
     if (u.includes("/api/inventario")) return r.fulfill({ json: productos });

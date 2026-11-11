@@ -48,7 +48,7 @@ public class VentaController {
             throw new IllegalArgumentException("Solo una caja puede cobrar");
         }
         List<VentaService.ItemInput> items = req.items().stream()
-                .map(i -> new VentaService.ItemInput(i.productoId(), i.cantidad(), i.precioUsd(), i.nombre()))
+                .map(i -> new VentaService.ItemInput(i.productoId(), i.cantidad(), i.precioUsd(), i.nombre(), i.presentacionId()))
                 .toList();
         List<VentaService.PagoInput> pagos = req.pagos().stream()
                 .map(p -> new VentaService.PagoInput(p.metodo(), p.moneda(), p.montoOriginal(), p.referencia()))
@@ -125,7 +125,7 @@ public class VentaController {
         }
     }
 
-    public record ItemRequest(Long productoId, @NotNull BigDecimal cantidad, BigDecimal precioUsd, String nombre) {
+    public record ItemRequest(Long productoId, @NotNull BigDecimal cantidad, BigDecimal precioUsd, String nombre, Long presentacionId) {
     }
 
     public record PagoRequest(@NotNull MetodoPago metodo, @NotNull Moneda moneda,
