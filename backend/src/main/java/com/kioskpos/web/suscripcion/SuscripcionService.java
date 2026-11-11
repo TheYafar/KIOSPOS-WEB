@@ -42,14 +42,15 @@ public class SuscripcionService {
 
     public SituacionNegocio situacion(Negocio n) {
         LocalDate hoy = LocalDate.now();
-        BigDecimal precio = PlanCatalogo.precioMensual(n.getPlan());
+        PlanCatalogo.Plan plan = PlanCatalogo.plan(n.getPlan());
+        int cajas = n.getCajasContratadas() == null ? 1 : n.getCajasContratadas();
+        BigDecimal precio = plan.mensualidad(cajas);
+        boolean prueba = n.isEnPrueba();
 
         if (SUSPENDIDA.equalsIgnoreCase(n.getEstado())) {
             int meses = mesesPendientes(n.getPagoHasta(), hoy);
-            return new SituacionNegocio(n.getId(), n.getNombre(), n.getPlan(), SUSPENDIDA,
-                    false, true, n.getPagoHasta(), diasVencido(n.getPagoHasta(), hoy),
-                    meses, precio.multiply(BigDecimal.valueOf(meses)),
-                    "Suspendida por el administrador");
+            return sit(n, plan, cajas, precio, SUSPENDIDA, false, diasVencido(n.getPagoHasta(), hoy),
+                    meses, precio.multiply(BigDecimal.valueOf(meses)), "Suspendida por el administrador");
         }
 
         int dias = diasVencido(n.getPagoHasta(), hoy);
@@ -57,17 +58,48 @@ public class SuscripcionService {
         BigDecimal deuda = precio.multiply(BigDecimal.valueOf(meses));
 
         if (dias == 0) {
-            return new SituacionNegocio(n.getId(), n.getNombre(), n.getPlan(), ACTIVA,
-                    true, false, n.getPagoHasta(), 0, 0, BigDecimal.ZERO, "Al día");
+            if (prueba) {
+                long quedan = n.getPagoHasta() == null ? 0 : ChronoUnit.DAYS.between(hoy, n.getPagoHasta()) + 1;
+                return sit(n, plan, cajas, precio, ACTIVA, true, 0, 0, BigDecimal.ZERO,
+                        "Prueba gratis: te quedan " + quedan + (quedan == 1 ? " día" : " días"));
+            }
+            return sit(n, plan, cajas, precio, ACTIVA, true, 0, 0, BigDecimal.ZERO, "Al día");
+        }
+        // La prueba gratis vence sola: sin días de gracia.
+        if (prueba) {
+            return sit(n, plan, cajas, precio, SUSPENDIDA, false, dias, 1, precio,
+                    "Tu prueba gratis terminó. Paga tu primer mes para seguir vendiendo.");
         }
         if (dias <= diasGracia) {
-            return new SituacionNegocio(n.getId(), n.getNombre(), n.getPlan(), AVISO,
-                    true, false, n.getPagoHasta(), dias, meses, deuda,
+            return sit(n, plan, cajas, precio, AVISO, true, dias, meses, deuda,
                     "Pago vencido hace " + dias + " día(s) — regularice para no perder el servicio");
         }
-        return new SituacionNegocio(n.getId(), n.getNombre(), n.getPlan(), SUSPENDIDA,
-                false, true, n.getPagoHasta(), dias, meses, deuda,
+        return sit(n, plan, cajas, precio, SUSPENDIDA, false, dias, meses, deuda,
                 "Suspendida por falta de pago (" + dias + " días) — solo consulta");
+    }
+
+    private static SituacionNegocio sit(Negocio n, PlanCatalogo.Plan plan, int cajas, BigDecimal mensualidad,
+                                        String estado, boolean cobra, int dias, int meses, BigDecimal deuda, String msg) {
+        return new SituacionNegocio(n.getId(), n.getNombre(), plan.codigo(), estado, cobra, !cobra,
+                n.getPagoHasta(), dias, meses, deuda, msg, n.isEnPrueba(), cajas, mensualidad, plan.nombre());
+    }
+
+    /**
+     * Cambia el plan y el número de cajas. No deja contratar menos cajas de las que ya
+     * están activas (hay que desactivar alguna antes). La nueva mensualidad aplica al
+     * próximo pago.
+     */
+    @Transactional
+    public Negocio cambiarPlan(Long negocioId, String plan, int cajas, long cajasActivas) {
+        Negocio n = negocioRepository.findById(negocioId)
+                .orElseThrow(() -> new IllegalArgumentException("Negocio no encontrado"));
+        String codigo = PlanCatalogo.validar(plan, cajas);
+        if (cajas < cajasActivas) {
+            throw new IllegalStateException("Tienes " + cajasActivas + " cajas activas. Desactiva alguna antes de bajar a " + cajas + ".");
+        }
+        n.setPlan(codigo);
+        n.setCajasContratadas(cajas);
+        return negocioRepository.save(n);
     }
 
     @Transactional(readOnly = true)
@@ -135,6 +167,8 @@ public class SuscripcionService {
                 ? negocio.getPagoHasta()
                 : LocalDate.now();
         negocio.setPagoHasta(base.plusMonths(pago.getMeses()));
+        // Con el primer pago deja de estar en prueba (ya tiene días de gracia como cliente).
+        negocio.setEnPrueba(false);
         // Aprobar un pago reactiva un corte automático; no toca una suspensión manual
         // explícita (eso se levanta con reactivar()).
         negocioRepository.save(negocio);

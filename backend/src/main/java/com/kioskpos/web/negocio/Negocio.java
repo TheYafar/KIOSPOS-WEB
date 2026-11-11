@@ -62,6 +62,10 @@ public class Negocio {
     @Column(name = "mensaje_ticket", length = 200)
     private String mensajeTicket;
 
+    /** Semana gratis: al vencer se suspende sin días de gracia. El primer pago aprobado lo apaga. */
+    @Column(name = "en_prueba", nullable = false)
+    private boolean enPrueba;
+
     @Column(name = "cajas_contratadas", nullable = false)
     private Integer cajasContratadas = 1;
 

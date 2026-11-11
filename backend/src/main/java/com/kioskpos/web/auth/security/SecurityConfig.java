@@ -40,6 +40,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/mi-negocio/pagos").hasAnyRole("DUENO", "ENCARGADO")
                         // Editar config del negocio: solo dueño/encargado (el GET lo lee el cajero).
                         .requestMatchers(HttpMethod.PUT, "/api/mi-negocio/config").hasAnyRole("DUENO", "ENCARGADO")
+                        .requestMatchers(HttpMethod.PUT, "/api/mi-negocio/plan").hasRole("DUENO")
                         .requestMatchers(HttpMethod.PUT, "/api/mi-negocio/caja-config").hasAnyRole("DUENO", "ENCARGADO")
                         // Fiado: cambiar límite / desactivar un cliente, solo dueño o encargado.
                         .requestMatchers(HttpMethod.PUT, "/api/clientes/**").hasAnyRole("DUENO", "ENCARGADO")

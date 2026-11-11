@@ -6,7 +6,8 @@ import java.time.LocalDate;
 /**
  * Foto calculada del estado de suscripción de un negocio (contra el reloj del
  * servidor). estadoEfectivo es lo que ve el super admin; puedeCobrar es lo que
- * autoriza (o no) a renovar el permiso de la caja.
+ * autoriza (o no) a renovar el permiso de la caja. enPrueba: semana gratis (sin días de
+ * gracia al vencer). mensualidad: lo que paga por mes con su plan y sus cajas.
  */
 public record SituacionNegocio(
         Long negocioId,
@@ -19,5 +20,9 @@ public record SituacionNegocio(
         int diasVencido,
         int mesesPendientes,
         BigDecimal deuda,
-        String mensaje) {
+        String mensaje,
+        boolean enPrueba,
+        int cajasContratadas,
+        BigDecimal mensualidad,
+        String planNombre) {
 }

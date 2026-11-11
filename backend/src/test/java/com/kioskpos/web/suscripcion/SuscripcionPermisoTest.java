@@ -51,6 +51,7 @@ class SuscripcionPermisoTest extends PostgresRlsTestBase {
         Negocio n = negocioRepository.findById(negocioId).orElseThrow();
         n.setPagoHasta(fecha);
         n.setEstado("ACTIVA");
+        n.setEnPrueba(false); // cliente que ya pagó alguna vez (tiene días de gracia)
         negocioRepository.save(n);
     }
 
@@ -125,5 +126,48 @@ class SuscripcionPermisoTest extends PostgresRlsTestBase {
         var sit = suscripcionService.situacion(neg);
         assertThat(sit.puedeCobrar()).isTrue();
         assertThat(sit.pagoHasta()).isAfterOrEqualTo(LocalDate.now());
+    }
+
+    @Test
+    void laPruebaGratisVenceSolaSinDiasDeGracia() {
+        Long neg = nuevoNegocio("Prueba", "prueba@ejemplo.com");
+        var inicio = suscripcionService.situacion(neg);
+        assertThat(inicio.enPrueba()).isTrue();
+        assertThat(inicio.puedeCobrar()).isTrue();
+        assertThat(inicio.mensaje()).contains("Prueba gratis: te quedan");
+
+        // Venció ayer: suspendido de una vez (quien ya pagó tendría 15 días de aviso).
+        Negocio n = negocioRepository.findById(neg).orElseThrow();
+        n.setPagoHasta(LocalDate.now().minusDays(1));
+        negocioRepository.save(n);
+        var vencida = suscripcionService.situacion(neg);
+        assertThat(vencida.estadoEfectivo()).isEqualTo("SUSPENDIDA");
+        assertThat(vencida.puedeCobrar()).isFalse();
+        assertThat(vencida.mensaje()).contains("prueba gratis terminó");
+        assertThat(vencida.deuda()).isEqualByComparingTo("25.00");
+
+        // Paga el primer mes: deja de estar en prueba y vuelve a cobrar.
+        var pago = suscripcionService.reportarPago(neg, new BigDecimal("25.00"), "USD", "Pago móvil", "R-9", 1);
+        suscripcionService.aprobarPago(pago.getId(), 1L);
+        var cliente = suscripcionService.situacion(neg);
+        assertThat(cliente.enPrueba()).isFalse();
+        assertThat(cliente.puedeCobrar()).isTrue();
+    }
+
+    @Test
+    void planYCajasDefinenLaMensualidadYLosLimites() {
+        Long neg = nuevoNegocio("Planes", "planes@ejemplo.com");
+        assertThat(suscripcionService.situacion(neg).mensualidad()).isEqualByComparingTo("25.00");
+        suscripcionService.cambiarPlan(neg, "basico", 2, 1);
+        assertThat(suscripcionService.situacion(neg).mensualidad()).isEqualByComparingTo("35.00"); // 25 + 1 caja extra de 10
+        suscripcionService.cambiarPlan(neg, "PRO", 3, 1);
+        var pro = suscripcionService.situacion(neg);
+        assertThat(pro.plan()).isEqualTo("PRO");
+        assertThat(pro.cajasContratadas()).isEqualTo(3);
+        assertThat(pro.mensualidad()).isEqualByComparingTo("48.00"); // 40 + 1 extra de 8
+
+        assertThatThrownBy(() -> suscripcionService.cambiarPlan(neg, "BASICO", 4, 1)).hasMessageContaining("hasta 3 cajas");
+        assertThatThrownBy(() -> suscripcionService.cambiarPlan(neg, "PRO", 1, 2)).hasMessageContaining("Desactiva alguna");
+        assertThatThrownBy(() -> suscripcionService.cambiarPlan(neg, "ORO", 1, 0)).hasMessageContaining("Plan inválido");
     }
 }

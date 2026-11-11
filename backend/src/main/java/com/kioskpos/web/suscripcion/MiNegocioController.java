@@ -32,10 +32,13 @@ public class MiNegocioController {
     private final NegocioRepository negocioRepository;
     private final TasaService tasaService;
     private final TasaNegocioService tasaNegocioService;
+    private final com.kioskpos.web.auth.CajaRepository cajaRepository;
 
     public MiNegocioController(SuscripcionService suscripcionService, PagoRepository pagoRepository,
                               NegocioRepository negocioRepository, TasaService tasaService,
-                              TasaNegocioService tasaNegocioService) {
+                              TasaNegocioService tasaNegocioService,
+                              com.kioskpos.web.auth.CajaRepository cajaRepository) {
+        this.cajaRepository = cajaRepository;
         this.suscripcionService = suscripcionService;
         this.pagoRepository = pagoRepository;
         this.negocioRepository = negocioRepository;
@@ -46,6 +49,17 @@ public class MiNegocioController {
     @GetMapping("/suscripcion")
     public SituacionNegocio suscripcion(@AuthenticationPrincipal KioskPrincipal principal) {
         return suscripcionService.situacion(principal.negocioId());
+    }
+
+    /** El dueño elige plan y cuántas cajas; la nueva mensualidad aplica al próximo pago. */
+    @PutMapping("/plan")
+    public SituacionNegocio cambiarPlan(@AuthenticationPrincipal KioskPrincipal principal, @RequestBody CambiarPlanRequest req) {
+        long activas = cajaRepository.findByActivaTrue().size(); // bajo RLS: solo las de su negocio
+        suscripcionService.cambiarPlan(principal.negocioId(), req.plan(), req.cajas() == null ? 1 : req.cajas(), activas);
+        return suscripcionService.situacion(principal.negocioId());
+    }
+
+    public record CambiarPlanRequest(String plan, Integer cajas) {
     }
 
     @GetMapping("/pagos")

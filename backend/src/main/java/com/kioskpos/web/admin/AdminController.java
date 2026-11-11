@@ -41,7 +41,7 @@ public class AdminController {
     @PostMapping("/negocios")
     public NegocioRegistroService.NegocioCreado crearNegocio(@RequestBody CrearNegocioRequest req) {
         return adminService.crearNegocio(req.nombreNegocio(), req.nombreDueno(), req.email(), req.password(),
-                req.telefono(), req.direccion(), req.cajasContratadas(), req.horariosCierre());
+                req.telefono(), req.direccion(), req.cajasContratadas(), req.horariosCierre(), req.plan());
     }
 
     @GetMapping("/negocios/{id}/cajas")
@@ -93,7 +93,16 @@ public class AdminController {
     public record CrearNegocioRequest(
             @NotBlank String nombreNegocio, @NotBlank String nombreDueno,
             @NotBlank String email, @NotBlank String password,
-            String telefono, String direccion, Integer cajasContratadas, String horariosCierre) {
+            String telefono, String direccion, Integer cajasContratadas, String horariosCierre, String plan) {
+    }
+
+    public record CambiarPlanRequest(String plan, Integer cajas) {
+    }
+
+    /** Cambiar plan y cajas de un negocio (el super admin). */
+    @org.springframework.web.bind.annotation.PutMapping("/negocios/{id}/plan")
+    public AdminService.NegocioVista cambiarPlan(@PathVariable Long id, @RequestBody CambiarPlanRequest req) {
+        return adminService.cambiarPlan(id, req.plan(), req.cajas() == null ? 1 : req.cajas());
     }
 
     public record RegistrarPagoRequest(
