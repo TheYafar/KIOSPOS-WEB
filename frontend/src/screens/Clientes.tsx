@@ -4,6 +4,7 @@ import { CantidadPesable, cantTxt } from "./Pesable";
 import { getSesion, getTasa } from "../session";
 import { UIcono } from "../icons";
 import { leerMonto } from "../arqueo";
+import { BuscarFactura, DetalleFactura } from "./Factura";
 
 // Fiado: la libreta de clientes y de TRABAJADORES del local. Quién debe, cuánto, desde
 // cuándo, y recibir abonos. Lo que se lleva un trabajador baja el stock (es una venta
@@ -30,6 +31,7 @@ export function Clientes() {
   const [abierto, setAbierto] = useState<number | null>(null);
   const [cargando, setCargando] = useState(true);
   const [tipo, setTipo] = useState<"CLIENTE" | "TRABAJADOR">("CLIENTE");
+  const [factura, setFactura] = useState(false);
   const buscar = useRef<HTMLInputElement>(null);
   const cargar = () => listarClientes().then((l) => { setLista(l); setErr(""); }).catch((e) => setErr((e as Error).message)).finally(() => setCargando(false));
   useEffect(() => { cargar(); if (window.matchMedia("(min-width:1024px)").matches) buscar.current?.focus(); }, []);
@@ -46,7 +48,10 @@ export function Clientes() {
       <div className="scroll pad cli">
         <div className="cli-head">
           <div><h2>Crédito</h2><p>{trabajadores ? "Lo que se llevan tus trabajadores: se descuenta del sueldo." : "Quién te debe y cuánto. Toca un cliente para cobrarle."}</p></div>
-          {(!trabajadores || esJefe()) && <button className="btn primary press" onClick={() => setNuevo(true)}><UIcono k="plus" sw={2.2} />{trabajadores ? "Nuevo trabajador" : "Nuevo cliente"}</button>}
+          <div className="cli-head-acc">
+            <button className="btn2 press" onClick={() => setFactura(true)}><UIcono k="search" sw={2} />Buscar factura</button>
+            {(!trabajadores || esJefe()) && <button className="btn primary press" onClick={() => setNuevo(true)}><UIcono k="plus" sw={2.2} />{trabajadores ? "Nuevo trabajador" : "Nuevo cliente"}</button>}
+          </div>
         </div>
         <div className="seg cli-tipo" role="tablist" aria-label="Clientes o trabajadores">
           <button className={!trabajadores ? "on" : ""} onClick={() => setTipo("CLIENTE")}>Clientes</button>
@@ -87,6 +92,7 @@ export function Clientes() {
       </div>
       {nuevo && <FormCliente trabajador={trabajadores} onClose={() => setNuevo(false)} onSaved={(c) => { setNuevo(false); cargar(); setAbierto(c.id); }} />}
       {abierto != null && <DetalleCliente id={abierto} onClose={() => { setAbierto(null); cargar(); }} />}
+      {factura && <BuscarFactura clientes={lista} onClose={() => setFactura(false)} />}
     </div>
   );
 }
@@ -166,6 +172,7 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
   const [enviando, setEnviando] = useState(false);
   const [desc, setDesc] = useState("");
   const [pestana, setPestana] = useState<"cuenta" | "fiar">("cuenta");
+  const [verVenta, setVerVenta] = useState<number | null>(null);
   const tasa = Number(getTasa()) || 0;
   const cargar = () => detalleCliente(id).then(setD).catch((e) => setErr((e as Error).message));
   useEffect(() => { cargar(); }, [id]);
@@ -260,9 +267,10 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
             {d.movimientos.map((x) => (
               <div key={x.id} className="cli-mov">
                 <span className={"pill " + (x.tipo === "CARGO" ? "late" : "ok")}>{x.tipo === "CARGO" ? "Crédito" : "Abono"}</span>
-                <span className="cli-mov-tx">{x.tipo === "CARGO" ? (x.ventaId ? "Venta #" + x.ventaId : "Venta") : (METODOS_ABONO.find((y) => y.id === x.metodo)?.n || ({ NOMINA: "Descontado del sueldo", ANULACION: "Venta anulada", DEVOLUCION: "Devolución" } as Record<string, string>)[x.metodo || ""] || x.metodo) + (x.moneda === "VES" && x.montoOriginal ? " · " + bs(x.montoOriginal) : "") + (x.referencia ? " · ref " + x.referencia : "")}
+                <span className="cli-mov-tx">{x.tipo === "CARGO" ? "Compra a crédito" : (METODOS_ABONO.find((y) => y.id === x.metodo)?.n || ({ NOMINA: "Descontado del sueldo", ANULACION: "Venta anulada", DEVOLUCION: "Devolución" } as Record<string, string>)[x.metodo || ""] || x.metodo) + (x.moneda === "VES" && x.montoOriginal ? " · " + bs(x.montoOriginal) : "") + (x.referencia ? " · ref " + x.referencia : "")}
                   <small>{new Date(x.createdAt).toLocaleString("es-VE", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</small></span>
                 <b className={"t " + (x.tipo === "CARGO" ? "mg-bad" : "mg-ok")}>{x.tipo === "CARGO" ? "+" : "−"} {usd(x.montoUsd)}</b>
+                {x.ventaId != null && <button className="btn2 sm press cli-mov-fac" onClick={() => setVerVenta(x.ventaId!)}>Ver factura</button>}
               </div>
             ))}
           </div>
@@ -270,6 +278,7 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
         )}
       </div>
       {editar && <FormCliente cliente={c} onClose={() => setEditar(false)} onSaved={() => { setEditar(false); cargar(); }} />}
+      {verVenta != null && <DetalleFactura ventaId={verVenta} clientes={[c]} onClose={() => setVerVenta(null)} />}
     </div>
   );
 }
@@ -281,9 +290,11 @@ export function ElegirCliente({ onElegir, onClose }: { onElegir: (c: ClienteFiad
   const [sel, setSel] = useState(0);
   const [nuevo, setNuevo] = useState(false);
   const [err, setErr] = useState("");
+  const [filtro, setFiltro] = useState<"TODOS" | "CLIENTE" | "TRABAJADOR">("TODOS");
   useEffect(() => { listarClientes().then(setLista).catch((e) => setErr((e as Error).message)); }, []);
   const f = q.trim().toLowerCase();
-  const vis = lista.filter((c) => c.activo && (!f || c.nombre.toLowerCase().includes(f) || (c.cedula || "").toLowerCase().includes(f) || (c.telefono || "").includes(f)));
+  const hayEmpleados = lista.some((c) => c.tipo === "TRABAJADOR" && c.activo);
+  const vis = lista.filter((c) => c.activo && (filtro === "TODOS" || (c.tipo || "CLIENTE") === filtro) && (!f || c.nombre.toLowerCase().includes(f) || (c.cedula || "").toLowerCase().includes(f) || (c.telefono || "").includes(f)));
   const key = (e: React.KeyboardEvent) => {
     e.stopPropagation();
     if (e.key === "Escape") { e.preventDefault(); onClose(); }
@@ -301,11 +312,18 @@ export function ElegirCliente({ onElegir, onClose }: { onElegir: (c: ClienteFiad
             <UIcono k="search" sw={2} />
             <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setSel(0); }} placeholder="Nombre, cédula o teléfono…" aria-label="Buscar cliente para crédito" />
           </label>
+          {hayEmpleados && (
+            <div className="seg" role="tablist" aria-label="Clientes o empleados">
+              {([["TODOS", "Todos"], ["CLIENTE", "Clientes"], ["TRABAJADOR", "Empleados"]] as const).map(([id, n]) => (
+                <button key={id} role="tab" aria-selected={filtro === id} className={filtro === id ? "on" : ""} onClick={() => { setFiltro(id); setSel(0); }}>{n}</button>
+              ))}
+            </div>
+          )}
           {err && <p className="pinmsg err">{err}</p>}
           <div className="cli-pick">
             {vis.slice(0, 30).map((c, i) => (
               <button key={c.id} className={"cli-pick-row press" + (i === sel ? " sel" : "")} onClick={() => onElegir(c)}>
-                <b>{c.nombre}{c.tipo === "TRABAJADOR" && <span className="pill info cli-badge">Trabajador</span>}</b><small>{c.cedula || c.telefono || ""}</small>
+                <b>{c.nombre}{c.tipo === "TRABAJADOR" && <span className="pill info cli-badge">Empleado</span>}</b><small>{c.cedula || c.telefono || ""}</small>
                 <span className={"t " + (c.saldoUsd > 0 ? "mg-bad" : "")}>{c.saldoUsd > 0 ? "debe " + usd(c.saldoUsd) : "al día"}</span>
               </button>
             ))}

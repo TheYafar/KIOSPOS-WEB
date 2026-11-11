@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { cobrar, getTasa, listarProductos, type PagoCobro, type Producto } from "../api";
+import { cobrar, facturaDe, getTasa, listarProductos, type PagoCobro, type Producto } from "../api";
 import { conectorDisponible, imprimirTicket } from "../conector";
 import { Icono, UIcono, catInfo } from "../icons";
 import { Cobro, type ResumenPago } from "./Cobro";
@@ -7,6 +7,7 @@ import { CantidadPesable, cantTxt } from "./Pesable";
 import { planSuspendido } from "../plan";
 import { Recargas } from "./Recargas";
 import { useAtras } from "../atras";
+import { numFactura } from "./Factura";
 
 interface Item { producto: Producto; qty: number; }
 
@@ -15,7 +16,7 @@ const usd = (n: number) => "$ " + money(n);
 const bs = (n: number) => "Bs " + money(n);
 const r2 = (n: number) => Math.round(n * 100) / 100;
 
-interface Done { total: number; totalBs: number; payLine: string; change: string; changeNote: string; receipt: string; }
+interface Done { total: number; totalBs: number; payLine: string; change: string; changeNote: string; receipt: string; factura?: number; credito?: ResumenPago["credito"]; }
 
 /** True en escritorio/tablet (riel lateral). Reacciona al cambiar el ancho. */
 function useIsDesktop(): boolean {
@@ -162,19 +163,19 @@ export function Caja() {
       // Se manda también el precio con que se cobró: si la venta se queda en la cola sin
       // internet y el catálogo cambia mientras tanto, el servidor respeta lo que se cobró.
       const its = [...carrito.values()].map((i) => ({ productoId: i.producto.id, cantidad: i.qty, precioUsd: i.producto.precioUsd }));
-      await cobrar(its, pagos, clienteId, { totalUsd: total, productos: [...carrito.values()].map((i) => i.producto.nombre).join(", ").slice(0, 120) });
+      const codigo = await cobrar(its, pagos, clienteId, { totalUsd: total, productos: [...carrito.values()].map((i) => i.producto.nombre).join(", ").slice(0, 120) });
       window.dispatchEvent(new Event("kp-turno"));
-      setDone({ total, totalBs, payLine: resumen.payLine, change: resumen.change, changeNote: resumen.changeNote, receipt: recibo(resumen.payLine, resumen.change) });
+      setDone({ total, totalBs, payLine: resumen.payLine, change: resumen.change, changeNote: resumen.changeNote, receipt: recibo(resumen.payLine, resumen.change, facturaDe(codigo)), factura: facturaDe(codigo), credito: resumen.credito });
       setView("done");
     } catch (e) { setErr((e as Error).message); }
   };
 
-  const recibo = (payLine: string, change: string) => {
+  const recibo = (payLine: string, change: string, factura?: number) => {
     const w = 40, pad = (l: string, r: string) => l.length + r.length >= w ? (l + " " + r).slice(0, w) : l + " ".repeat(w - l.length - r.length) + r;
     const center = (s: string) => " ".repeat(Math.max(0, Math.floor((w - s.length) / 2))) + s;
     const now = new Date();
     const dt = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} ` + now.toLocaleTimeString("es-VE", { hour: "numeric", minute: "2-digit" });
-    const L = [center("BODEGA COCOA"), center("Valencia"), dt, "-".repeat(w)];
+    const L = [center("BODEGA COCOA"), center("Valencia"), ...(factura != null ? [pad("Factura N°", numFactura(factura))] : []), dt, "-".repeat(w)];
     [...carrito.values()].forEach((i) => { L.push(i.producto.nombre.slice(0, w)); L.push(pad("  " + cantTxt(i.producto, i.qty) + " x " + money(i.producto.precioUsd), usd(r2(i.producto.precioUsd * i.qty)))); });
     L.push("-".repeat(w), pad("TOTAL", usd(total)), pad("En Bs (BCV " + tasa + ")", bs(totalBs)), payLine.slice(0, w));
     if (change) L.push(pad("Vuelto", change));
@@ -211,6 +212,10 @@ export function Caja() {
             <div className="tick"><UIcono k="check" sw={2.6} /></div>
             <h2>Venta cobrada</h2>
             <p className="t">{usd(done.total)} · {done.payLine}</p>
+            {done.factura != null
+              ? <div className="fac-num" aria-label="Número de factura"><small>Factura N°</small><b className="t">{numFactura(done.factura)}</b></div>
+              : <div className="fac-num pend"><small>Factura</small><b>Se numera al enviarse (sin internet)</b></div>}
+            {done.credito && <p className="fac-cred">Anotado a crédito {done.credito.trabajador ? "del empleado" : "de"} <b>{done.credito.nombre}</b>: {usd(done.credito.montoUsd)}. Con el N° de factura el dueño ve todo lo que se llevó.</p>}
             {done.change && <div className="change">Vuelto: {done.change}{done.changeNote && <small>{done.changeNote}</small>}</div>}
           </div>
           <div className="receipt-lbl">Así sale el ticket (40 columnas)</div>

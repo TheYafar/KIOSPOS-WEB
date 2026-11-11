@@ -187,6 +187,10 @@ export async function cobrar(items: LineaCobro[], pagos: PagoCobro[], clienteId?
   return codigoUnico;
 }
 
+// Número de factura que dio el servidor a cada venta enviada (por su codigoUnico).
+const facturas = new Map<string, number>();
+export function facturaDe(codigoUnico: string): number | undefined { return facturas.get(codigoUnico); }
+
 export interface ResultadoSync { enviadas: number; pendientes: number; errores: number; }
 
 export async function sincronizar(): Promise<ResultadoSync> {
@@ -202,6 +206,7 @@ export async function sincronizar(): Promise<ResultadoSync> {
         body: JSON.stringify({ ...(venta.payload as object), creadoAt: venta.creadoAt })
       });
       if (resp.ok) {
+        try { const v = await resp.json(); if (v?.numeroFactura != null) facturas.set(venta.codigoUnico, v.numeroFactura); } catch { /* sin cuerpo */ }
         await quitar(venta.codigoUnico);
         enviadas++;
       } else if (resp.status === 401 || resp.status === 403) {

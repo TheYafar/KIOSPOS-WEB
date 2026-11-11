@@ -107,7 +107,7 @@ test("al cobrar, a un trabajador no se le fía más que su sueldo", async ({ pag
   await ir(page); await abrirCobro(page);
   const card = page.locator(".cb3-card", { has: page.locator('.cb3-nm b:text-is("Crédito")') });
   await card.getByRole("button", { name: "Elegir cliente" }).click();
-  await expect(page.locator(".cli-pick-row .cli-badge")).toHaveText("Trabajador");
+  await expect(page.locator(".cli-pick-row .cli-badge")).toHaveText("Empleado");
   await page.locator(".cli-pick-row", { hasText: "Luis" }).click(); // debe $13 + $2,75 > sueldo $15
   await expect(page.locator(".cb3-go")).toHaveText(/Pasa el límite de crédito de Luis \(empleado\) \(\$ 15,00\)/);
   await page.getByLabel("Monto en Crédito").fill("2");

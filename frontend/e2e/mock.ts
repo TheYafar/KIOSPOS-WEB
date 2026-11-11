@@ -132,6 +132,7 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     if (/\/api\/ventas\/\d+\/detalle/.test(u)) return r.fulfill({ json: detalleDemo(Number(u.split("/").slice(-2)[0])) });
     if (/\/api\/ventas\/\d+\/anular/.test(u)) { st.anulada = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { id: 11, estado: "ANULADA" } }); }
     if (/\/api\/ventas\/\d+\/devolver/.test(u)) { st.devuelta = { id: Number(u.split("/").slice(-2)[0]), ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { id: 2 } }); }
+    if (u.includes("/api/ventas/buscar")) { const n = Number(new URL(u).searchParams.get("numero")); return r.fulfill({ json: ventasDemo.filter((v) => v.numeroFactura === n) }); }
     if (u.includes("/api/ventas") && m === "GET") return r.fulfill({ json: ventasDemo });
     if (u.includes("/api/recargas") && m === "POST" && !u.includes("/anular")) {
       const b = JSON.parse(r.request().postData() || "{}");
