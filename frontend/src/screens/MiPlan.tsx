@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { miSuscripcion, misPagos, reportarPago, type MiPago, type Situacion } from "../api";
+import { cambiarMiPlan, miSuscripcion, misPagos, reportarPago, type MiPago, type Situacion } from "../api";
+import { ElegirPlan } from "./ElegirPlan";
+import { getSesion } from "../session";
 
 const usd = (n: number | string) => "$ " + Number(n).toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const pillCls: Record<string, string> = { ACTIVA: "ok", AVISO: "warn", SUSPENDIDA: "bad" };
@@ -17,12 +19,22 @@ export function MiPlan() {
   const [metodo, setMetodo] = useState("Pago móvil");
   const [referencia, setReferencia] = useState("");
   const [meses, setMeses] = useState("1");
+  const [cambiando, setCambiando] = useState<{ plan: string; cajas: number } | null>(null);
+  const esDueno = getSesion()?.rol === "DUENO";
 
   const cargar = () => {
     miSuscripcion().then(setSit).catch((e) => setErr((e as Error).message));
     misPagos().then(setPagos).catch(() => {});
   };
   useEffect(cargar, []);
+
+  const guardarPlan = async () => {
+    if (!cambiando) return;
+    try {
+      const s = await cambiarMiPlan(cambiando.plan, cambiando.cajas);
+      setSit(s); setCambiando(null); setErr(""); setMsg("Plan actualizado. La nueva mensualidad aplica desde tu próximo pago.");
+    } catch (e) { setErr((e as Error).message); }
+  };
 
   const enviar = async () => {
     const m = numOf(monto);
@@ -44,13 +56,26 @@ export function MiPlan() {
       <div className="plan-head">
         <div>
           <span className="plan-k">Tu plan</span>
-          <b className="plan-name">Plan {sit.plan || "—"}</b>
+          <b className="plan-name">Plan {sit.planNombre || sit.plan || "—"}</b>
+          {sit.mensualidad != null && <span className="plan-sub t">{usd(sit.mensualidad)}/mes · {sit.cajasContratadas ?? 1} {(sit.cajasContratadas ?? 1) === 1 ? "caja" : "cajas"}</span>}
         </div>
-        <span className={"cb-pill " + (pillCls[est] || "warn")}><i />{est}</span>
+        <span className={"cb-pill " + (sit.enPrueba && est === "ACTIVA" ? "warn" : pillCls[est] || "warn")}><i />{sit.enPrueba && est === "ACTIVA" ? "PRUEBA GRATIS" : est}</span>
       </div>
+      {esDueno && !cambiando && <button className="cb-btn ghost plan-cambiar" onClick={() => { setMsg(""); setCambiando({ plan: sit.plan || "BASICO", cajas: sit.cajasContratadas ?? 1 }); }}>Cambiar plan o cajas</button>}
+      {cambiando && (
+        <div className="plan-form">
+          <b>Elige tu plan</b>
+          <ElegirPlan plan={cambiando.plan} cajas={cambiando.cajas} onChange={(plan, cajas) => setCambiando({ plan, cajas })} />
+          {err && <p className="pinmsg err">{err}</p>}
+          <div className="cb-formacts">
+            <button className="cb-btn ghost" onClick={() => { setCambiando(null); setErr(""); }}>Cancelar</button>
+            <button className="cb-btn save" onClick={guardarPlan}>Guardar plan</button>
+          </div>
+        </div>
+      )}
 
       <div className="plan-grid">
-        <div className="plan-box"><span className="k">Pagaste hasta</span><b className="t">{sit.pagoHasta || "—"}</b></div>
+        <div className="plan-box"><span className="k">{sit.enPrueba ? "Prueba gratis hasta" : "Pagaste hasta"}</span><b className="t">{sit.pagoHasta || "—"}</b></div>
         {sit.mesesPendientes > 0
           ? <div className="plan-box bad"><span className="k">Debes</span><b className="t">{usd(sit.deuda)}</b><span className="d">{sit.mesesPendientes} mes(es)</span></div>
           : <div className="plan-box ok"><span className="k">Al día</span><b className="t">✓</b><span className="d">sin deuda</span></div>}
@@ -59,7 +84,7 @@ export function MiPlan() {
 
       {msg && <div className="plan-ok">{msg}</div>}
 
-      {!form && <button className="cb-btn save" style={{ width: "100%" }} onClick={() => { setMsg(""); setForm(true); }}>Reportar un pago</button>}
+      {!form && <button className="cb-btn save" style={{ width: "100%" }} onClick={() => { setMsg(""); setForm(true); if (!monto && sit.mensualidad) setMonto(String(sit.mensualidad).replace(".", ",")); }}>Reportar un pago</button>}
       {form && (
         <div className="plan-form">
           <b>Reportar un pago</b>

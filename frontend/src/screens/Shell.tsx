@@ -233,6 +233,15 @@ const usd2 = (n: number) => "$ " + Number(n || 0).toLocaleString("es-VE", { mini
 
 /** Barra arriba de todo: roja y grande si el servicio está suspendido; ámbar si está por cortarse. */
 function AvisoPlan({ plan, esCaja, onPagar }: { plan: Situacion; esCaja: boolean; onPagar: () => void }) {
+  if (plan.puedeCobrar && plan.enPrueba && !esCaja) {
+    return (
+      <div className="plan-aviso plan-prueba" role="status">
+        <UIcono k="alert" sw={2} />
+        <span><b>{plan.mensaje}.</b> Elige tu plan y paga cuando quieras: al terminar la prueba la caja deja de cobrar.</span>
+        <button className="btn2 press" onClick={onPagar}>Ver planes</button>
+      </div>
+    );
+  }
   if (plan.puedeCobrar && plan.estadoEfectivo !== "AVISO") return null;
   if (!plan.puedeCobrar) {
     return (

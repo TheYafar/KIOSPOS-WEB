@@ -1,5 +1,6 @@
+import { ElegirPlan } from "./ElegirPlan";
 import { useEffect, useState } from "react";
-import { admin2fa, adminAprobarPago, adminCrearNegocio, adminEnlaceClave, adminNegocios, adminPagosPendientes, adminReactivar, adminRegistrarPago, adminSuspender, type NegocioVista, type PagoPendiente } from "../api";
+import { admin2fa, adminAprobarPago, adminCambiarPlan, adminCrearNegocio, adminEnlaceClave, adminNegocios, adminPagosPendientes, adminReactivar, adminRegistrarPago, adminSuspender, type NegocioVista, type PagoPendiente } from "../api";
 import { UIcono } from "../icons";
 import { HorariosCierre } from "./negocio";
 import { TemaBtn } from "../TemaBtn";
@@ -30,6 +31,7 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
   const [negs, setNegs] = useState<NegocioVista[]>([]);
   const [pagos, setPagos] = useState<PagoPendiente[]>([]);
   const [modal, setModal] = useState(false);
+  const [planNeg, setPlanNeg] = useState<NegocioVista | null>(null);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const [q, setQ] = useState("");
@@ -127,8 +129,8 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
                     <div className="card neg" key={s.negocioId}>
                       <div className="neg-top">
                         <span className="neg-av" style={{ ["--av" as string]: AV[i % AV.length] }}>{(s.nombre.charAt(0) || "·").toUpperCase()}</span>
-                        <div className="grow" style={{ minWidth: 0 }}><b>{s.nombre}</b><div className="d">Plan {s.plan} · {n.cajas} caja(s)</div></div>
-                        <span className={"pill " + (pillCls[s.estadoEfectivo] || "late")}><i />{s.estadoEfectivo}</span>
+                        <div className="grow" style={{ minWidth: 0 }}><b>{s.nombre}</b><div className="d">{s.planNombre || "Plan " + s.plan}{s.mensualidad != null ? " · " + usd(s.mensualidad) + "/mes" : ""} · {n.cajas}/{s.cajasContratadas ?? n.cajas} caja(s)</div></div>
+                        <span className={"pill " + (s.enPrueba && s.estadoEfectivo === "ACTIVA" ? "late" : pillCls[s.estadoEfectivo] || "late")}><i />{s.enPrueba && s.estadoEfectivo === "ACTIVA" ? "PRUEBA" : s.estadoEfectivo}</span>
                       </div>
                       <div className="neg-data">
                         <div className="nd"><span className="k">Pagó hasta</span><b>{s.pagoHasta || "—"}</b></div>
@@ -138,6 +140,7 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
                       </div>
                       <div className="neg-foot">
                         <button className="btn ghost press" onClick={() => setPagoNeg(n)}>Registrar pago</button>
+                        <button className="btn ghost press" onClick={() => setPlanNeg(n)}>Plan</button>
                         <button className="btn ghost press" title="Enlace para que el dueño ponga contraseña nueva" onClick={() => pedirEnlace(n)}><UIcono k="lock" sw={2} />Clave</button>
                         {s.estadoEfectivo === "SUSPENDIDA"
                           ? <button className="btn primary press" onClick={() => accion(() => adminReactivar(s.negocioId), "Reactivado")}>Reactivar</button>
@@ -157,6 +160,7 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
       {modal && <FormNegocio onClose={() => setModal(false)} onSaved={() => { setModal(false); setMsg("Negocio creado"); cargar(); }} onErr={setErr} />}
       {seg && <Seguridad2fa onClose={() => setSeg(false)} onCambio={(a) => { setCon2fa(a); setMsg(a ? "Verificación en dos pasos activada" : "Verificación en dos pasos desactivada"); }} />}
       {enlace && <EnlaceClave {...enlace} onClose={() => setEnlace(null)} />}
+      {planNeg && <FormPlanAdmin neg={planNeg} onClose={() => setPlanNeg(null)} onSaved={() => { setPlanNeg(null); setMsg("Plan actualizado"); cargar(); }} />}
       {pagoNeg && <FormPago neg={pagoNeg} onClose={() => setPagoNeg(null)} onSaved={() => { setPagoNeg(null); setMsg("Pago registrado"); cargar(); }} onErr={(e) => { setPagoNeg(null); setErr(e); }} />}
     </div>
   );
@@ -226,6 +230,7 @@ function FormPago({ neg, onClose, onSaved, onErr }: { neg: NegocioVista; onClose
 function FormNegocio({ onClose, onSaved, onErr }: { onClose: () => void; onSaved: () => void; onErr: (s: string) => void }) {
   const [f, setF] = useState({ nombreNegocio: "", nombreDueno: "", email: "", password: "", telefono: "", direccion: "", cajasContratadas: "1" });
   const [horarios, setHorarios] = useState("");
+  const [plan, setPlan] = useState({ plan: "BASICO", cajas: 1 });
   const set = (k: keyof typeof f) => (e: React.ChangeEvent<HTMLInputElement>) => setF({ ...f, [k]: e.target.value });
   const ok = f.nombreNegocio.trim() && f.nombreDueno.trim() && f.email.trim() && f.password.length >= 6;
   const guardar = async () => {
@@ -234,7 +239,7 @@ function FormNegocio({ onClose, onSaved, onErr }: { onClose: () => void; onSaved
         nombreNegocio: f.nombreNegocio.trim(), nombreDueno: f.nombreDueno.trim(),
         email: f.email.trim(), password: f.password,
         telefono: f.telefono.trim() || undefined, direccion: f.direccion.trim() || undefined,
-        cajasContratadas: Number(f.cajasContratadas) || 1, horariosCierre: horarios || undefined
+        cajasContratadas: plan.cajas, plan: plan.plan, horariosCierre: horarios || undefined
       });
       onSaved();
     } catch (e) { onErr((e as Error).message); onClose(); }
@@ -250,10 +255,30 @@ function FormNegocio({ onClose, onSaved, onErr }: { onClose: () => void; onSaved
           <label className="lbl">Contraseña (mín. 6)<input className="inp" type="password" value={f.password} onChange={set("password")} /></label>
           <label className="lbl">Teléfono<input className="inp" value={f.telefono} onChange={set("telefono")} placeholder="0412-1234567" /></label>
           <label className="lbl">Dirección / local<input className="inp" value={f.direccion} onChange={set("direccion")} placeholder="Dónde queda la bodega" /></label>
-          <label className="lbl">¿Cuántas cajas?<input className="inp t" type="number" min="1" value={f.cajasContratadas} onChange={set("cajasContratadas")} /></label>
+          <div className="lbl"><span>Plan (arranca con 7 días de prueba gratis)</span><ElegirPlan plan={plan.plan} cajas={plan.cajas} onChange={(p, c) => setPlan({ plan: p, cajas: c })} /></div>
           <div className="lbl"><span>Horarios de cierre de caja</span><HorariosCierre value={horarios} onChange={setHorarios} /></div>
         </div>
         <div className="modal-foot"><button className="btn primary big press" disabled={!ok} onClick={guardar}>Crear negocio y dueño</button></div>
+      </div>
+    </div>
+  );
+}
+
+function FormPlanAdmin({ neg, onClose, onSaved }: { neg: NegocioVista; onClose: () => void; onSaved: () => void }) {
+  const [v, setV] = useState({ plan: neg.situacion.plan || "BASICO", cajas: neg.situacion.cajasContratadas ?? Math.max(1, neg.cajas) });
+  const [err, setErr] = useState("");
+  const guardar = async () => {
+    try { await adminCambiarPlan(neg.situacion.negocioId, v.plan, v.cajas); onSaved(); } catch (e) { setErr((e as Error).message); }
+  };
+  return (
+    <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-card" role="dialog" aria-label="Plan del negocio">
+        <div className="modal-head"><h2>Plan de {neg.situacion.nombre}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="modal-body">
+          <ElegirPlan plan={v.plan} cajas={v.cajas} onChange={(plan, cajas) => setV({ plan, cajas })} />
+          {err && <p className="pinmsg err">{err}</p>}
+        </div>
+        <div className="modal-foot"><button className="btn primary big press" onClick={guardar}>Guardar plan</button></div>
       </div>
     </div>
   );

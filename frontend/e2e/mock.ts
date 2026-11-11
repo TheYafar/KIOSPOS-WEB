@@ -23,7 +23,8 @@ export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: a
   anulada?: any; devuelta?: any; compra?: any; descuento?: any; fiado?: any; producto?: any; categoria?: any; nomina?: any;
   ventaFalla?: string; turnoDesde?: string; nominaHist?: any[]; nominaAnulada?: any;
   recargas?: any[]; rango?: any; configNeg?: any;
-  contab?: Record<string, { contenido: string; version: number }>; contabPuts?: number; }
+  contab?: Record<string, { contenido: string; version: number }>; contabPuts?: number;
+  prueba?: boolean; planCambio?: any; }
 
 export const ventasDemo = [
   { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
@@ -53,6 +54,13 @@ export function rangoDemo(u: string) {
     masVendidos: [{ productoId: 1, nombre: "Harina PAN", cantidad: 30, vendidoUsd: 30, gananciaUsd: 9 }, { productoId: 2, nombre: "Coca-Cola 2L", cantidad: 8, vendidoUsd: 14, gananciaUsd: 6 }],
     porDia: dias.length > 1 ? dias : [] };
 }
+
+export const planesDemo = [
+  { codigo: "BASICO", nombre: "Bodega", precioBase: 25, cajasIncluidas: 1, precioCajaExtra: 10, maxCajas: 3, descripcion: "Para la bodega de una o dos cajas." },
+  { codigo: "PRO", nombre: "Bodega Pro", precioBase: 40, cajasIncluidas: 2, precioCajaExtra: 8, maxCajas: 10, descripcion: "Para negocios con varias cajas." },
+];
+export const situacionDemo = (st: Estado) => ({ negocioId: 1, nombre: "Bodega", plan: "BASICO", planNombre: "Bodega", estadoEfectivo: "ACTIVA", puedeCobrar: true, pagoHasta: "2026-12-10",
+  diasVencido: 0, mesesPendientes: 0, deuda: 0, mensaje: st.prueba ? "Prueba gratis: te quedan 5 días" : "", enPrueba: !!st.prueba, cajasContratadas: 1, mensualidad: 25 });
 
 export const clientesDemo = () => [
   { id: 1, nombre: "María Pérez", cedula: "V12345678", telefono: "04121234567", limiteUsd: 10, activo: true, saldoUsd: 8, ultimoMovimiento: "2026-11-09T12:00:00Z" },
@@ -175,7 +183,13 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
       return r.fulfill({ json: { ...c, tasaBcv: bcv, tasaEfectiva: efectiva(c, bcv) } });
     }
     if (u.includes("/api/mi-negocio/config")) return r.fulfill({ json: { nombre: "Bodega", telefono: null, direccion: null, cajasContratadas: 1, horariosCierre: null } });
-    if (u.includes("/api/mi-negocio/suscripcion")) return r.fulfill({ json: { negocioId: 1, nombre: "Bodega", plan: "BASICO", estadoEfectivo: "ACTIVA", puedeCobrar: true, pagoHasta: "2026-12-10", diasVencido: 0, mesesPendientes: 0, deuda: 0, mensaje: "" } });
+    if (u.includes("/api/planes")) return r.fulfill({ json: planesDemo });
+    if (u.includes("/api/mi-negocio/plan") && m === "PUT") {
+      st.planCambio = JSON.parse(r.request().postData() || "{}");
+      const p = planesDemo.find((x) => x.codigo === st.planCambio.plan)!;
+      return r.fulfill({ json: { ...situacionDemo(st), plan: p.codigo, planNombre: p.nombre, cajasContratadas: st.planCambio.cajas, mensualidad: p.precioBase + Math.max(0, st.planCambio.cajas - p.cajasIncluidas) * p.precioCajaExtra } });
+    }
+    if (u.includes("/api/mi-negocio/suscripcion")) return r.fulfill({ json: situacionDemo(st) });
     if (/\/api\/(usuarios|cajas|reportes\/cierres|mi-negocio\/pagos|admin\/pagos-pendientes)/.test(u)) return r.fulfill({ json: [] });
     if (u.includes("/api/reportes/dia")) return r.fulfill({ json: { fecha: "2026-11-10", cantidadVentas: 0, totalUsd: 0, totalBs: 0, costoUsd: 0, gananciaUsd: 0, pagos: [] } });
     return r.fulfill({ json: {} });

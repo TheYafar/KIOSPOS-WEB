@@ -403,7 +403,17 @@ export async function adminLogin(email: string, password: string, codigo?: strin
   return r.token;
 }
 
-export interface Situacion { negocioId: number; nombre: string; plan: string; estadoEfectivo: string; puedeCobrar: boolean; soloConsulta?: boolean; pagoHasta: string | null; diasVencido: number; mesesPendientes: number; deuda: number; mensaje: string; }
+export interface Situacion { negocioId: number; nombre: string; plan: string; estadoEfectivo: string; puedeCobrar: boolean; soloConsulta?: boolean; pagoHasta: string | null; diasVencido: number; mesesPendientes: number; deuda: number; mensaje: string;
+  enPrueba?: boolean; cajasContratadas?: number; mensualidad?: number; planNombre?: string; }
+export interface PlanV { codigo: string; nombre: string; precioBase: number; cajasIncluidas: number; precioCajaExtra: number; maxCajas: number; descripcion: string; }
+export const mensualidadDe = (p: PlanV, cajas: number) => Math.round((p.precioBase + Math.max(0, cajas - p.cajasIncluidas) * p.precioCajaExtra) * 100) / 100;
+export async function listarPlanes(): Promise<PlanV[]> { return parse(await fetch("/api/planes", { headers: auth() })); }
+export async function cambiarMiPlan(plan: string, cajas: number): Promise<Situacion> {
+  return parse(await fetch("/api/mi-negocio/plan", { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ plan, cajas }) }));
+}
+export async function adminCambiarPlan(id: number, plan: string, cajas: number): Promise<unknown> {
+  return parse(await fetch(`/api/admin/negocios/${id}/plan`, { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ plan, cajas }) }));
+}
 
 // ---------- Mi negocio (suscripción del dueño) ----------
 export interface MiPago { id: number; monto: number; moneda: string; metodo: string; referencia: string | null; meses: number; estado: string; }
@@ -414,7 +424,7 @@ export async function reportarPago(body: { monto: number; moneda?: string; metod
 }
 export interface NegocioVista { situacion: Situacion; cajas: number; ultimaVezEnLinea: string | null; ultimoPago: { monto: string; referencia: string | null; fecha: string } | null; }
 export async function adminNegocios(): Promise<NegocioVista[]> { return parse(await fetch("/api/admin/negocios", { headers: auth() })); }
-export async function adminCrearNegocio(body: { nombreNegocio: string; nombreDueno: string; email: string; password: string; telefono?: string; direccion?: string; cajasContratadas?: number; horariosCierre?: string }): Promise<{ negocioId: number; duenoId: number }> {
+export async function adminCrearNegocio(body: { nombreNegocio: string; nombreDueno: string; email: string; password: string; telefono?: string; direccion?: string; cajasContratadas?: number; horariosCierre?: string; plan?: string }): Promise<{ negocioId: number; duenoId: number }> {
   return parse(await fetch("/api/admin/negocios", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
 }
 
