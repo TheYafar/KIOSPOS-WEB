@@ -15,6 +15,17 @@ export function App() {
     setSesion(null);
   }, []);
 
+  // El servidor dijo que la sesión venció: volver a la entrada con un aviso.
+  useEffect(() => {
+    const vencida = () => {
+      if (!getSesion()) return;
+      try { sessionStorage.setItem("kp_aviso_login", "Tu sesión venció. Entra otra vez."); } catch { /* */ }
+      salir();
+    };
+    window.addEventListener("kp-sesion-vencida", vencida);
+    return () => window.removeEventListener("kp-sesion-vencida", vencida);
+  }, [salir]);
+
   // Tasa BCV automática: el servidor la trae del BCV; la refrescamos al abrir,
   // cada hora y al reconectar. Si falla, se mantiene la última conocida.
   useEffect(() => {

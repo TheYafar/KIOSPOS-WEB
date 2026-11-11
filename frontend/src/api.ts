@@ -23,6 +23,10 @@ function auth(): HeadersInit {
 }
 
 async function parse(resp: Response): Promise<any> {
+  // Sesión vencida (el token dura 12 h): avisar a la app para que lleve a entrar otra vez.
+  if (resp.status === 401 && getSesion() && !/\/api\/(auth|admin\/login)/.test(resp.url)) {
+    window.dispatchEvent(new Event("kp-sesion-vencida"));
+  }
   const txt = await resp.text();
   const body = txt ? JSON.parse(txt) : null;
   if (!resp.ok) {

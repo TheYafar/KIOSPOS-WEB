@@ -24,7 +24,7 @@ export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: a
   ventaFalla?: string; turnoDesde?: string; nominaHist?: any[]; nominaAnulada?: any;
   recargas?: any[]; rango?: any; configNeg?: any;
   contab?: Record<string, { contenido: string; version: number }>; contabPuts?: number;
-  prueba?: boolean; planCambio?: any; }
+  prueba?: boolean; planCambio?: any; sesionVencida?: boolean; }
 
 export const ventasDemo = [
   { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
@@ -97,6 +97,7 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
   }, local);
   await page.route("**/api/**", async (r) => {
     const u = r.request().url(), m = r.request().method();
+    if (st.sesionVencida && !u.includes("/api/auth/") && !u.includes("/api/caja/cajeros") && !u.includes("/api/tasa")) return r.fulfill({ status: 401, json: { error: "Sesión vencida" } });
     if (u.includes("/api/caja/cajeros")) return r.fulfill({ json: [{ id: 2, nombre: "test1" }, { id: 3, nombre: "test2" }] });
     if (u.includes("/api/auth/login-cajero")) return r.fulfill({ json: { token: "x", rol: "CAJERO", usuarioId: 3, negocioId: 1, cajaId: 1, nombreCompleto: "test2" } });
     if (u.includes("/api/inventario/categorias")) {

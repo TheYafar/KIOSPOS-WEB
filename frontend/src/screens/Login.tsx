@@ -25,6 +25,10 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
   const [sel, setSel] = useState<Cajero | null>(null);
   const [pin, setPin] = useState("");
   const [err, setErr] = useState("");
+  // Si la sesión venció, la app deja aquí el aviso antes de volver a esta pantalla.
+  const [aviso] = useState(() => {
+    try { const m = sessionStorage.getItem("kp_aviso_login") || ""; sessionStorage.removeItem("kp_aviso_login"); return m; } catch { return ""; }
+  });
   const [pinErr, setPinErr] = useState("");
   const [shake, setShake] = useState(false);
   const [reloj, setReloj] = useState(new Date());
@@ -236,6 +240,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
               <input className="inp" value={tasa} onChange={(e) => setTasaLocal(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && cajaTok.trim()) guardarConfig(); }} />
             </label>
             <p className="hint" style={{ marginTop: -6 }}>Se actualiza sola con el BCV. Solo cámbiala si no tienes internet.</p>
+            {aviso && !err && <p className="pinmsg err" role="alert">{aviso}</p>}
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={guardarConfig} disabled={!cajaTok.trim() || guardando}>{guardando ? "Verificando…" : "Guardar y continuar"}</button>
           </div>
@@ -261,6 +266,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
               <input className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="current-password" onKeyDown={(e) => { if (e.key === "Enter" && email && pass) entrarDueno(); }} />
             </label>
             {ok && <p className="pinmsg ok">{ok}</p>}
+            {aviso && !err && <p className="pinmsg err" role="alert">{aviso}</p>}
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={entrarDueno} disabled={!email || !pass}>Entrar</button>
             <button className="link" onClick={() => { setErr(""); setOk(""); setVista("olvide"); }}>¿Olvidaste tu contraseña?</button>
@@ -284,6 +290,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
             </label>
             {ok ? <p className="pinmsg ok">{ok} Revisa también la carpeta de spam. El enlace vence en 30 minutos.</p>
               : <p className="hint">¿No te llega? Pídele al soporte de KioskPOS un enlace por WhatsApp.</p>}
+            {aviso && !err && <p className="pinmsg err" role="alert">{aviso}</p>}
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={pedirEnlace} disabled={!email.includes("@") || enviando}>{enviando ? "Enviando…" : ok ? "Enviar otra vez" : "Enviarme el enlace"}</button>
             <button className="link" onClick={() => { setErr(""); setOk(""); setVista("dueno"); }}>Volver</button>
@@ -307,6 +314,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
                 onKeyDown={(e) => { if (e.key === "Enter" && pass && pass2) ponerClave(); }} />
             </label>
             {pass.length > 0 && pass.length < 8 && <p className="hint">Faltan {8 - pass.length} caracteres</p>}
+            {aviso && !err && <p className="pinmsg err" role="alert">{aviso}</p>}
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={ponerClave} disabled={!pass || !pass2 || enviando}>{enviando ? "Guardando…" : "Guardar contraseña"}</button>
             <button className="link" onClick={() => { setErr(""); setPass(""); setPass2(""); setVista("dueno"); }}>Cancelar</button>
@@ -331,6 +339,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
                   onKeyDown={(e) => { if (e.key === "Enter" && codigo.length === 6) entrarAdmin(); }} />
               </label>
             )}
+            {aviso && !err && <p className="pinmsg err" role="alert">{aviso}</p>}
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={entrarAdmin} disabled={!email || !pass || (pide2fa && codigo.length !== 6)}>Entrar</button>
             <button className="link" onClick={() => { setErr(""); setPide2fa(false); setCodigo(""); setVista("dueno"); }}>Volver</button>
@@ -344,7 +353,8 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
     <div className="app"><div className="entrar">{side}
       <main className="entrar-main">
         <div className="entrar-head"><h1>¿Quién va a cobrar?</h1><p>Toca tu nombre y escribe tu PIN de 4 dígitos<span className="kbtip">← → elige · teclea el PIN</span></p></div>
-        {err && <p className="pinmsg err">{err}</p>}
+        {aviso && !err && <p className="pinmsg err" role="alert">{aviso}</p>}
+            {err && <p className="pinmsg err">{err}</p>}
         <div className="personas">
           {cajeros.map((c, i) => (
             <button key={c.id} className="persona" aria-pressed={sel?.id === c.id}

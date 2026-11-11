@@ -24,6 +24,11 @@ public class SecurityConfig {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                // Sin sesión válida (token vencido o dañado) -> 401, para que la app lleve a entrar
+                // otra vez. 403 queda solo para "tu rol no puede hacer esto".
+                .exceptionHandling(e -> e.authenticationEntryPoint(
+                        new org.springframework.security.web.authentication.HttpStatusEntryPoint(
+                                org.springframework.http.HttpStatus.UNAUTHORIZED)))
                 .authorizeHttpRequests(auth -> auth
                         // Públicos: el login de dueño/cajero, el login de super admin,
                         // los endpoints que se autentican con el token de la caja, y salud.

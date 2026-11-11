@@ -94,5 +94,11 @@ class HistorialVentasWebTest extends PostgresRlsTestBase {
         mvc.perform(get("/api/ventas/" + ventaId + "/detalle").header("Authorization", tokCaja))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.lineas[0].nombre").value("Harina PAN"));
+
+        // Sin sesión o con token vencido/dañado: 401 (la app lleva a entrar otra vez), no 403.
+        mvc.perform(get("/api/ventas")).andExpect(status().isUnauthorized());
+        mvc.perform(get("/api/ventas").header("Authorization", "Bearer token-vencido")).andExpect(status().isUnauthorized());
+        // Con sesión pero sin permiso para eso (cajero en Nómina): 403.
+        mvc.perform(get("/api/nomina").header("Authorization", tokCaja)).andExpect(status().isForbidden());
     }
 }
