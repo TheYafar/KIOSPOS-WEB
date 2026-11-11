@@ -39,7 +39,7 @@ test("alta del negocio, caja con PIN, abrir, vender, reporte y cierre — servid
   await page.goto("/");
 
   // Entrar con PIN.
-  await page.locator(".persona", { hasText: "Pedro E2E" }).click();
+  await page.locator(".persona", { hasText: "Pedro" }).click(); // la pantalla muestra solo el primer nombre
   for (const d of "4321") await page.keyboard.press(d);
   await expect(page.locator(".caja-est")).toContainText("Caja cerrada");
 
