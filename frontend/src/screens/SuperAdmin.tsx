@@ -75,7 +75,8 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
             <div><h1>Administración</h1><div className="sub">Super admin · uriel</div></div>
             <div className="hpills"><TamBtn /><TemaBtn />
               <button className={"btn press " + (con2fa === false ? "warn-btn" : "ghost")} onClick={() => setSeg(true)}><UIcono k="lock" sw={2} />Seguridad</button>
-              <button className="btn primary press" onClick={() => setModal(true)}><UIcono k="plus" sw={2.2} />Nuevo negocio</button></div>
+              <button className="btn primary press" onClick={() => setModal(true)}><UIcono k="plus" sw={2.2} />Nuevo negocio</button>
+              <button className="btn ghost press" onClick={onSalir}><UIcono k="user" sw={2} />Salir</button></div>
           </header>
           <div className="caja">
             <div className="scroll pad">
