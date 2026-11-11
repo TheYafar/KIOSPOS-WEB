@@ -37,8 +37,16 @@ pantalla de configuración.
    - Abre los puertos **80 y 443** en el firewall del servidor.
    Al levantar, Caddy saca el certificado solo y sirve `https://tudominio`. (La PWA
    necesita HTTPS para instalarse y para el service worker.)
-6. Monitoreo: UptimeRobot gratis al `/actuator/health`. Respaldo diario: `ops/respaldo.sh`
-   (cron que deja `ops/vps-inicial.sh`) + copia fuera del servidor con rclone. Ver SEGURIDAD.md.
+6. Monitoreo y respaldos (los crons los deja `ops/vps-inicial.sh`):
+   - **Vigilancia cada 5 min** (`ops/monitor.sh`): app en `https://tudominio/actuator/health`,
+     contenedores, disco, edad del último respaldo y vencimiento del certificado. Avisa por
+     **Telegram** cuando algo falla y cuando se recupera (pon `TELEGRAM_TOKEN` y
+     `TELEGRAM_CHAT_ID` en el `.env`; bot con @BotFather).
+   - Además, **UptimeRobot** gratis a `https://tudominio/actuator/health` (avisa aunque el
+     servidor entero esté apagado).
+   - **Respaldo diario** 3:15 am (`ops/respaldo.sh`) + copia fuera del servidor con rclone.
+   - **Prueba de restauración** cada domingo (`ops/probar-respaldo.sh`): restaura el último
+     respaldo en un Postgres temporal y revisa tablas y datos. Avisa si falla. Ver SEGURIDAD.md.
 
 ## Notas de seguridad
 

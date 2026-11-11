@@ -29,7 +29,14 @@ public final class Conector {
 
     public static void main(String[] args) throws IOException {
         int puerto = args.length > 0 ? parsePuerto(args[0]) : PUERTO;
-        HttpServer server = HttpServer.create(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), puerto), 0);
+        HttpServer server;
+        try {
+            server = HttpServer.create(new InetSocketAddress(InetAddress.getByName("127.0.0.1"), puerto), 0);
+        } catch (java.net.BindException e) {
+            // Ya hay un Conector abierto (una sola instancia): salir sin error.
+            System.out.println("El Conector KioskPOS ya está abierto en el puerto " + puerto + ".");
+            return;
+        }
         server.createContext("/estado", Conector::estado);
         server.createContext("/imprimir", Conector::imprimir);
         server.createContext("/abrir-gaveta", Conector::abrirGaveta);
@@ -37,6 +44,7 @@ public final class Conector {
         server.start();
         System.out.println("Conector KioskPOS escuchando en http://127.0.0.1:" + puerto);
         System.out.println("Impresora por defecto: " + Impresora.impresoraPorDefecto());
+        Bandeja.mostrar(puerto, server);
     }
 
     private static void estado(HttpExchange ex) throws IOException {

@@ -30,3 +30,4 @@ Thumbs.db
 frontend/test-results/
 frontend/playwright-report/
 frontend/*.png
+frontend/playwright-report-real/

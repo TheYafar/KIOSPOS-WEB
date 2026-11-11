@@ -45,7 +45,17 @@ puerto como primer argumento.
 Responde CORS para que la PWA (otro origen) pueda llamarlo. El cliente del frontend está
 en [`../frontend/src/conector.ts`](../frontend/src/conector.ts).
 
+## Instalar en la PC de la caja (arranca solo)
+
+1. Instala **Java 21** (por ejemplo Temurin).
+2. Copia `kioskpos-conector.jar` y la carpeta `windows/` a la PC.
+3. Doble clic en `windows/instalar.bat` (o `powershell -ExecutionPolicy Bypass -File instalar.ps1`).
+
+Queda como **tarea programada** "KioskPOS Conector": arranca al iniciar sesión, sin ventana,
+y se reinicia sola si se cae. Muestra una **K verde junto al reloj** con: imprimir ticket de
+prueba, abrir gaveta y cerrar. Si ya hay uno abierto, no abre otro. Para quitarlo:
+`windows/desinstalar.ps1`.
+
 ## Pendiente
 
-- Empaquetar como servicio de Windows con auto-arranque (y un icono en la bandeja).
 - Selección/calibración de impresora desde la PWA.

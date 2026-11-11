@@ -29,6 +29,10 @@ export default defineConfig({
       }
     })
   ],
+  // vite preview (pruebas contra el servidor real): /api también va al backend.
+  preview: {
+    proxy: { "/api": process.env.KP_API || "http://localhost:8080" }
+  },
   server: {
     port: 5173,
     proxy: {

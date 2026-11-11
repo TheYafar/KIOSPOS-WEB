@@ -65,9 +65,13 @@ else
   echo "AVISO: no hay llave SSH en /root/.ssh/authorized_keys; NO se desactivó el login con clave."
 fi
 
-# 8) Respaldo diario 3:15 am (la app debe estar en /opt/KIOSPOS-WEB)
+# 8) Respaldo diario 3:15 am, prueba de restauración los domingos y vigilancia cada 5 min
+#    (la app debe estar en /opt/KIOSPOS-WEB). Avisos por Telegram: TELEGRAM_TOKEN y
+#    TELEGRAM_CHAT_ID en el .env (ver DESPLIEGUE.md).
 cat > /etc/cron.d/kioskpos-respaldo <<'C'
-15 3 * * * root cd /opt/KIOSPOS-WEB && ./ops/respaldo.sh >> /var/log/kioskpos-respaldo.log 2>&1
+15 3 * * * root cd /opt/KIOSPOS-WEB && ./ops/respaldo.sh >> /var/log/kioskpos-respaldo.log 2>&1 || ./ops/avisar.sh "El respaldo diario falló"
+30 4 * * 0 root cd /opt/KIOSPOS-WEB && ./ops/probar-respaldo.sh >> /var/log/kioskpos-respaldo.log 2>&1
+*/5 * * * * root cd /opt/KIOSPOS-WEB && ./ops/monitor.sh >> /var/log/kioskpos-monitor.log 2>&1
 C
 
 echo "Listo. Ahora: git clone https://github.com/TheYafar/KIOSPOS-WEB.git /opt/KIOSPOS-WEB, crea el .env y levanta (ver DESPLIEGUE.md)."
