@@ -461,3 +461,17 @@ export { getTasa, setTasa };
 // ---------- Tasa BCV (automática, la sirve el servidor) ----------
 export interface TasaBcv { bs: number | null; fuente: string; fechaFuente: string | null; actualizado: string | null; }
 export async function tasaBcvServidor(): Promise<TasaBcv> { return parse(await fetch("/api/tasa")); }
+
+// ---------- Cuentas "a mano" guardadas en el servidor ----------
+export interface DocContab { clave: string; contenido: string; version: number; updatedAt: string; }
+export class ConflictoDoc extends Error { constructor(public actual: DocContab | null) { super("Otro equipo guardó cambios más nuevos"); } }
+export async function leerDocContab(clave: "libro" | "hojas"): Promise<DocContab | null> {
+  const r = await fetch("/api/contabilidad/" + clave, { headers: auth() });
+  if (r.status === 204) return null;
+  return parse(r);
+}
+export async function guardarDocContab(clave: "libro" | "hojas", contenido: string, version: number): Promise<DocContab> {
+  const r = await fetch("/api/contabilidad/" + clave, { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ contenido, version }) });
+  if (r.status === 409) { const b = await r.json().catch(() => ({})); throw new ConflictoDoc(b?.actual ?? null); }
+  return parse(r);
+}

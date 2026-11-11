@@ -46,6 +46,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/clientes/*/descuento-sueldo").hasAnyRole("DUENO", "ENCARGADO")
                         // Nómina: solo dueño o encargado.
                         .requestMatchers("/api/nomina", "/api/nomina/**").hasAnyRole("DUENO", "ENCARGADO")
+                        .requestMatchers("/api/contabilidad/**").hasAnyRole("DUENO", "ENCARGADO")
                         // Compras y proveedores: solo dueño o encargado.
                         .requestMatchers("/api/compras/**", "/api/proveedores/**").hasAnyRole("DUENO", "ENCARGADO")
                         // Inventario: leer lo puede todo usuario; crear/editar/borrar/importar solo dueño/encargado.

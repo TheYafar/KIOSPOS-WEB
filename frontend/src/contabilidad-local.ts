@@ -1,7 +1,7 @@
 /**
- * Guardado LOCAL (en el equipo, localStorage) de lo que el dueño anota a mano en
- * Contabilidad: la libreta guiada y las hojas libres. Es per-dispositivo por ahora;
- * la persistencia en el servidor (tablas con negocio_id + RLS) es el siguiente paso.
+ * Copia LOCAL (en el equipo, localStorage) de lo que el dueño anota a mano en
+ * Contabilidad: la libreta guiada y las hojas libres. La copia buena vive en el servidor
+ * (contabilidad-sync.ts, tabla contabilidad_docs con RLS); esta sirve sin internet.
  * Todo get/set va envuelto en try/catch para que la pantalla funcione aunque
  * localStorage falle (modo privado, almacenamiento bloqueado, etc.).
  */

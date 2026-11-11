@@ -22,7 +22,8 @@ export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: a
   movs?: any[]; clientes?: any[]; abonos?: any[]; nuevoCliente?: any;
   anulada?: any; devuelta?: any; compra?: any; descuento?: any; fiado?: any; producto?: any; categoria?: any; nomina?: any;
   ventaFalla?: string; turnoDesde?: string; nominaHist?: any[]; nominaAnulada?: any;
-  recargas?: any[]; rango?: any; configNeg?: any; }
+  recargas?: any[]; rango?: any; configNeg?: any;
+  contab?: Record<string, { contenido: string; version: number }>; contabPuts?: number; }
 
 export const ventasDemo = [
   { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
@@ -131,6 +132,17 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     }
     if (/\/api\/recargas\/\d+\/anular/.test(u)) { const id = Number(u.split("/").slice(-2)[0]); const x = st.recargas?.find((y) => y.id === id); if (x) x.anulada = true; return r.fulfill({ json: x ?? {} }); }
     if (u.includes("/api/recargas")) return r.fulfill({ json: [...(st.recargas ?? [])].reverse() });
+    if (u.includes("/api/contabilidad/")) {
+      const clave = u.split("/api/contabilidad/")[1].split("?")[0];
+      st.contab ??= {};
+      if (m === "PUT") {
+        const b = JSON.parse(r.request().postData() || "{}"); const cur = st.contab[clave];
+        if ((cur?.version ?? 0) !== b.version) return r.fulfill({ status: 409, json: { error: "Otro equipo guardó cambios más nuevos", actual: cur ? { clave, ...cur, updatedAt: "" } : null } });
+        st.contab[clave] = { contenido: b.contenido, version: (cur?.version ?? 0) + 1 }; st.contabPuts = (st.contabPuts ?? 0) + 1;
+        return r.fulfill({ json: { clave, ...st.contab[clave], updatedAt: "" } });
+      }
+      return st.contab[clave] ? r.fulfill({ json: { clave, ...st.contab[clave], updatedAt: "" } }) : r.fulfill({ status: 204, body: "" });
+    }
     if (u.includes("/api/reportes/rango")) { st.rango = u; return r.fulfill({ json: rangoDemo(u) }); }
     if (u.includes("/api/mi-negocio/config")) {
       if (m === "PUT") st.configNeg = JSON.parse(r.request().postData() || "{}");

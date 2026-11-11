@@ -1,3 +1,4 @@
+import { TEXTO_SYNC, useDocServidor } from "../contabilidad-sync";
 import { useEffect, useMemo, useState } from "react";
 import { cierresDia, reporteDia, type CierreDia, type ReporteDia } from "../api";
 import { getTasa } from "../session";
@@ -43,6 +44,7 @@ export function Contabilidad() {
   // --- A mano: libreta (guardado local) ---
   const [libro, setLibroState] = useState<EntradaLibro[]>(() => getLibro());
   const commitLibro = (l: EntradaLibro[]) => { setLibroState(l); setLibro(l); };
+  const syncLibro = useDocServidor<EntradaLibro[]>("libro", libro, (v) => { setLibroState(v); setLibro(v); }, (v): v is EntradaLibro[] => Array.isArray(v));
 
   const manT = useMemo(() => {
     let vendiste = 0, costo = 0, entradas = 0, gastos = 0;
@@ -81,6 +83,8 @@ export function Contabilidad() {
   const [hojas, setHojasState] = useState<Hoja[]>(() => getHojas());
   const [activa, setActiva] = useState(0);
   const commitHojas = (h: Hoja[]) => { setHojasState(h); setHojas(h); };
+  const syncHojas = useDocServidor<Hoja[]>("hojas", hojas, (v) => { setHojasState(v); setHojas(v); setActiva((a) => Math.min(a, Math.max(0, v.length - 1))); },
+    (v): v is Hoja[] => Array.isArray(v) && v.length > 0 && v.every((h) => h && Array.isArray((h as Hoja).cols) && Array.isArray((h as Hoja).rows)));
   const [tasaHoja, setTasaHoja] = useState(String(Number(getTasa()) || 900));
   const rate = numOf(tasaHoja);
 
@@ -234,7 +238,8 @@ export function Contabilidad() {
 
           {sub === "lib" && (
             <>
-              <div className="cb-banner">Aquí colocas <b>todo tú</b>: cada cierre, cada gasto. La app solo <b>guarda y suma</b>. (Por ahora se guarda en este equipo.)</div>
+              <div className="cb-banner">Aquí colocas <b>todo tú</b>: cada cierre, cada gasto. La app solo <b>guarda y suma</b>, en tu cuenta: lo ves desde cualquier equipo.</div>
+              <span className={"cb-sync " + syncLibro} role="status">{TEXTO_SYNC[syncLibro]}</span>
               {!fOpen && <button className="cb-anotar" onClick={() => setFOpen(true)}>+ Anotar</button>}
               {fOpen && (
                 <section className="cb-form">
@@ -286,6 +291,7 @@ export function Contabilidad() {
           {sub === "hoja" && (
             <>
               <div className="cb-banner">Tu propia hoja, como un <b>Excel sencillo</b>. Varias hojas con nombre, columnas propias, y exportar para tu copia de seguridad.</div>
+              <span className={"cb-sync " + syncHojas} role="status">{TEXTO_SYNC[syncHojas]}</span>
 
               <div className="cb-hojas">
                 {hojas.map((h, i) => (i === activa ? (
