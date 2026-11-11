@@ -37,7 +37,7 @@ export function Nomina({ onIrFiado }: { onIrFiado: () => void }) {
     <div className="caja">
       <div className="scroll pad cli">
         <div className="cli-head">
-          <div><h2>Nómina</h2><p>Págale a cada trabajador. Lo que debe de fiado se descuenta solo del sueldo.</p></div>
+          <div><h2>Nómina</h2><p>Págale a cada trabajador. Lo que debe a crédito se descuenta solo del sueldo.</p></div>
           <button className="btn primary press" onClick={() => setNuevo(true)}><UIcono k="plus" sw={2.2} />Nuevo trabajador</button>
         </div>
         <div className="seg cli-tipo" role="tablist" aria-label="Trabajadores o historial">
@@ -48,7 +48,7 @@ export function Nomina({ onIrFiado }: { onIrFiado: () => void }) {
           <div className="inv-stat"><span className="ibox" style={{ background: "var(--primary-soft)", color: "var(--primary)" }}><UIcono k="user" /></span>
             <div><span className="k">Sueldos por período</span><span className="v t">{usd(r?.totalSueldosUsd ?? 0)}</span><span className="d">{ts.filter((t) => t.activo).length} trabajador(es)</span></div></div>
           <div className="inv-stat"><span className="ibox" style={{ background: "var(--bad-soft)", color: "var(--bad)" }}><UIcono k="recibo" /></span>
-            <div><span className="k">Deben de fiado</span><span className={"v t" + ((r?.totalFiadoUsd ?? 0) > 0 ? " mg-bad" : "")}>{usd(r?.totalFiadoUsd ?? 0)}</span><span className="d">se descuenta al pagar</span></div></div>
+            <div><span className="k">Deben a crédito</span><span className={"v t" + ((r?.totalFiadoUsd ?? 0) > 0 ? " mg-bad" : "")}>{usd(r?.totalFiadoUsd ?? 0)}</span><span className="d">se descuenta al pagar</span></div></div>
           <div className="inv-stat"><span className="ibox" style={{ background: "var(--ok-soft)", color: "var(--ok)" }}><UIcono k="cash" /></span>
             <div><span className="k">Pagado este mes</span><span className="v t">{usd(r?.pagadoEsteMesUsd ?? 0)}</span></div></div>
         </div>
@@ -64,24 +64,24 @@ export function Nomina({ onIrFiado }: { onIrFiado: () => void }) {
                 </div>
                 <div className="nom-cuenta">
                   <div><span>Sueldo</span><b className="t">{usd(t.sueldoUsd)}</b></div>
-                  <div className={t.debeFiadoUsd > 0 ? "bad" : ""}><span>− Debe de fiado</span><b className="t">{usd(t.debeFiadoUsd)}</b></div>
+                  <div className={t.debeFiadoUsd > 0 ? "bad" : ""}><span>− Debe a crédito</span><b className="t">{usd(t.debeFiadoUsd)}</b></div>
                   <div className="neto"><span>Recibiría</span><b className="t">{usd(t.netoSugeridoUsd)}</b></div>
                 </div>
                 {t.debeFiadoUsd > t.sueldoUsd && t.sueldoUsd > 0 && <span className="hint mg-bad">Debe más que su sueldo: el resto queda para el próximo pago.</span>}
                 <div className="nom-acc">
-                  <button className="btn2 press" onClick={onIrFiado}>Ver su fiado</button>
+                  <button className="btn2 press" onClick={onIrFiado}>Ver su crédito</button>
                   <button className="btn primary press" disabled={!t.activo} onClick={() => setPagando(t)}>Pagar nómina</button>
                 </div>
               </div>
             ))}
-            {r && ts.length === 0 && <p className="noresult">Aún no tienes trabajadores. Anota el primero con su sueldo: lo que se lleve fiado se le descuenta aquí al pagarle.</p>}
+            {r && ts.length === 0 && <p className="noresult">Aún no tienes trabajadores. Anota el primero con su sueldo: lo que se lleve a crédito se le descuenta aquí al pagarle.</p>}
           </div>
         ) : (
           <div className="vt-list">
             {hist.map(({ pago: p, trabajador }) => (
               <button key={p.id} className={"card vt-row press" + (p.estado === "ANULADO" ? " anulada" : "")} onClick={() => setRecibo({ pago: p, trabajador })}>
                 <span className="vt-n t">{fecha(p.createdAt)}</span>
-                <span className="vt-tx"><b>{trabajador} · {p.periodo}{p.estado === "ANULADO" && <span className="pill bad vt-pill">Anulado</span>}</b><small>{nombreMetodo(p.metodo)}{p.fiadoDescontadoUsd > 0 ? " · fiado descontado " + usd(p.fiadoDescontadoUsd) : ""}</small></span>
+                <span className="vt-tx"><b>{trabajador} · {p.periodo}{p.estado === "ANULADO" && <span className="pill bad vt-pill">Anulado</span>}</b><small>{nombreMetodo(p.metodo)}{p.fiadoDescontadoUsd > 0 ? " · crédito descontado " + usd(p.fiadoDescontadoUsd) : ""}</small></span>
                 <span className="vt-m"><b className="t">{usd(p.netoUsd)}</b>{p.moneda === "VES" && <small className="t">{bs(p.montoPagado)}</small>}</span>
               </button>
             ))}
@@ -146,14 +146,14 @@ function FormPagoNomina({ t, onClose, onPagado }: { t: TrabajadorNomina; onClose
             <label className="lbl">Concepto del descuento<input className="inp" value={concepto} onChange={(e) => setConcepto(e.target.value)} placeholder="Opcional: adelanto del lunes" aria-label="Concepto de los descuentos" /></label>
           </div>
           <div className="nom-fiado">
-            <div><b>Descontar su fiado</b><small>Debe {usd(t.debeFiadoUsd)}. Se le baja de su cuenta en Fiado.</small></div>
+            <div><b>Descontar su crédito</b><small>Debe {usd(t.debeFiadoUsd)}. Se le baja de su cuenta en Crédito.</small></div>
             <div className="inpw"><i>$</i><input className="inp t pre" inputMode="decimal" value={fiadoTxt ?? money(r2(maxFiado))} onChange={(e) => setFiadoTxt(e.target.value.replace(/[^\d.,]/g, ""))} aria-label="Fiado a descontar" disabled={t.debeFiadoUsd <= 0} /></div>
           </div>
           <div className="nom-calc">
             <div><span>Sueldo</span><b className="t">{usd(s)}</b></div>
             {b > 0 && <div><span>+ Bonos</span><b className="t">{usd(b)}</b></div>}
             {o > 0 && <div><span>− {concepto.trim() || "Otros descuentos"}</span><b className="t">{usd(o)}</b></div>}
-            {fiado > 0 && <div className="bad"><span>− Fiado</span><b className="t">{usd(fiado)}</b></div>}
+            {fiado > 0 && <div className="bad"><span>− Crédito</span><b className="t">{usd(fiado)}</b></div>}
             <div className={"neto" + (neto < 0 ? " bad" : "")}><span>Recibe</span><b className="t">{usd(neto)}</b>{enBs && <small className="t">{bs(r2(neto * tasa))} (tasa {money(tasa)})</small>}</div>
           </div>
           <div className="lbl">¿Cómo le pagas?
@@ -186,7 +186,7 @@ function Recibo({ r, onClose, onAnulado }: { r: { pago: PagoNomina; trabajador: 
   const lineas = [cen("RECIBO DE PAGO DE NOMINA"), cen(fecha(p.createdAt)), "-".repeat(w), "Trabajador: " + r.trabajador, "Periodo: " + p.periodo, "-".repeat(w),
     pad("Sueldo", usd(p.sueldoUsd)), ...(p.bonosUsd > 0 ? [pad("+ Bonos", usd(p.bonosUsd))] : []),
     ...(p.otrosDescuentosUsd > 0 ? [pad("- " + (p.conceptoDescuentos || "Descuentos"), usd(p.otrosDescuentosUsd))] : []),
-    ...(p.fiadoDescontadoUsd > 0 ? [pad("- Fiado", usd(p.fiadoDescontadoUsd))] : []), "-".repeat(w), pad("RECIBE", usd(p.netoUsd)),
+    ...(p.fiadoDescontadoUsd > 0 ? [pad("- Credito", usd(p.fiadoDescontadoUsd))] : []), "-".repeat(w), pad("RECIBE", usd(p.netoUsd)),
     ...(p.moneda === "VES" ? [pad("En bolivares", bs(p.montoPagado))] : []), pad("Forma de pago", nombreMetodo(p.metodo)), ...(p.referencia ? [pad("Ref.", p.referencia)] : []),
     "", "", "Firma: ______________________________"];
   const texto = lineas.join("\n");
@@ -199,12 +199,12 @@ function Recibo({ r, onClose, onAnulado }: { r: { pago: PagoNomina; trabajador: 
       <div className="modal-card">
         <div className="modal-head"><h2>{anulado ? "Pago anulado" : "Pago registrado ✓"}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
         <div className="modal-body">
-          {anulado && <p className="pinmsg">Este pago se anuló{p.motivoAnulacion ? ": " + p.motivoAnulacion : ""}. {p.fiadoDescontadoUsd > 0 ? "El fiado que se había descontado volvió a su cuenta." : ""}</p>}
+          {anulado && <p className="pinmsg">Este pago se anuló{p.motivoAnulacion ? ": " + p.motivoAnulacion : ""}. {p.fiadoDescontadoUsd > 0 ? "El crédito que se había descontado volvió a su cuenta." : ""}</p>}
           <pre className={"nom-recibo t" + (anulado ? " anulado" : "")} aria-label="Recibo">{texto}</pre>
           {anulando && (
             <label className="fld">Motivo de la anulación
               <input autoFocus value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Ej.: monto equivocado" onKeyDown={(e) => { if (e.key === "Enter") anular(); }} />
-              <span className="hint">{p.fiadoDescontadoUsd > 0 ? "El fiado descontado (" + usd(p.fiadoDescontadoUsd) + ") vuelve a la cuenta del trabajador." : "El pago deja de contar en la nómina."}</span>
+              <span className="hint">{p.fiadoDescontadoUsd > 0 ? "El crédito descontado (" + usd(p.fiadoDescontadoUsd) + ") vuelve a la cuenta del trabajador." : "El pago deja de contar en la nómina."}</span>
             </label>
           )}
           {aviso && <p className="pinmsg">{aviso}</p>}

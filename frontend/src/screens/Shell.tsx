@@ -35,7 +35,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
     // El cajero solo ve lo de su caja: vender, cerrar y el historial para devoluciones.
     // Fiado, configuración, productos y lo demás es del dueño.
     ? [{ id: "caja", n: "Vender", icon: "cart" }, { id: "cuadre", n: "Cierre", icon: "cash" }, { id: "ventas", n: "Ventas", icon: "recibo" }]
-    : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "ventas", n: "Ventas", icon: "recibo" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "contabilidad", n: "Cuentas", icon: "cash" }, { id: "fiado", n: "Fiado", icon: "user" }, { id: "nomina", n: "Nómina", icon: "equipo" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }];
+    : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "ventas", n: "Ventas", icon: "recibo" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "contabilidad", n: "Cuentas", icon: "cash" }, { id: "fiado", n: "Crédito", icon: "user" }, { id: "nomina", n: "Nómina", icon: "equipo" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }];
   const [tab, setTab] = useState(tabs[0].id);
   const [online, setOnline] = useState(navigator.onLine);
   const [ayuda, setAyuda] = useState(false);
@@ -274,7 +274,7 @@ function SuspendidoModal({ plan, esCaja, onPagar, onClose }: { plan: Situacion; 
           <h2>Servicio suspendido</h2>
           <p>{plan.pagoHasta ? "Tu plan de KioskPOS venció el " + fechaLarga(plan.pagoHasta) + "." : "Tu plan de KioskPOS no está activado."}</p>
           {plan.deuda > 0 && <div className="susp-deuda"><span>Debes</span><b className="t">{usd2(plan.deuda)}</b>{plan.mesesPendientes > 0 && <small>{plan.mesesPendientes} mes(es) de mensualidad</small>}</div>}
-          <p className="susp-tx">Mientras no pagues, la caja <b>no puede cobrar ni fiar</b>. Tus datos están guardados y puedes consultarlos.
+          <p className="susp-tx">Mientras no pagues, la caja <b>no puede cobrar ni dar crédito</b>. Tus datos están guardados y puedes consultarlos.
             {esCaja ? " Avísale al dueño del negocio para que pague." : " Paga por pago móvil, transferencia o Zelle y repórtalo: apenas se apruebe, todo vuelve a funcionar."}</p>
         </div>
         <div className="modal-foot two-btn">

@@ -40,15 +40,15 @@ test("cobrar fiado: elegir cliente con el teclado y la venta lleva clienteId", a
   const st: Estado = { turnoAbierto: true };
   await preparar(page, st, { "kioskpos.sesion": sesionCajero });
   await ir(page); await abrirCobro(page);
-  const card = page.locator(".cb3-card", { has: page.locator('.cb3-nm b:text-is("Fiado")') });
+  const card = page.locator(".cb3-card", { has: page.locator('.cb3-nm b:text-is("Crédito")') });
   await card.getByRole("button", { name: "Elegir cliente" }).click();
-  await expect(page.getByLabel("Buscar cliente para fiar")).toBeFocused();
+  await expect(page.getByLabel("Buscar cliente para crédito")).toBeFocused();
   await expect(page.locator(".cli-pick-row")).toHaveCount(3);
   await page.keyboard.type("josé");
   await expect(page.locator(".cli-pick-row")).toHaveCount(1);
   await page.keyboard.press("Enter");
   await expect(card).toContainText("José Rojas");
-  await expect(page.getByLabel("Monto en Fiado")).toHaveValue("2,75");
+  await expect(page.getByLabel("Monto en Crédito")).toHaveValue("2,75");
   await page.keyboard.press("Enter");
   await expect(page.getByText("Nueva venta")).toBeVisible();
   expect(st.venta.clienteId).toBe(2);
@@ -58,11 +58,11 @@ test("cobrar fiado: elegir cliente con el teclado y la venta lleva clienteId", a
 test("no deja fiar por encima del límite del cliente", async ({ page }) => {
   await preparar(page, { turnoAbierto: true }, { "kioskpos.sesion": sesionCajero });
   await ir(page); await abrirCobro(page);
-  const card = page.locator(".cb3-card", { has: page.locator('.cb3-nm b:text-is("Fiado")') });
+  const card = page.locator(".cb3-card", { has: page.locator('.cb3-nm b:text-is("Crédito")') });
   await card.getByRole("button", { name: "Elegir cliente" }).click();
   await page.locator(".cli-pick-row", { hasText: "María Pérez" }).click(); // debe $8, límite $10
-  await expect(page.locator(".cb3-go")).toHaveText(/Pasa el límite de fiado de María Pérez/);
-  await page.getByLabel("Monto en Fiado").fill("1");
+  await expect(page.locator(".cb3-go")).toHaveText(/Pasa el límite de crédito de María Pérez/);
+  await page.getByLabel("Monto en Crédito").fill("1");
   await page.getByLabel("Monto en Efectivo $").fill("1,75");
   await expect(page.locator(".cb3-go")).toBeEnabled();
 });
@@ -105,12 +105,12 @@ test("al cobrar, a un trabajador no se le fía más que su sueldo", async ({ pag
   const st: Estado = { turnoAbierto: true, clientes: [{ id: 3, nombre: "Luis (empleado)", cedula: null, telefono: null, limiteUsd: 0, activo: true, saldoUsd: 13, ultimoMovimiento: null, tipo: "TRABAJADOR", sueldoUsd: 15 }] };
   await preparar(page, st, { "kioskpos.sesion": sesionCajero });
   await ir(page); await abrirCobro(page);
-  const card = page.locator(".cb3-card", { has: page.locator('.cb3-nm b:text-is("Fiado")') });
+  const card = page.locator(".cb3-card", { has: page.locator('.cb3-nm b:text-is("Crédito")') });
   await card.getByRole("button", { name: "Elegir cliente" }).click();
   await expect(page.locator(".cli-pick-row .cli-badge")).toHaveText("Trabajador");
   await page.locator(".cli-pick-row", { hasText: "Luis" }).click(); // debe $13 + $2,75 > sueldo $15
-  await expect(page.locator(".cb3-go")).toHaveText(/Pasa el límite de fiado de Luis \(empleado\) \(\$ 15,00\)/);
-  await page.getByLabel("Monto en Fiado").fill("2");
+  await expect(page.locator(".cb3-go")).toHaveText(/Pasa el límite de crédito de Luis \(empleado\) \(\$ 15,00\)/);
+  await page.getByLabel("Monto en Crédito").fill("2");
   await page.getByLabel("Monto en Efectivo $").fill("0,75");
   await expect(page.locator(".cb3-go")).toBeEnabled();
 });

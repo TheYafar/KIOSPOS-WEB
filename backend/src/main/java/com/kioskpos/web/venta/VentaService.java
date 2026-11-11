@@ -100,7 +100,7 @@ public class VentaService {
     public Venta fiarDesdeLibreta(KioskPrincipal principal, Long clienteId, BigDecimal tasa, List<ItemInput> items) {
         var sit = suscripcionService.situacion(principal.negocioId());
         if (!sit.puedeCobrar()) {
-            throw new com.kioskpos.web.permiso.PermisoDenegadoException("No se puede fiar: el plan de KioskPOS de este negocio "
+            throw new com.kioskpos.web.permiso.PermisoDenegadoException("No se puede dar crédito: el plan de KioskPOS de este negocio "
                     + (sit.pagoHasta() == null ? "no está activado" : "venció el " + sit.pagoHasta())
                     + " (no es por el cliente). Reporta el pago en Más → Mi plan o pídele al administrador que lo registre.");
         }
@@ -235,7 +235,7 @@ public class VentaService {
             }
             if (p.metodo() == MetodoPago.FIADO) {
                 if (p.moneda() != Moneda.USD) {
-                    throw new IllegalArgumentException("El fiado se anota en dólares");
+                    throw new IllegalArgumentException("El crédito se anota en dólares");
                 }
                 fiadoUsd = fiadoUsd.add(p.montoOriginal().setScale(2, RoundingMode.HALF_UP));
             } else {
@@ -245,7 +245,7 @@ public class VentaService {
         Cliente clienteFiado = null;
         if (fiadoUsd.signum() > 0) {
             if (fiadoUsd.compareTo(totalUsd) > 0) {
-                throw new IllegalArgumentException("Lo fiado no puede ser mayor que el total de la venta");
+                throw new IllegalArgumentException("El crédito no puede ser mayor que el total de la venta");
             }
             clienteFiado = clienteService.validarFiado(input.clienteId(), fiadoUsd);
             venta.setClienteId(clienteFiado.getId());

@@ -17,8 +17,8 @@ const bs = (n: number) => "Bs " + money(n);
 // El día del negocio es el de Venezuela (igual que el servidor), aunque el equipo tenga otra zona.
 const hoy = () => hoyVe();
 const ayer = () => hace(1);
-const NOMBRE: Record<string, string> = { EFECTIVO_USD: "Efectivo $", EFECTIVO_BS: "Efectivo Bs", PAGO_MOVIL: "Pago móvil", PUNTO: "Punto", BIOPAGO: "Biopago", OTRO: "Otra", FIADO: "Fiado",
-  A_CUENTA: "A su fiado", FUERA_DE_CAJA: "Fuera de caja", COMO_PAGO: "Como pagó" };
+const NOMBRE: Record<string, string> = { EFECTIVO_USD: "Efectivo $", EFECTIVO_BS: "Efectivo Bs", PAGO_MOVIL: "Pago móvil", PUNTO: "Punto", BIOPAGO: "Biopago", OTRO: "Otra", FIADO: "Crédito",
+  A_CUENTA: "A su crédito", FUERA_DE_CAJA: "Fuera de caja", COMO_PAGO: "Como pagó" };
 const fmtParte = (p: { metodo: string; moneda: string; monto: number }) => (NOMBRE[p.metodo] || p.metodo) + " " + (p.moneda === "USD" ? usd(p.monto) : bs(p.monto));
 const esJefe = () => { const r = getSesion()?.rol; return r === "DUENO" || r === "ENCARGADO"; };
 
@@ -113,7 +113,7 @@ function DetalleVentaModal({ id, onClose, onCambio }: { id: number; onClose: () 
   // Cómo se le devuelve: por defecto igual que pagó; o todo por una sola forma.
   const metodos = [
     ...(enCaja ? [["COMO_PAGO", "Como pagó"], ["EFECTIVO_USD", "Efectivo $"], ["EFECTIVO_BS", "Efectivo Bs"], ["PAGO_MOVIL", "Pago móvil"], ["PUNTO", "Punto"], ["BIOPAGO", "Biopago"]] : []),
-    ...(v.clienteId ? [["A_CUENTA", "A su fiado"]] : []),
+    ...(v.clienteId ? [["A_CUENTA", "A su crédito"]] : []),
     ...(esJefe() ? [["FUERA_DE_CAJA", "Fuera de caja"]] : []),
   ] as [string, string][];
   const enBs = (n: number) => Math.round(n * v.tasa * 100) / 100;
@@ -189,7 +189,7 @@ function DetalleVentaModal({ id, onClose, onCambio }: { id: number; onClose: () 
               {metodo === "COMO_PAGO" && <span className="hint">Se le devuelve por las mismas formas con que pagó, en la misma proporción (sin contar el vuelto).</span>}
               {totalDev > 0 && (
                 <div className="cli-saldo debe vt-reemb">
-                  <span>{metodo === "A_CUENTA" ? "Se baja de su fiado" : "Le devuelves"} {usd(totalDev)}</span>
+                  <span>{metodo === "A_CUENTA" ? "Se baja de su crédito" : "Le devuelves"} {usd(totalDev)}</span>
                   {partes.map((p) => <div key={p.metodo + p.moneda} className="vt-parte"><span>{NOMBRE[p.metodo] || p.metodo}</span><b className="t">{p.moneda === "USD" ? usd(p.monto) : bs(p.monto)}</b></div>)}
                   <small>La mercancía vuelve al inventario y el dinero se descuenta del cierre de caja.</small>
                 </div>

@@ -49,7 +49,7 @@ test("formas de pago apagadas no salen y las monedas extra se cobran como OTRO",
     extras: [{ id: "eur", nombre: "Euros", tipo: "OTRA", simbolo: "€", tasaUsd: 1.1, activo: true }] }) };
   await preparar(page, st, { "kioskpos.sesion": sesionCajero });
   await ir(page); await abrirCobro(page);
-  await expect(page.locator(".cb3-nm b")).toHaveText(["Efectivo $", "Efectivo Bs", "Pago móvil", "Euros", "Fiado"]);
+  await expect(page.locator(".cb3-nm b")).toHaveText(["Efectivo $", "Efectivo Bs", "Pago móvil", "Euros", "Crédito"]);
   await boton(page, "Euros").click();
   await expect(page.getByLabel("Monto en Euros")).toHaveValue("2,50"); // 2,75 / 1,10
   await page.keyboard.press("Enter");

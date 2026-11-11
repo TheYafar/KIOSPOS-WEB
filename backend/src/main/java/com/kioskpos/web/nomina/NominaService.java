@@ -100,11 +100,11 @@ public class NominaService {
         }
         BigDecimal debe = t.saldoUsd().max(BigDecimal.ZERO);
         if (fiado.compareTo(debe) > 0) {
-            throw new IllegalArgumentException(t.nombre() + " debe $" + debe.toPlainString() + " de fiado; no se puede descontar más");
+            throw new IllegalArgumentException(t.nombre() + " debe $" + debe.toPlainString() + " a crédito; no se puede descontar más");
         }
         BigDecimal neto = sueldo.add(bonos).subtract(otros).subtract(fiado);
         if (neto.signum() < 0) {
-            throw new IllegalArgumentException("Los descuentos pasan del sueldo: baja lo que se descuenta del fiado");
+            throw new IllegalArgumentException("Los descuentos pasan del sueldo: baja lo que se descuenta del crédito");
         }
         String metodo = in.metodo() == null ? "" : in.metodo();
         boolean enBs = METODOS_BS.contains(metodo);

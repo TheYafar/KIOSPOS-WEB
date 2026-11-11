@@ -311,7 +311,7 @@ export function Contabilidad() {
                 <div className="cb-chips">
                   <button onClick={() => loadTpl("caja")}>Caja del día</button>
                   <button onClick={() => loadTpl("gastos")}>Gastos del mes</button>
-                  <button onClick={() => loadTpl("fiado")}>Fiado de clientes</button>
+                  <button onClick={() => loadTpl("fiado")}>Crédito de clientes</button>
                   <button onClick={() => loadTpl("cuentas")}>Mis cuentas (reponer)</button>
                   <button onClick={() => loadTpl("blank")}>En blanco</button>
                 </div>

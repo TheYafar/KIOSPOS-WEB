@@ -65,7 +65,7 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
     sim: x.tipo === "OTRA" ? (x.simbolo || "u") : undefined,
   }));
   // Fiado: se anota en la cuenta de un cliente (en $). No entra dinero ni da vuelto.
-  const fiado: Forma[] = metodoActivo("FIADO") ? [{ id: "FIADO", n: "Fiado", moneda: "USD", icon: "user", color: "var(--c-charcuteria)",
+  const fiado: Forma[] = metodoActivo("FIADO") ? [{ id: "FIADO", n: "Crédito", moneda: "USD", icon: "user", color: "var(--c-charcuteria)",
     sub: cliente ? cliente.nombre + (cliente.saldoUsd > 0 ? " · debe " + usd(cliente.saldoUsd) : "") : "A cuenta de un cliente" }] : [];
   const formas = [...(activas.length ? activas : FORMAS), ...extras, ...fiado];
   const forma = (id: string) => formas.find((f) => f.id === id);
@@ -80,9 +80,9 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   const refMala = pmUsado && !/^\d{4,6}$/.test(ref);
   const fiadoUsd = montos.FIADO || 0;
   const fiadoMal = fiadoUsd <= 0 ? ""
-    : !cliente ? "Elige a quién le fías"
-    : fiadoUsd > total + 0.005 ? "Lo fiado no puede pasar del total"
-    : limiteDe(cliente) > 0 && cliente.saldoUsd + fiadoUsd > limiteDe(cliente) + 0.005 ? "Pasa el límite de fiado de " + cliente.nombre + " (" + usd(limiteDe(cliente)) + ")"
+    : !cliente ? "Elige a quién le das crédito"
+    : fiadoUsd > total + 0.005 ? "El crédito no puede pasar del total"
+    : limiteDe(cliente) > 0 && cliente.saldoUsd + fiadoUsd > limiteDe(cliente) + 0.005 ? "Pasa el límite de crédito de " + cliente.nombre + " (" + usd(limiteDe(cliente)) + ")"
     : "";
 
   // El motivo REAL por el que no se puede cobrar (antes decía "Faltan $0,00" aunque faltara la referencia).

@@ -15,7 +15,7 @@ const celda = (v: string | number) => {
   const t = typeof v === "number" ? num(v) : v;
   return /[;"\n]/.test(t) ? '"' + t.replace(/"/g, '""') + '"' : t;
 };
-const METODO: Record<string, string> = { EFECTIVO_USD: "Efectivo $", EFECTIVO_BS: "Efectivo Bs", PUNTO: "Punto", PAGO_MOVIL: "Pago móvil", BIOPAGO: "Biopago", OTRO: "Otras formas", FIADO: "Fiado" };
+const METODO: Record<string, string> = { EFECTIVO_USD: "Efectivo $", EFECTIVO_BS: "Efectivo Bs", PUNTO: "Punto", PAGO_MOVIL: "Pago móvil", BIOPAGO: "Biopago", OTRO: "Otras formas", FIADO: "Crédito" };
 
 /** CSV para Excel en español: separador ';', coma decimal y BOM para que abra con acentos. */
 export function reporteCsv(r: ReporteDia): string {

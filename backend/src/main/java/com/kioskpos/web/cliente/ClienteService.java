@@ -109,7 +109,7 @@ public class ClienteService {
     @Transactional
     public Cliente validarFiado(Long clienteId, BigDecimal montoUsd) {
         if (clienteId == null) {
-            throw new IllegalArgumentException("Para fiar hay que elegir el cliente");
+            throw new IllegalArgumentException("Para dar crédito hay que elegir el cliente");
         }
         Cliente c = clientes.bloquear(clienteId).orElseThrow(() -> new IllegalArgumentException("Cliente no encontrado"));
         if (!c.isActivo()) {
@@ -124,7 +124,7 @@ public class ClienteService {
         if (limite != null && limite.signum() > 0) {
             BigDecimal saldo = saldo(clienteId);
             if (saldo.add(montoUsd).compareTo(limite) > 0) {
-                throw new IllegalArgumentException("Pasa el límite de fiado de " + c.getNombre() + ": debe $"
+                throw new IllegalArgumentException("Pasa el límite de crédito de " + c.getNombre() + ": debe $"
                         + saldo.setScale(2, RoundingMode.HALF_UP).toPlainString() + " y el límite es $"
                         + limite.setScale(2, RoundingMode.HALF_UP).toPlainString());
             }

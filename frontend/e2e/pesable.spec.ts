@@ -34,17 +34,17 @@ test("fiar desde el perfil: pestaña Fiar productos con un producto normal y uno
   await ir(page);
   await page.keyboard.press("Alt+5");
   await page.locator(".cli-row", { hasText: "José Rojas" }).click();
-  await page.getByRole("tab", { name: "Fiar productos" }).click();
-  await page.getByLabel("Buscar producto para fiar").fill("harina");
+  await page.getByRole("tab", { name: "Dar a crédito" }).click();
+  await page.getByLabel("Buscar producto para crédito").fill("harina");
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Más Harina PAN" }).click(); // 2 × $1
-  await page.getByLabel("Buscar producto para fiar").fill("queso");
+  await page.getByLabel("Buscar producto para crédito").fill("queso");
   await page.keyboard.press("Enter");
   await page.getByLabel("Cantidad en kilos").fill("0,25");
   await page.keyboard.press("Enter"); // 0,25 × $6 = $1,50
   await expect(page.locator(".cli-saldo b")).toHaveText("$ 3,50");
-  await page.getByRole("button", { name: "Fiar $ 3,50" }).click();
-  await expect(page.locator(".pinmsg.ok")).toContainText("Fiado $ 3,50 a José Rojas");
+  await page.getByRole("button", { name: "Anotar a crédito $ 3,50" }).click();
+  await expect(page.locator(".pinmsg.ok")).toContainText("Crédito de $ 3,50 a José Rojas");
   expect(st.fiado).toMatchObject({ id: 2, items: [{ productoId: 1, cantidad: 2 }, { productoId: 4, cantidad: 0.25 }] });
 });
 
@@ -55,9 +55,9 @@ test("si el plan está vencido, Fiar avisa que no es por el cliente y no deja", 
   await page.getByRole("button", { name: "Entendido" }).click();
   await page.keyboard.press("Alt+5");
   await page.locator(".cli-row", { hasText: "José Rojas" }).click();
-  await page.getByRole("tab", { name: "Fiar productos" }).click();
-  await page.getByLabel("Buscar producto para fiar").fill("harina");
+  await page.getByRole("tab", { name: "Dar a crédito" }).click();
+  await page.getByLabel("Buscar producto para crédito").fill("harina");
   await page.keyboard.press("Enter");
   await expect(page.locator(".cfg-ro")).toContainText("No es por José Rojas");
-  await expect(page.getByRole("button", { name: /^Fiar/ })).toBeDisabled();
+  await expect(page.getByRole("button", { name: /^Anotar a crédito/ })).toBeDisabled();
 });

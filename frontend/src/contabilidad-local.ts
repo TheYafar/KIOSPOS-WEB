@@ -61,7 +61,7 @@ export function plantillasHoja(): Record<string, { name: string; cols: ColHoja[]
       rows: [["", "Luz", "", ""], ["", "Bolsas", "", ""], ["", "Flete", "", ""]]
     },
     fiado: {
-      name: "Fiado de clientes",
+      name: "Crédito de clientes",
       cols: [{ name: "Cliente", money: false }, { name: "Fecha", money: false }, { name: "Debe", money: true }, { name: "Abonó", money: true }],
       rows: [["", "", "", ""], ["", "", "", ""], ["", "", "", ""]]
     },

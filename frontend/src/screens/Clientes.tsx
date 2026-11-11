@@ -45,7 +45,7 @@ export function Clientes() {
     <div className="caja">
       <div className="scroll pad cli">
         <div className="cli-head">
-          <div><h2>Fiado</h2><p>{trabajadores ? "Lo que se llevan tus trabajadores: se descuenta del sueldo." : "Quién te debe y cuánto. Toca un cliente para cobrarle."}</p></div>
+          <div><h2>Crédito</h2><p>{trabajadores ? "Lo que se llevan tus trabajadores: se descuenta del sueldo." : "Quién te debe y cuánto. Toca un cliente para cobrarle."}</p></div>
           {(!trabajadores || esJefe()) && <button className="btn primary press" onClick={() => setNuevo(true)}><UIcono k="plus" sw={2.2} />{trabajadores ? "Nuevo trabajador" : "Nuevo cliente"}</button>}
         </div>
         <div className="seg cli-tipo" role="tablist" aria-label="Clientes o trabajadores">
@@ -81,8 +81,8 @@ export function Clientes() {
           })}
         </div>
         {!cargando && delTipo.length === 0 && !err && <p className="noresult">{trabajadores
-          ? (esJefe() ? "Anota a tus trabajadores con su sueldo: lo que se lleven fiado se descuenta del sueldo." : "El dueño anota a los trabajadores.")
-          : "Aún no hay clientes. Anota el primero con “Nuevo cliente” o al cobrar con Fiado."}</p>}
+          ? (esJefe() ? "Anota a tus trabajadores con su sueldo: lo que se lleven a crédito se descuenta del sueldo." : "El dueño anota a los trabajadores.")
+          : "Aún no hay clientes. Anota el primero con “Nuevo cliente” o al cobrar con Crédito."}</p>}
         {delTipo.length > 0 && vis.length === 0 && <p className="noresult">Nadie coincide con “{q}”.</p>}
       </div>
       {nuevo && <FormCliente trabajador={trabajadores} onClose={() => setNuevo(false)} onSaved={(c) => { setNuevo(false); cargar(); setAbierto(c.id); }} />}
@@ -121,7 +121,7 @@ export function FormCliente({ cliente, nombreInicial, trabajador, onClose, onSav
           </div>
           {jefe && (
             <button className="cfg-row press" role="switch" aria-checked={esTrab} onClick={() => setEsTrab(!esTrab)}>
-              <span className="cfg-tx"><b>Trabaja en el local</b><small>Lo que se lleve fiado se le descuenta del sueldo.</small></span>
+              <span className="cfg-tx"><b>Trabaja en el local</b><small>Lo que se lleve a crédito se le descuenta del sueldo.</small></span>
               <span className={"sw" + (esTrab ? " on" : "")}><i /></span>
             </button>
           )}
@@ -132,13 +132,13 @@ export function FormCliente({ cliente, nombreInicial, trabajador, onClose, onSav
             </label>
           )}
           {jefe ? (
-            <label className="lbl">Límite de fiado <span className="opt">(vacío = sin límite)</span>
+            <label className="lbl">Límite de crédito <span className="opt">(vacío = sin límite)</span>
               <div className="inpw"><i>$</i><input className="inp t pre" inputMode="decimal" value={lim} onChange={(e) => setLim(e.target.value.replace(/[^\d.,]/g, ""))} placeholder="Sin límite" aria-label="Límite de fiado" /></div>
             </label>
-          ) : <span className="hint">El límite de fiado lo pone el dueño.</span>}
+          ) : <span className="hint">El límite de crédito lo pone el dueño.</span>}
           {cliente && jefe && (
             <button className="cfg-row press" role="switch" aria-checked={activo} onClick={() => setActivo(!activo)}>
-              <span className="cfg-tx"><b>Se le puede fiar</b><small>Apágalo para no fiarle más (su deuda sigue).</small></span>
+              <span className="cfg-tx"><b>Se le puede dar crédito</b><small>Apágalo para no darle más crédito (su deuda sigue).</small></span>
               <span className={"sw" + (activo ? " on" : "")}><i /></span>
             </button>
           )}
@@ -202,9 +202,9 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
       <div className="modal-card cli-det" onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Escape") { e.preventDefault(); onClose(); } }}>
         <div className="modal-head"><h2>{c.nombre}{trab && <span className="pill info cli-badge">Trabajador</span>}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
         <div className="cli-tabs">
-          <div className="seg" role="tablist" aria-label="Cuenta o fiar">
+          <div className="seg" role="tablist" aria-label="Cuenta o crédito">
             <button role="tab" aria-selected={pestana === "cuenta"} className={pestana === "cuenta" ? "on" : ""} onClick={() => setPestana("cuenta")}>Cuenta</button>
-            <button role="tab" aria-selected={pestana === "fiar"} className={pestana === "fiar" ? "on" : ""} onClick={() => { setOk(""); setErr(""); setPestana("fiar"); }}>Fiar productos</button>
+            <button role="tab" aria-selected={pestana === "fiar"} className={pestana === "fiar" ? "on" : ""} onClick={() => { setOk(""); setErr(""); setPestana("fiar"); }}>Dar a crédito</button>
           </div>
         </div>
         {pestana === "fiar" ? <FiarProductos cliente={c} onHecho={(t) => { setOk(t); setPestana("cuenta"); cargar(); }} /> : (
@@ -259,7 +259,7 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
           <div className="cli-movs">
             {d.movimientos.map((x) => (
               <div key={x.id} className="cli-mov">
-                <span className={"pill " + (x.tipo === "CARGO" ? "late" : "ok")}>{x.tipo === "CARGO" ? "Fiado" : "Abono"}</span>
+                <span className={"pill " + (x.tipo === "CARGO" ? "late" : "ok")}>{x.tipo === "CARGO" ? "Crédito" : "Abono"}</span>
                 <span className="cli-mov-tx">{x.tipo === "CARGO" ? (x.ventaId ? "Venta #" + x.ventaId : "Venta") : (METODOS_ABONO.find((y) => y.id === x.metodo)?.n || ({ NOMINA: "Descontado del sueldo", ANULACION: "Venta anulada", DEVOLUCION: "Devolución" } as Record<string, string>)[x.metodo || ""] || x.metodo) + (x.moneda === "VES" && x.montoOriginal ? " · " + bs(x.montoOriginal) : "") + (x.referencia ? " · ref " + x.referencia : "")}
                   <small>{new Date(x.createdAt).toLocaleString("es-VE", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" })}</small></span>
                 <b className={"t " + (x.tipo === "CARGO" ? "mg-bad" : "mg-ok")}>{x.tipo === "CARGO" ? "+" : "−"} {usd(x.montoUsd)}</b>
@@ -295,11 +295,11 @@ export function ElegirCliente({ onElegir, onClose }: { onElegir: (c: ClienteFiad
   return (
     <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card" onKeyDown={key}>
-        <div className="modal-head"><h2>¿A quién le fías?</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="modal-head"><h2>¿A quién le das crédito?</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
         <div className="modal-body">
           <label className="search">
             <UIcono k="search" sw={2} />
-            <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setSel(0); }} placeholder="Nombre, cédula o teléfono…" aria-label="Buscar cliente para fiar" />
+            <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setSel(0); }} placeholder="Nombre, cédula o teléfono…" aria-label="Buscar cliente para crédito" />
           </label>
           {err && <p className="pinmsg err">{err}</p>}
           <div className="cli-pick">
@@ -354,7 +354,7 @@ function FiarProductos({ cliente: c, onHecho }: { cliente: ClienteFiado; onHecho
     setEnviando(true); setErr("");
     try {
       const r = await fiarCliente(c.id, lineas.map((l) => ({ productoId: l.p.id, cantidad: l.qty })));
-      onHecho("Fiado " + "$ " + money(r.totalUsd) + " a " + c.nombre + " ✓ (los productos bajaron del inventario)");
+      onHecho("Crédito de " + "$ " + money(r.totalUsd) + " a " + c.nombre + " ✓ (los productos bajaron del inventario)");
     } catch (e) { setErr((e as Error).message); setEnviando(false); }
   };
   return (
@@ -362,7 +362,7 @@ function FiarProductos({ cliente: c, onHecho }: { cliente: ClienteFiado; onHecho
       <div className="modal-body">
         <label className="search">
           <UIcono k="search" sw={2} />
-          <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setSel(0); }} placeholder="Busca el producto o escanea el código…" aria-label="Buscar producto para fiar"
+          <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setSel(0); }} placeholder="Busca el producto o escanea el código…" aria-label="Buscar producto para crédito"
             onKeyDown={(e) => {
               if (e.key === "ArrowDown") { e.preventDefault(); setSel((x) => Math.min(x + 1, res.length - 1)); }
               else if (e.key === "ArrowUp") { e.preventDefault(); setSel((x) => Math.max(x - 1, 0)); }
@@ -399,14 +399,14 @@ function FiarProductos({ cliente: c, onHecho }: { cliente: ClienteFiado; onHecho
             <span>Se anota en su cuenta</span>
             <b className="t">$ {money(total)}</b>
             <small className="t">Bs {money(Math.round(total * tasa * 100) / 100)} · quedaría debiendo $ {money(c.saldoUsd + total)}{lim > 0 ? " de $ " + money(lim) + (c.tipo === "TRABAJADOR" && c.limiteUsd <= 0 ? " (su sueldo)" : "") : ""}</small>
-            {pasa && <small className="mg-bad">Pasa su límite de fiado: quita algo o cóbrale una parte.</small>}
+            {pasa && <small className="mg-bad">Pasa su límite de crédito: quita algo o cóbrale una parte.</small>}
           </div>
         )}
-        {plan && !plan.ok && <div className="cfg-ro" role="alert"><UIcono k="lock" sw={2} />No se puede fiar ni cobrar: el plan de KioskPOS está vencido o sin activar ({plan.msg}). No es por {c.nombre}. Reporta el pago en Más → Mi plan.</div>}
+        {plan && !plan.ok && <div className="cfg-ro" role="alert"><UIcono k="lock" sw={2} />No se puede dar crédito ni cobrar: el plan de KioskPOS está vencido o sin activar ({plan.msg}). No es por {c.nombre}. Reporta el pago en Más → Mi plan.</div>}
         {!c.activo && <p className="pinmsg err">A {c.nombre} no se le está fiando (desactivado).</p>}
         {err && <p className="pinmsg err">{err}</p>}
       </div>
-      <div className="modal-foot"><button className="btn primary big press" disabled={!lineas.length || pasa || enviando || !c.activo || (plan != null && !plan.ok)} onClick={fiar}>{enviando ? "Guardando…" : lineas.length ? "Fiar $ " + money(total) : "Agrega productos"}</button></div>
+      <div className="modal-foot"><button className="btn primary big press" disabled={!lineas.length || pasa || enviando || !c.activo || (plan != null && !plan.ok)} onClick={fiar}>{enviando ? "Guardando…" : lineas.length ? "Anotar a crédito $ " + money(total) : "Agrega productos"}</button></div>
       {pesar && <CantidadPesable producto={pesar.p} tasa={tasa} inicial={pesar.inicial} onClose={() => setPesar(null)}
         onOk={(cant) => { fijar(pesar.p, cant); setPesar(null); setQ(""); setSel(0); }} />}
     </>

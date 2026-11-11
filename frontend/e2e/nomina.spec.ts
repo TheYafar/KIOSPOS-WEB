@@ -19,6 +19,6 @@ test("Nómina en el menú del dueño: paga el sueldo descontando el fiado y mues
   await page.getByLabel("Referencia del pago").fill("7788");
   await page.getByRole("button", { name: /^Pagar \$ 5,00/ }).click();
   await expect(page.getByRole("heading", { name: "Pago registrado ✓" })).toBeVisible();
-  await expect(page.getByLabel("Recibo")).toContainText("- Fiado");
+  await expect(page.getByLabel("Recibo")).toContainText("- Credito");
   expect(st.nomina).toMatchObject({ trabajadorId: 3, sueldoUsd: 15, bonosUsd: 2, otrosDescuentosUsd: 0, fiadoDescontadoUsd: 12, metodo: "PAGO_MOVIL", tasa: 900, referencia: "7788" });
 });

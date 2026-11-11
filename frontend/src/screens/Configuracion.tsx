@@ -14,7 +14,7 @@ const METODOS: { id: MetodoId; n: string; sub: string; icon: string; color: stri
   { id: "PAGO_MOVIL", n: "Pago móvil", sub: "Transferencia inmediata", icon: "phone", color: "var(--c-bebidas)" },
   { id: "PUNTO", n: "Punto de venta", sub: "Tarjeta de débito", icon: "card", color: "var(--warn)" },
   { id: "BIOPAGO", n: "Biopago", sub: "Huella (BDV)", icon: "finger", color: "var(--c-chucherias)" },
-  { id: "FIADO", n: "Fiado", sub: "Anotar en la cuenta del cliente", icon: "user", color: "var(--c-charcuteria)" },
+  { id: "FIADO", n: "Crédito", sub: "Anotar en la cuenta del cliente", icon: "user", color: "var(--c-charcuteria)" },
 ];
 
 const money = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
