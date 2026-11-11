@@ -30,13 +30,16 @@ public class AdminService {
     private final SuscripcionService suscripcionService;
     private final NegocioRegistroService negocioRegistroService;
     private final EmailService emailService;
+    private final com.kioskpos.web.auth.CuentaLoginRepository cuentaLoginRepository;
 
     public AdminService(NegocioRepository negocioRepository,
                         PagoRepository pagoRepository,
                         CajaRepository cajaRepository,
                         SuscripcionService suscripcionService,
                         NegocioRegistroService negocioRegistroService,
-                        EmailService emailService) {
+                        EmailService emailService,
+                        com.kioskpos.web.auth.CuentaLoginRepository cuentaLoginRepository) {
+        this.cuentaLoginRepository = cuentaLoginRepository;
         this.negocioRepository = negocioRepository;
         this.pagoRepository = pagoRepository;
         this.cajaRepository = cajaRepository;
@@ -76,13 +79,30 @@ public class AdminService {
     }
 
     public Negocio aprobarPago(Long pagoId, Long superAdminId) {
-        return suscripcionService.aprobarPago(pagoId, superAdminId);
+        Negocio n = suscripcionService.aprobarPago(pagoId, superAdminId);
+        avisarPago(n);
+        return n;
+    }
+
+    /** Correo "Pago recibido" al dueño (async; si falla o no hay correo, no rompe nada). */
+    private void avisarPago(Negocio n) {
+        if (n == null) {
+            return;
+        }
+        try {
+            cuentaLoginRepository.findFirstByNegocioIdOrderByIdAsc(n.getId())
+                    .ifPresent(c -> emailService.pagoAprobado(c.getEmail(), n.getNombre(), n.getPagoHasta()));
+        } catch (RuntimeException e) {
+            // el correo es un extra: nunca tumba la aprobación del pago
+        }
     }
 
     /** El super admin registra un pago ya recibido del dueño (y reactiva si estaba suspendido). */
     public Negocio registrarPago(Long negocioId, java.math.BigDecimal monto, String moneda,
                                  String metodo, String referencia, int meses, Long superAdminId) {
-        return suscripcionService.registrarPagoAdmin(negocioId, monto, moneda, metodo, referencia, meses, superAdminId);
+        Negocio n = suscripcionService.registrarPagoAdmin(negocioId, monto, moneda, metodo, referencia, meses, superAdminId);
+        avisarPago(n);
+        return n;
     }
 
     public void suspender(Long negocioId) {

@@ -74,8 +74,7 @@ public class MiNegocioController {
     public ConfigNegocio config(@AuthenticationPrincipal KioskPrincipal principal) {
         Negocio n = negocioRepository.findById(principal.negocioId())
                 .orElseThrow(() -> new IllegalArgumentException("Negocio no encontrado"));
-        return new ConfigNegocio(n.getNombre(), n.getTelefono(), n.getDireccion(),
-                n.getCajasContratadas(), n.getHorariosCierre());
+        return aConfig(n);
     }
 
     /** Actualiza el perfil y horarios (solo dueño/encargado, por SecurityConfig). */
@@ -84,19 +83,49 @@ public class MiNegocioController {
                                           @RequestBody ActualizarConfigRequest req) {
         Negocio n = negocioRepository.findById(principal.negocioId())
                 .orElseThrow(() -> new IllegalArgumentException("Negocio no encontrado"));
-        n.setTelefono(req.telefono());
-        n.setDireccion(req.direccion());
+        if (req.nombre() != null) {
+            String nombre = req.nombre().trim();
+            if (nombre.isEmpty() || nombre.length() > 150) {
+                throw new IllegalArgumentException("El nombre del negocio es obligatorio (máx. 150 letras)");
+            }
+            n.setNombre(nombre);
+        }
+        n.setTelefono(limpio(req.telefono(), 40));
+        n.setDireccion(limpio(req.direccion(), 200));
         n.setHorariosCierre(req.horariosCierre());
+        if (req.rif() != null) {
+            n.setRif(limpio(req.rif(), 30));
+        }
+        if (req.mensajeTicket() != null) {
+            n.setMensajeTicket(limpio(req.mensajeTicket(), 200));
+        }
         negocioRepository.save(n);
+        return aConfig(n);
+    }
+
+    private static String limpio(String v, int max) {
+        if (v == null || v.isBlank()) {
+            return null;
+        }
+        String t = v.trim();
+        if (t.length() > max) {
+            throw new IllegalArgumentException("Texto demasiado largo (máx. " + max + ")");
+        }
+        return t;
+    }
+
+    private static ConfigNegocio aConfig(Negocio n) {
         return new ConfigNegocio(n.getNombre(), n.getTelefono(), n.getDireccion(),
-                n.getCajasContratadas(), n.getHorariosCierre());
+                n.getCajasContratadas(), n.getHorariosCierre(), n.getRif(), n.getMensajeTicket());
     }
 
     public record ConfigNegocio(String nombre, String telefono, String direccion,
-                                Integer cajasContratadas, String horariosCierre) {
+                                Integer cajasContratadas, String horariosCierre,
+                                String rif, String mensajeTicket) {
     }
 
-    public record ActualizarConfigRequest(String telefono, String direccion, String horariosCierre) {
+    public record ActualizarConfigRequest(String telefono, String direccion, String horariosCierre,
+                                          String nombre, String rif, String mensajeTicket) {
     }
 
     // ---------- Configuración de la caja (formas de pago + tasa) ----------

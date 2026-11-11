@@ -35,16 +35,13 @@ public class TicketService {
 
     @Transactional(readOnly = true)
     public String generar(Venta venta) {
-        String nombreNegocio = negocioRepository.findById(venta.getNegocioId())
-                .map(Negocio::getNombre)
-                .orElse("KIOSKPOS");
+        Negocio negocio = negocioRepository.findById(venta.getNegocioId()).orElse(null);
+        String nombreNegocio = negocio != null ? negocio.getNombre() : "KIOSKPOS";
 
         String linea = "-".repeat(ANCHO) + "\n";
         StringBuilder sb = new StringBuilder();
 
-        for (String r : envolver(nombreNegocio.replaceAll("\\s+", " "))) {
-            sb.append(centrar(r)).append("\n");
-        }
+        sb.append(encabezado(negocio, nombreNegocio));
         sb.append(linea);
 
         sb.append("TICKET # ").append(String.format("%06d", venta.getNumeroFactura())).append("\n");
@@ -99,8 +96,33 @@ public class TicketService {
             sb.append(linea);
         }
 
-        for (String r : envolver("Gracias por su compra. Vuelva pronto.")) {
+        String pie = negocio != null && negocio.getMensajeTicket() != null && !negocio.getMensajeTicket().isBlank()
+                ? negocio.getMensajeTicket() : "Gracias por su compra. Vuelva pronto.";
+        for (String r : envolver(pie.replaceAll("\\s+", " ").trim())) {
             sb.append(centrar(r)).append("\n");
+        }
+        return sb.toString();
+    }
+
+    /** Nombre del negocio (en mayúsculas), RIF, dirección y teléfono, centrados. */
+    static String encabezado(Negocio negocio, String nombreNegocio) {
+        StringBuilder sb = new StringBuilder();
+        for (String r : envolver(nombreNegocio.replaceAll("\\s+", " ").trim().toUpperCase(Locale.ROOT))) {
+            sb.append(centrar(r)).append("\n");
+        }
+        if (negocio == null) {
+            return sb.toString();
+        }
+        if (negocio.getRif() != null && !negocio.getRif().isBlank()) {
+            sb.append(centrar("RIF: " + negocio.getRif().trim())).append("\n");
+        }
+        if (negocio.getDireccion() != null && !negocio.getDireccion().isBlank()) {
+            for (String r : envolver(negocio.getDireccion().replaceAll("\\s+", " ").trim())) {
+                sb.append(centrar(r)).append("\n");
+            }
+        }
+        if (negocio.getTelefono() != null && !negocio.getTelefono().isBlank()) {
+            sb.append(centrar("Tel: " + negocio.getTelefono().trim())).append("\n");
         }
         return sb.toString();
     }

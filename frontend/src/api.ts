@@ -401,9 +401,9 @@ export async function adminCrearNegocio(body: { nombreNegocio: string; nombreDue
 }
 
 // ---------- Config del negocio (perfil + horarios de cierre) ----------
-export interface ConfigNegocio { nombre: string; telefono: string | null; direccion: string | null; cajasContratadas: number; horariosCierre: string | null; }
+export interface ConfigNegocio { nombre: string; telefono: string | null; direccion: string | null; cajasContratadas: number; horariosCierre: string | null; rif?: string | null; mensajeTicket?: string | null; }
 export async function getConfigNegocio(): Promise<ConfigNegocio> { return parse(await fetch("/api/mi-negocio/config", { headers: auth() })); }
-export async function putConfigNegocio(body: { telefono?: string; direccion?: string; horariosCierre?: string }): Promise<ConfigNegocio> {
+export async function putConfigNegocio(body: { telefono?: string; direccion?: string; horariosCierre?: string; nombre?: string; rif?: string; mensajeTicket?: string }): Promise<ConfigNegocio> {
   return parse(await fetch("/api/mi-negocio/config", { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
 }
 // ---------- Config de caja del negocio (formas de pago + tasa) — la comparten todas sus cajas ----------

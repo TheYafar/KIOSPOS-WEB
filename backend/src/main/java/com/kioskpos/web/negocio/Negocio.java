@@ -54,6 +54,14 @@ public class Negocio {
     @Column(length = 200)
     private String direccion;
 
+    /** RIF que sale en el ticket (opcional). */
+    @Column(length = 30)
+    private String rif;
+
+    /** Mensaje al pie del ticket (ej. "Gracias por su compra"). Null = el de siempre. */
+    @Column(name = "mensaje_ticket", length = 200)
+    private String mensajeTicket;
+
     @Column(name = "cajas_contratadas", nullable = false)
     private Integer cajasContratadas = 1;
 

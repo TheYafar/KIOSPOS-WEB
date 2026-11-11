@@ -37,12 +37,15 @@ public class CuadreService {
     private final MovimientoClienteRepository movimientoClienteRepository;
     private final com.kioskpos.web.devolucion.DevolucionRepository devolucionRepository;
     private final com.kioskpos.web.devolucion.DevolucionReembolsoRepository devolucionReembolsoRepository;
+    private final com.kioskpos.web.recarga.RecargaRepository recargaRepository;
 
     public CuadreService(TurnoRepository turnoRepository, VentaRepository ventaRepository,
                          MovimientoCajaRepository movimientoCajaRepository,
                          MovimientoClienteRepository movimientoClienteRepository,
                          com.kioskpos.web.devolucion.DevolucionRepository devolucionRepository,
-                         com.kioskpos.web.devolucion.DevolucionReembolsoRepository devolucionReembolsoRepository) {
+                         com.kioskpos.web.devolucion.DevolucionReembolsoRepository devolucionReembolsoRepository,
+                         com.kioskpos.web.recarga.RecargaRepository recargaRepository) {
+        this.recargaRepository = recargaRepository;
         this.devolucionRepository = devolucionRepository;
         this.devolucionReembolsoRepository = devolucionReembolsoRepository;
         this.turnoRepository = turnoRepository;
@@ -114,7 +117,7 @@ public class CuadreService {
         return new Resumen(turno.getId(), turno.getEstado(), r.fondoUsd(), r.fondoBs(),
                 r.efectivoUsd(), r.efectivoBs(), r.vueltoUsd(), r.vueltoBs(),
                 r.esperadoUsd(), r.esperadoBs(), dUsd, dBs, difUsd, difBs, r.metodos(), r.movimientos(),
-                r.fiadoUsd(), r.comisionAvancesBs(), turno.getFechaApertura());
+                r.fiadoUsd(), r.comisionAvancesBs(), turno.getFechaApertura(), r.recargasBs(), r.comisionRecargasBs());
     }
 
     private Resumen calcular(Turno turno) {
@@ -180,6 +183,23 @@ public class CuadreService {
             switch (ab.getMetodo()) {
                 case "EFECTIVO_USD" -> mov.sumar("ABONO", "USD", m);
                 case "EFECTIVO_BS" -> mov.sumar("ABONO", "VES", m);
+                case "PUNTO" -> puntoBs = puntoBs.add(m);
+                case "PAGO_MOVIL" -> pagoMovilBs = pagoMovilBs.add(m);
+                case "BIOPAGO" -> biopagoBs = biopagoBs.add(m);
+                default -> { /* validado al registrar */ }
+            }
+        }
+
+        // Recargas de saldo: lo cobrado entra a su forma de pago.
+        BigDecimal recargasBs = BigDecimal.ZERO;
+        BigDecimal comisionRecargasBs = BigDecimal.ZERO;
+        for (var rc : recargaRepository.findByTurnoIdAndAnuladaFalse(turno.getId())) {
+            recargasBs = recargasBs.add(rc.getMontoBs());
+            comisionRecargasBs = comisionRecargasBs.add(rc.getComisionBs());
+            BigDecimal m = rc.getMontoCobrado();
+            switch (rc.getMetodoCobro()) {
+                case "EFECTIVO_USD" -> mov.sumar("RECARGA", "USD", m);
+                case "EFECTIVO_BS" -> mov.sumar("RECARGA", "VES", m);
                 case "PUNTO" -> puntoBs = puntoBs.add(m);
                 case "PAGO_MOVIL" -> pagoMovilBs = pagoMovilBs.add(m);
                 case "BIOPAGO" -> biopagoBs = biopagoBs.add(m);
@@ -255,7 +275,8 @@ public class CuadreService {
                 vueltoUsd.setScale(2, RoundingMode.HALF_UP), vueltoBs.setScale(2, RoundingMode.HALF_UP),
                 esperadoUsd, esperadoBs, null, null, null, null, metodos, mov.lineas(),
                 fiadoUsd.setScale(2, RoundingMode.HALF_UP), comisionAvancesBs.setScale(2, RoundingMode.HALF_UP),
-                turno.getFechaApertura());
+                turno.getFechaApertura(), recargasBs.setScale(2, RoundingMode.HALF_UP),
+                comisionRecargasBs.setScale(2, RoundingMode.HALF_UP));
     }
 
     /** Suma movimientos por tipo y moneda. GASTO/RETIRO/AVANCE salen; INGRESO/ABONO entran. */
@@ -268,7 +289,7 @@ public class CuadreService {
         }
 
         BigDecimal entra(String moneda) {
-            return total(moneda, List.of("INGRESO", "ABONO"));
+            return total(moneda, List.of("INGRESO", "ABONO", "RECARGA"));
         }
 
         BigDecimal sale(String moneda) {
@@ -317,7 +338,9 @@ public class CuadreService {
                           List<MovLinea> movimientos,
                           BigDecimal fiadoUsd,
                           BigDecimal comisionAvancesBs,
-                          Instant fechaApertura) {
+                          Instant fechaApertura,
+                          BigDecimal recargasBs,
+                          BigDecimal comisionRecargasBs) {
     }
 
     /** Total de movimientos de un tipo en una moneda (GASTO, RETIRO, INGRESO, AVANCE, ABONO, DEVOLUCION). */

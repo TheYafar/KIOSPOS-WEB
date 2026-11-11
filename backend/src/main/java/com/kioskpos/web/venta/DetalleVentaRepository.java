@@ -47,4 +47,17 @@ public interface DetalleVentaRepository extends JpaRepository<DetalleVenta, Long
             WHERE dv.created_at >= :desde AND dv.created_at < :hasta
             """, nativeQuery = true)
     java.util.List<Object[]> devueltoYCostoEntre(@Param("desde") java.time.LocalDateTime desde, @Param("hasta") java.time.LocalDateTime hasta);
+
+    /**
+     * Productos más vendidos del rango (COMPLETADAS): [productoId, nombre, cantidad, vendido $, costo $],
+     * ordenados por lo vendido en dólares.
+     */
+    @Query("SELECT d.productoId, d.nombre, SUM(d.cantidad), SUM(d.subtotalUsd), "
+            + "SUM(COALESCE(d.costoUnitarioUsd, p.costoUsd, 0) * d.cantidad) FROM DetalleVenta d "
+            + "LEFT JOIN com.kioskpos.web.producto.Producto p ON p.id = d.productoId "
+            + "WHERE d.venta.estado = 'COMPLETADA' "
+            + "AND d.venta.fechaHora >= :desde AND d.venta.fechaHora < :hasta "
+            + "GROUP BY d.productoId, d.nombre ORDER BY SUM(d.subtotalUsd) DESC")
+    java.util.List<Object[]> masVendidosEntre(@Param("desde") Instant desde, @Param("hasta") Instant hasta,
+                                              org.springframework.data.domain.Pageable pagina);
 }

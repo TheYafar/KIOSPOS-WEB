@@ -30,6 +30,14 @@ public class ReporteController {
         return reporteService.resumenDelDia(fecha);
     }
 
+    /** Resumen de un rango (semana, mes...): ambos días incluidos. */
+    @GetMapping("/rango")
+    public ReporteService.ResumenDia rango(
+            @RequestParam("desde") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam("hasta") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+        return reporteService.resumenEntre(desde, hasta);
+    }
+
     @GetMapping("/cierres")
     public List<ReporteService.CierreDia> cierres(
             @RequestParam(value = "fecha", required = false)

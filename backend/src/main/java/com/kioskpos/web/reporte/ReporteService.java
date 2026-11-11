@@ -36,6 +36,10 @@ public class ReporteService {
     private final MovimientoCajaRepository movimientoCajaRepository;
     private final MovimientoClienteRepository movimientoClienteRepository;
     private final com.kioskpos.web.devolucion.DevolucionRepository devolucionRepository;
+    private final com.kioskpos.web.recarga.RecargaRepository recargaRepository;
+
+    /** Máximo de días de un reporte por rango (un año). */
+    public static final int MAX_DIAS = 366;
 
     public ReporteService(VentaRepository ventaRepository,
                           DetalleVentaRepository detalleVentaRepository,
@@ -43,7 +47,9 @@ public class ReporteService {
                           TurnoRepository turnoRepository,
                           MovimientoCajaRepository movimientoCajaRepository,
                           MovimientoClienteRepository movimientoClienteRepository,
-                          com.kioskpos.web.devolucion.DevolucionRepository devolucionRepository) {
+                          com.kioskpos.web.devolucion.DevolucionRepository devolucionRepository,
+                          com.kioskpos.web.recarga.RecargaRepository recargaRepository) {
+        this.recargaRepository = recargaRepository;
         this.devolucionRepository = devolucionRepository;
         this.ventaRepository = ventaRepository;
         this.detalleVentaRepository = detalleVentaRepository;
@@ -56,8 +62,25 @@ public class ReporteService {
     @Transactional(readOnly = true)
     public ResumenDia resumenDelDia(LocalDate dia) {
         LocalDate d = dia != null ? dia : LocalDate.now(ZONA);
+        return resumenEntre(d, d);
+    }
+
+    /**
+     * Resumen de un rango de días (ambos incluidos, calendario de Venezuela): lo mismo que el
+     * del día, más los productos más vendidos y la venta/ganancia de cada día (para semana y mes).
+     */
+    @Transactional(readOnly = true)
+    public ResumenDia resumenEntre(LocalDate desdeDia, LocalDate hastaDia) {
+        LocalDate d = desdeDia != null ? desdeDia : LocalDate.now(ZONA);
+        LocalDate h = hastaDia != null ? hastaDia : d;
+        if (h.isBefore(d)) {
+            throw new IllegalArgumentException("La fecha final no puede ser antes de la inicial");
+        }
+        if (java.time.temporal.ChronoUnit.DAYS.between(d, h) >= MAX_DIAS) {
+            throw new IllegalArgumentException("El rango no puede pasar de un año");
+        }
         Instant desde = d.atStartOfDay(ZONA).toInstant();
-        Instant hasta = d.plusDays(1).atStartOfDay(ZONA).toInstant();
+        Instant hasta = h.plusDays(1).atStartOfDay(ZONA).toInstant();
 
         Object[] tot = ventaRepository.totalesEntre(desde, hasta).get(0);
         BigDecimal totalUsd = dec(tot[0]);
@@ -97,8 +120,45 @@ public class ReporteService {
                 MovimientoCliente.Tipo.ABONO.name(), desde, hasta).stream()
                 .map(MovimientoCliente::getMontoUsd).reduce(BigDecimal.ZERO, BigDecimal::add);
 
+        // Recargas de saldo (todas las cajas).
+        long cantRecargas = 0;
+        BigDecimal recargasBs = BigDecimal.ZERO;
+        BigDecimal comisionRecargas = BigDecimal.ZERO;
+        for (var rc : recargaRepository.findByAnuladaFalseAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(desde, hasta)) {
+            cantRecargas++;
+            recargasBs = recargasBs.add(rc.getMontoBs());
+            comisionRecargas = comisionRecargas.add(rc.getComisionBs());
+        }
+
+        List<ProductoTop> top = new ArrayList<>();
+        for (Object[] f : detalleVentaRepository.masVendidosEntre(desde, hasta,
+                org.springframework.data.domain.PageRequest.of(0, 10))) {
+            BigDecimal vendido = dec(f[3]);
+            top.add(new ProductoTop(f[0] == null ? null : ((Number) f[0]).longValue(), String.valueOf(f[1]),
+                    dec(f[2]), vendido, vendido.subtract(dec(f[4]))));
+        }
+
+        // Día por día (solo si el rango tiene más de un día).
+        List<DiaLinea> porDia = new ArrayList<>();
+        if (h.isAfter(d)) {
+            for (LocalDate x = d; !x.isAfter(h); x = x.plusDays(1)) {
+                Instant a = x.atStartOfDay(ZONA).toInstant();
+                Instant b = x.plusDays(1).atStartOfDay(ZONA).toInstant();
+                Object[] t = ventaRepository.totalesEntre(a, b).get(0);
+                BigDecimal vend = dec(t[0]);
+                BigDecimal cos = detalleVentaRepository.costoEntre(a, b);
+                Object[] dv = detalleVentaRepository.devueltoYCostoEntre(
+                        java.time.LocalDateTime.ofInstant(a, java.time.ZoneOffset.UTC),
+                        java.time.LocalDateTime.ofInstant(b, java.time.ZoneOffset.UTC)).get(0);
+                BigDecimal neto = vend.subtract(dec(dv[0]));
+                BigDecimal costoNeto = (cos == null ? BigDecimal.ZERO : cos).subtract(dec(dv[1])).max(BigDecimal.ZERO);
+                porDia.add(new DiaLinea(x.toString(), ((Number) t[2]).longValue(), neto, neto.subtract(costoNeto)));
+            }
+        }
+
         return new ResumenDia(d.toString(), cantidad, totalUsd, totalBs, costo, ganancia, desglose,
-                List.copyOf(movs.values()), comision, abonos, devueltoUsd);
+                List.copyOf(movs.values()), comision, abonos, devueltoUsd,
+                h.toString(), cantRecargas, recargasBs, comisionRecargas, top, porDia);
     }
 
     /**
@@ -151,7 +211,17 @@ public class ReporteService {
     public record ResumenDia(String fecha, long cantidadVentas, BigDecimal totalUsd, BigDecimal totalBs,
                              BigDecimal costoUsd, BigDecimal gananciaUsd, List<DesglosePago> pagos,
                              List<MovimientoDia> movimientos, BigDecimal comisionAvancesBs, BigDecimal abonosFiadoUsd,
-                             BigDecimal devolucionesUsd) {
+                             BigDecimal devolucionesUsd,
+                             String hasta, long cantidadRecargas, BigDecimal recargasBs, BigDecimal comisionRecargasBs,
+                             List<ProductoTop> masVendidos, List<DiaLinea> porDia) {
+    }
+
+    /** Un producto entre los más vendidos: cantidad, vendido $ y ganancia $. */
+    public record ProductoTop(Long productoId, String nombre, BigDecimal cantidad, BigDecimal vendidoUsd, BigDecimal gananciaUsd) {
+    }
+
+    /** Venta neta y ganancia de un día dentro de un rango. */
+    public record DiaLinea(String fecha, long cantidadVentas, BigDecimal totalUsd, BigDecimal gananciaUsd) {
     }
 
     /** Gastos/retiros/ingresos/avances del día por moneda. */

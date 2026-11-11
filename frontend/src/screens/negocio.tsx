@@ -25,6 +25,9 @@ export function HorariosCierre({ value, onChange }: { value: string; onChange: (
 
 // ===== Ajustes del negocio (el dueño edita su perfil + horarios) =====
 export function AjustesNegocio() {
+  const [nombre, setNombre] = useState("");
+  const [rif, setRif] = useState("");
+  const [pie, setPie] = useState("");
   const [tel, setTel] = useState("");
   const [dir, setDir] = useState("");
   const [horarios, setHorarios] = useState("");
@@ -34,13 +37,14 @@ export function AjustesNegocio() {
 
   useEffect(() => {
     getConfigNegocio().then((c) => {
+      setNombre(c.nombre || ""); setRif(c.rif || ""); setPie(c.mensajeTicket || "");
       setTel(c.telefono || ""); setDir(c.direccion || ""); setHorarios(c.horariosCierre || "");
     }).catch((e) => setErr((e as Error).message)).finally(() => setCargando(false));
   }, []);
 
   const guardar = async () => {
     try {
-      await putConfigNegocio({ telefono: tel.trim(), direccion: dir.trim(), horariosCierre: horarios });
+      await putConfigNegocio({ nombre: nombre.trim(), rif: rif.trim(), mensajeTicket: pie.trim(), telefono: tel.trim(), direccion: dir.trim(), horariosCierre: horarios });
       setMsg("Guardado ✓"); setErr("");
       setTimeout(() => setMsg(""), 2500);
     } catch (e) { setErr((e as Error).message); }
@@ -50,15 +54,42 @@ export function AjustesNegocio() {
 
   return (
     <section className="aj">
-      <div className="aj-head"><b>Ajustes del negocio</b><span>Tus datos y a qué hora se cierra la caja.</span></div>
+      <div className="aj-head"><b>Ajustes del negocio</b><span>Tus datos (salen en el ticket) y a qué hora se cierra la caja.</span></div>
+      <label className="lbl">Nombre del negocio<input className="inp" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: Bodega Cocoa" maxLength={150} /></label>
+      <label className="lbl">RIF<input className="inp" value={rif} onChange={(e) => setRif(e.target.value)} placeholder="Ej: J-12345678-9 (opcional)" maxLength={30} /></label>
       <label className="lbl">Teléfono<input className="inp" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="Ej: 0412-1234567" /></label>
       <label className="lbl">Dirección / local<input className="inp" value={dir} onChange={(e) => setDir(e.target.value)} placeholder="Dónde queda la bodega" /></label>
+      <label className="lbl">Mensaje al pie del ticket<input className="inp" value={pie} onChange={(e) => setPie(e.target.value)} placeholder="Gracias por su compra. Vuelva pronto." maxLength={200} /></label>
+      <div className="lbl"><span>Así sale el ticket</span><pre className="aj-ticket t" aria-label="Vista del ticket">{vistaTicket(nombre, rif, dir, tel, pie)}</pre></div>
       <div className="lbl"><span>Horarios de cierre de caja</span><HorariosCierre value={horarios} onChange={setHorarios} /></div>
       {err && <p className="pinmsg err">{err}</p>}
       {msg && <span className="pill ok" style={{ alignSelf: "flex-start" }}>{msg}</span>}
       <button className="btn primary" onClick={guardar}>Guardar ajustes</button>
     </section>
   );
+}
+
+/** Encabezado y pie del ticket de 40 columnas, igual que TicketService del servidor. */
+export function vistaTicket(nombre: string, rif: string, dir: string, tel: string, pie: string): string {
+  const W = 40;
+  const cen = (t: string) => (t.length >= W ? t.slice(0, W) : " ".repeat(Math.floor((W - t.length) / 2)) + t);
+  const env = (t: string) => {
+    const out: string[] = []; let a = "";
+    for (let w of t.replace(/\s+/g, " ").trim().split(" ")) {
+      if (a && a.length + 1 + w.length > W) { out.push(a); a = ""; }
+      while (w.length > W) { out.push(w.slice(0, W)); w = w.slice(W); }
+      a = a ? a + " " + w : w;
+    }
+    if (a || !out.length) out.push(a);
+    return out;
+  };
+  const l: string[] = env((nombre || "Mi bodega").toUpperCase()).map(cen);
+  if (rif.trim()) l.push(cen("RIF: " + rif.trim()));
+  if (dir.trim()) l.push(...env(dir).map(cen));
+  if (tel.trim()) l.push(cen("Tel: " + tel.trim()));
+  l.push("-".repeat(W), "TICKET # 000123", "1 x Harina PAN" + " ".repeat(15) + "Bs. 900,00", "-".repeat(W));
+  l.push(...env(pie.trim() || "Gracias por su compra. Vuelva pronto.").map(cen));
+  return l.join("\n");
 }
 
 // ===== Aviso de cierre para el CAJERO en la caja =====
