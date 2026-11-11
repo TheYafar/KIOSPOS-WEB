@@ -493,5 +493,34 @@ el alta/venta/login (try/catch + log).
 - **Límites:** no más cajas que `cajas_contratadas`; fiado bloquea la fila del cliente (sin pasar el límite con dos
   ventas a la vez); devolver "como pagó" en partes cierra exacto (sin céntimos sueltos).
 - Pruebas: `CompraDevolucionTest` (backend) y `e2e/naranja.spec.ts`.
-- **Pendiente (rojo/amarillo de la auditoría):** dueño de turno/movimiento al cerrar/anular, token de usuario
-  desactivado, acceso del cajero a reportes por API; Sección 6 (planes).
+- **Pendiente (rojo de la auditoría):** dueño de turno/movimiento al cerrar/anular, token de usuario
+  desactivado, acceso del cajero a reportes por API.
+
+## 25. Lo que faltaba ("amarillo" de la auditoría) + Sección 6
+
+- **Ticket con datos del negocio** (V21 `negocios.rif`, `mensaje_ticket`): `TicketService.encabezado` (nombre en
+  mayúsculas, RIF, dirección, teléfono) y mensaje al pie. Ajustes del negocio (`screens/negocio.tsx`) edita nombre,
+  RIF y mensaje con vista previa (`vistaTicket`). Correo "Pago recibido" al aprobar/registrar pago (`AdminService.avisarPago`).
+- **Recargas** (V22 `recargas`, RLS; `recarga/RecargaService`): MOVISTAR/DIGITEL/MOVILNET/CANTV/SIMPLE_TV/INTER/OTRA;
+  `POST|GET /api/recargas`, `POST /api/recargas/{id}/anular` (solo su caja, turno abierto). Lo cobrado entra a su
+  forma de pago en el cuadre (efectivo = movimiento `RECARGA`); `comision_bs` = cobrado − recargado. PWA: botón
+  **Recarga (F4)** en Vender (`screens/Recargas.tsx`).
+- **Reportes por rango**: `GET /api/reportes/rango?desde&hasta` (`ReporteService.resumenEntre`: día por día, 10 más
+  vendidos, recargas). Reportes: Hoy/Semana/Mes, barras por día, más vendidos, **Exportar a Excel**
+  (`reporte-export.ts`, CSV con `;`, coma decimal y BOM). Pruebas de reportes usan el día de Caracas (CI corre en UTC).
+- **Cuentas "a mano" en el servidor** (V23 `contabilidad_docs`, RLS, JSON + `version`):
+  `GET|PUT /api/contabilidad/{libro|hojas}` (409 con lo del servidor si otro equipo guardó antes).
+  `contabilidad-sync.ts` (`useDocServidor`): copia local + subida a los 1,5 s, pendiente sin internet.
+- **Planes (Sección 6)** (`suscripcion/PlanCatalogo`): Bodega $25 (1 caja, +$10, máx. 3) y Bodega Pro $40 (2 cajas,
+  +$8, máx. 10); mensualidad = plan + cajas extra. V24 `negocios.en_prueba`: la prueba de 7 días **vence sola sin
+  gracia**; el primer pago aprobado la apaga. `GET /api/planes`, `PUT /api/mi-negocio/plan` (dueño),
+  `PUT /api/admin/negocios/{id}/plan`; plan al crear negocio. PWA: `ElegirPlan.tsx` en Mi plan y en el panel admin,
+  barra "Prueba gratis: te quedan N días".
+- **Conector**: icono en la bandeja (`Bandeja.java`), una sola instancia, `conector/windows/instalar.ps1|.bat`
+  (tarea programada al iniciar sesión que se reinicia sola).
+- **Pruebas contra el servidor real**: job CI `e2e-real` (backend + Postgres reales) con `frontend/e2e-real/` y
+  `playwright.real.config.ts` (`npm run e2e:real`).
+- **Producción**: `ops/monitor.sh` (cada 5 min; salud HTTPS, contenedores, disco, respaldo, certificado) y
+  `ops/probar-respaldo.sh` (domingos, restaura en Postgres temporal) avisan por Telegram (`ops/avisar.sh`,
+  `TELEGRAM_TOKEN`/`TELEGRAM_CHAT_ID`). nginx expone `/actuator/health`.
+
