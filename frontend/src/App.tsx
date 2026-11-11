@@ -13,6 +13,8 @@ export function App() {
   const salir = useCallback(() => {
     cerrarSesion();
     setSesion(null);
+    // Sin la pestaña en la URL: el próximo que entre arranca en su primera pestaña.
+    try { history.replaceState(null, "", window.location.pathname); } catch { /* ignore */ }
   }, []);
 
   // El servidor dijo que la sesión venció: volver a la entrada con un aviso.

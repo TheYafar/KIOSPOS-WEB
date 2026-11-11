@@ -6,6 +6,7 @@ import { Cobro, type ResumenPago } from "./Cobro";
 import { CantidadPesable, cantTxt } from "./Pesable";
 import { planSuspendido } from "../plan";
 import { Recargas } from "./Recargas";
+import { useAtras } from "../atras";
 
 interface Item { producto: Producto; qty: number; }
 
@@ -188,6 +189,9 @@ export function Caja() {
   };
 
   const nuevaVenta = () => { setCarrito(new Map()); setDone(null); setErr(""); setView("caja"); listarProductos().then(setProductos).catch(() => {}); };
+  // Atrás del teléfono: en el cobro vuelve al ticket; con la venta ya cobrada arranca una nueva
+  // (nunca deja el carrito ya cobrado para cobrarlo otra vez).
+  useAtras(view === "checkout" || view === "done", () => { if (view === "done") nuevaVenta(); else setView(isDesktop ? "caja" : "ticket"); });
 
   // ----- LISTO -----
   if (view === "done" && done) {

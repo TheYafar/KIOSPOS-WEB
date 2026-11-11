@@ -36,6 +36,8 @@ test("fiar desde el perfil: pestaña Fiar productos con un producto normal y uno
   await page.locator(".cli-row", { hasText: "José Rojas" }).click();
   await page.getByRole("tab", { name: "Dar a crédito" }).click();
   await page.getByLabel("Buscar producto para crédito").fill("harina");
+  // Como una persona: Enter cuando ya se ve el resultado (los productos cargan al abrir).
+  await expect(page.locator(".fiar-res").getByText("Harina PAN")).toBeVisible();
   await page.keyboard.press("Enter");
   await page.getByRole("button", { name: "Más Harina PAN" }).click(); // 2 × $1
   await page.getByLabel("Buscar producto para crédito").fill("queso");
@@ -57,6 +59,8 @@ test("si el plan está vencido, Fiar avisa que no es por el cliente y no deja", 
   await page.locator(".cli-row", { hasText: "José Rojas" }).click();
   await page.getByRole("tab", { name: "Dar a crédito" }).click();
   await page.getByLabel("Buscar producto para crédito").fill("harina");
+  // Como una persona: Enter cuando ya se ve el resultado (los productos cargan al abrir).
+  await expect(page.locator(".fiar-res").getByText("Harina PAN")).toBeVisible();
   await page.keyboard.press("Enter");
   await expect(page.locator(".cfg-ro")).toContainText("No es por José Rojas");
   await expect(page.getByRole("button", { name: /^Anotar a crédito/ })).toBeDisabled();

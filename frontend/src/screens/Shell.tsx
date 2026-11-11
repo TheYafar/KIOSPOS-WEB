@@ -36,7 +36,24 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
     // Fiado, configuración, productos y lo demás es del dueño.
     ? [{ id: "caja", n: "Vender", icon: "cart" }, { id: "cuadre", n: "Cierre", icon: "cash" }, { id: "ventas", n: "Ventas", icon: "recibo" }]
     : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "ventas", n: "Ventas", icon: "recibo" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "contabilidad", n: "Cuentas", icon: "cash" }, { id: "fiado", n: "Crédito", icon: "user" }, { id: "nomina", n: "Nómina", icon: "equipo" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }];
-  const [tab, setTab] = useState(tabs[0].id);
+  // La pestaña vive en la URL (#/ventas, #/inventario…) para que el botón Atrás del
+  // teléfono o del navegador vuelva a la pestaña anterior en vez de salir de la app.
+  const tabDeUrl = () => {
+    const m = window.location.hash.match(/^#\/([\w-]+)/);
+    return m && tabs.some((t) => t.id === m[1]) ? m[1] : tabs[0].id;
+  };
+  const [tab, setTabEstado] = useState(tabDeUrl);
+  const setTab = (id: string) => {
+    setTabEstado(id);
+    if (window.location.hash !== "#/" + id) history.pushState({ tab: id }, "", "#/" + id);
+  };
+  useEffect(() => {
+    history.replaceState({ tab }, "", "#/" + tab);
+    const alVolver = () => setTabEstado(tabDeUrl());
+    window.addEventListener("popstate", alVolver);
+    return () => window.removeEventListener("popstate", alVolver);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [online, setOnline] = useState(navigator.onLine);
   const [ayuda, setAyuda] = useState(false);
   // Ventas cobradas que aún no llegan al servidor (sin internet o rechazadas).
