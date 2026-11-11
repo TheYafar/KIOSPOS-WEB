@@ -1,5 +1,6 @@
 package com.kioskpos.web.admin;
 
+import com.kioskpos.web.auth.AuthService;
 import com.kioskpos.web.auth.NegocioRegistroService;
 import com.kioskpos.web.auth.security.KioskPrincipal;
 import com.kioskpos.web.suscripcion.Pago;
@@ -23,9 +24,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminController {
 
     private final AdminService adminService;
+    private final AuthService authService;
 
-    public AdminController(AdminService adminService) {
+    public AdminController(AdminService adminService, AuthService authService) {
         this.adminService = adminService;
+        this.authService = authService;
+    }
+
+    /** Opción A de soporte: el super admin entra a un negocio como SOPORTE (solo lectura). */
+    @PostMapping("/negocios/{id}/entrar-soporte")
+    public AuthService.ResultadoLogin entrarSoporte(@PathVariable Long id) {
+        return authService.entrarComoSoporte(id);
     }
 
     @GetMapping("/negocios")

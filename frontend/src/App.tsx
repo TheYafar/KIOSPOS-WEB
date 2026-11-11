@@ -91,7 +91,7 @@ export function App() {
     return <Login onLogin={setSesion} />;
   }
   if (sesion.rol === "SUPER_ADMIN") {
-    return <SuperAdmin onSalir={salir} />;
+    return <SuperAdmin onSalir={salir} onEntrarNegocio={setSesion} />;
   }
   return <Shell sesion={sesion} onSalir={salir} />;
 }

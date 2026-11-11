@@ -78,6 +78,31 @@ public class UsuarioService {
         return usuarioRepository.save(cajero);
     }
 
+    /**
+     * El usuario "Soporte Técnico" (uriel) del negocio en contexto. Es VISIBLE en la
+     * lista del cliente y el dueño puede desactivarlo (CLAUDE.md §4). No tiene login
+     * propio: al super admin lo usa para entrar al negocio desde su panel. Se crea la
+     * primera vez si no existe (y crearSiNoHay=true); si ya existe se devuelve tal cual
+     * (aunque esté desactivado, para respetar que el dueño lo haya apagado).
+     */
+    @Transactional
+    public Usuario soporteTecnico(boolean crearSiNoHay) {
+        List<Usuario> existentes = usuarioRepository.findByRol(RolUsuario.SOPORTE);
+        if (!existentes.isEmpty()) {
+            return existentes.get(0);
+        }
+        if (!crearSiNoHay) {
+            return null;
+        }
+        Usuario s = new Usuario();
+        s.setNegocioId(NegocioContext.require());
+        s.setNombreCompleto("Soporte Técnico");
+        s.setRol(RolUsuario.SOPORTE);
+        s.setEsSoporte(true);
+        s.setActivo(true);
+        return usuarioRepository.save(s);
+    }
+
     @Transactional(readOnly = true)
     public List<Usuario> listar() {
         return usuarioRepository.findByActivoTrue();

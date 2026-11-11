@@ -1,6 +1,7 @@
 import { ElegirPlan } from "./ElegirPlan";
 import { useEffect, useState } from "react";
-import { admin2fa, adminAprobarPago, adminCambiarPlan, adminCrearNegocio, adminEnlaceClave, adminNegocios, adminPagosPendientes, adminReactivar, adminRegistrarPago, adminSuspender, type NegocioVista, type PagoPendiente } from "../api";
+import { admin2fa, adminAprobarPago, adminCambiarPlan, adminCrearNegocio, adminEnlaceClave, adminEntrarSoporte, adminNegocios, adminPagosPendientes, adminReactivar, adminRegistrarPago, adminSuspender, type NegocioVista, type PagoPendiente } from "../api";
+import { type Sesion } from "../session";
 import { UIcono } from "../icons";
 import { HorariosCierre } from "./negocio";
 import { TemaBtn } from "../TemaBtn";
@@ -27,7 +28,7 @@ function desde(iso: string | null): string {
   return d.toLocaleDateString("es-VE", { day: "numeric", month: "short" });
 }
 
-export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
+export function SuperAdmin({ onSalir, onEntrarNegocio }: { onSalir: () => void; onEntrarNegocio: (s: Sesion) => void }) {
   const [negs, setNegs] = useState<NegocioVista[]>([]);
   const [pagos, setPagos] = useState<PagoPendiente[]>([]);
   const [modal, setModal] = useState(false);
@@ -53,6 +54,10 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
   useEffect(() => { cargar(); }, []);
 
   const accion = async (fn: () => Promise<void>, ok: string) => { try { await fn(); setMsg(ok); cargar(); } catch (e) { setErr((e as Error).message); } };
+  const entrarSoporte = async (negId: number) => {
+    try { onEntrarNegocio(await adminEntrarSoporte(negId)); }
+    catch (e) { setErr((e as Error).message); }
+  };
 
   const activos = negs.filter((n) => n.situacion.estadoEfectivo === "ACTIVA").length;
   const deuda = negs.reduce((s, n) => s + n.situacion.deuda, 0);
@@ -143,6 +148,7 @@ export function SuperAdmin({ onSalir }: { onSalir: () => void }) {
                         <button className="btn ghost press" onClick={() => setPagoNeg(n)}>Registrar pago</button>
                         <button className="btn ghost press" onClick={() => setPlanNeg(n)}>Plan</button>
                         <button className="btn ghost press" title="Enlace para que el dueño ponga contraseña nueva" onClick={() => pedirEnlace(n)}><UIcono k="lock" sw={2} />Clave</button>
+                        <button className="btn ghost press" title="Entrar a este negocio como Soporte Técnico (solo lectura)" onClick={() => entrarSoporte(s.negocioId)}><UIcono k="user" sw={2} />Entrar como soporte</button>
                         {s.estadoEfectivo === "SUSPENDIDA"
                           ? <button className="btn primary press" onClick={() => accion(() => adminReactivar(s.negocioId), "Reactivado")}>Reactivar</button>
                           : <button className="btn danger press" onClick={() => accion(() => adminSuspender(s.negocioId), "Suspendido")}>Suspender</button>}

@@ -57,6 +57,9 @@ public class NegocioRegistroService {
 
             Usuario dueno = usuarioService.crearConCorreo(
                     nombreDueno, RolUsuario.DUENO, email, password);
+            // Usuario de Soporte Técnico (uriel), visible y desactivable por el dueño.
+            // El super admin entra al negocio con él desde su panel (Opción A).
+            usuarioService.soporteTecnico(true);
             return new NegocioCreado(negocio.getId(), dueno.getId());
         } finally {
             NegocioContext.clear();

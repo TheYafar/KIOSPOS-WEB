@@ -120,6 +120,32 @@ public class AuthService {
         }
     }
 
+    /**
+     * El super admin entra a un negocio como SOPORTE (Opción A). No pide clave: lo
+     * autoriza su propia sesión de super admin (el endpoint que llama esto está bajo
+     * /api/admin/**). Emite un token de SOPORTE con el negocio en contexto, para que
+     * RLS lo acote a ese negocio. Como SOPORTE solo puede LEER (SecurityConfig deja
+     * las escrituras sensibles a DUENO/ENCARGADO), es acceso de solo-consulta.
+     */
+    public ResultadoLogin entrarComoSoporte(Long negocioId) {
+        if (negocioId == null) {
+            throw new AuthException("Negocio no indicado");
+        }
+        try {
+            NegocioContext.set(negocioId);
+            Usuario soporte = usuarioService.soporteTecnico(true);
+            if (!soporte.isActivo()) {
+                throw new AuthException("El soporte técnico está desactivado en este negocio");
+            }
+            KioskPrincipal p = new KioskPrincipal(
+                    soporte.getId(), negocioId, RolUsuario.SOPORTE, null);
+            return new ResultadoLogin(jwtService.emitir(p), soporte.getId(),
+                    soporte.getNombreCompleto(), RolUsuario.SOPORTE, negocioId, null);
+        } finally {
+            NegocioContext.clear();
+        }
+    }
+
     /** Lista de cajeros activos para la pantalla de bloqueo de una caja (sin datos sensibles). */
     public List<CajeroResumen> listarCajerosDeCaja(String cajaToken) {
         if (cajaToken == null) {

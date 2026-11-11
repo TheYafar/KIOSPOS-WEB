@@ -463,6 +463,13 @@ export async function adminEnlaceClave(negocioId: number): Promise<string> {
 }
 export async function adminSuspender(id: number): Promise<void> { await parse(await fetch(`/api/admin/negocios/${id}/suspender`, { method: "POST", headers: auth() })); }
 export async function adminReactivar(id: number): Promise<void> { await parse(await fetch(`/api/admin/negocios/${id}/reactivar`, { method: "POST", headers: auth() })); }
+/** Opción A: el super admin entra a un negocio como SOPORTE (solo lectura). Deja la sesión lista. */
+export async function adminEntrarSoporte(negocioId: number): Promise<Sesion> {
+  const r = await parse(await fetch(`/api/admin/negocios/${negocioId}/entrar-soporte`, { method: "POST", headers: auth() }));
+  const s: Sesion = { token: r.token, rol: r.rol as Rol, usuarioId: r.usuarioId, negocioId: r.negocioId, cajaId: r.cajaId, nombre: r.nombreCompleto };
+  setSesion(s);
+  return s;
+}
 export interface PagoPendiente { id: number; negocioId: number; monto: number; moneda: string; metodo: string; referencia: string | null; meses: number; estado: string; }
 export async function adminPagosPendientes(): Promise<PagoPendiente[]> { return parse(await fetch("/api/admin/pagos-pendientes", { headers: auth() })); }
 export async function adminAprobarPago(pagoId: number): Promise<void> { await parse(await fetch(`/api/admin/pagos/${pagoId}/aprobar`, { method: "POST", headers: auth() })); }
