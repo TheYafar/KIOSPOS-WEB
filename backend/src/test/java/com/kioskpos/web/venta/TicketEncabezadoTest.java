@@ -26,5 +26,7 @@ class TicketEncabezadoTest {
         Negocio n = new Negocio();
         n.setNombre("Mi bodega");
         assertThat(TicketService.encabezado(n, n.getNombre()).trim()).isEqualTo("MI BODEGA");
+        n.setMensajeTicket("Dios todo poderoso");
+        assertThat(TicketService.encabezado(n, n.getNombre())).contains("DIOS TODO PODEROSO");
     }
 }

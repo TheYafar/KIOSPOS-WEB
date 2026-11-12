@@ -40,7 +40,7 @@ const aTexto = (n: number) => (n <= 0 ? "" : n.toFixed(2).replace(".", ","));
 /** Límite de fiado: el propio, o el sueldo si es un trabajador sin límite (igual que el servidor). */
 const limiteDe = (c: ClienteFiado) => (c.limiteUsd > 0 ? c.limiteUsd : c.tipo === "TRABAJADOR" ? c.sueldoUsd || 0 : 0);
 
-export interface ResumenPago { payLine: string; change: string; changeNote: string; credito?: { nombre: string; trabajador: boolean; montoUsd: number }; }
+export interface ResumenPago { payLine: string; change: string; changeNote: string; vueltoUsd?: number; vueltoBs?: number; credito?: { nombre: string; trabajador: boolean; montoUsd: number }; }
 
 export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   total: number; tasa: number; isDesktop: boolean; err: string;
@@ -130,7 +130,7 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
     const payLine = usados.map((f) => f.n + " " + fmtF(f, unidades(f)) + (f.id === "PAGO_MOVIL" ? " ref. " + ref : f.id === "FIADO" && cliente ? " (" + cliente.nombre + ")" : "")).join(" + ");
     const change = e.vueltoUsd > 0 ? usd(e.vueltoUsd) + " (" + bs(Math.round(e.vueltoUsd * tasa * 100) / 100) + ")" : e.vueltoBs > 0 ? bs(e.vueltoBs) : "";
     onConfirm(pagos, {
-      payLine, change, changeNote: change ? "El vuelto sale del efectivo" : "",
+      payLine, change, changeNote: change ? "El vuelto sale del efectivo" : "", vueltoUsd: e.vueltoUsd, vueltoBs: e.vueltoBs,
       ...(fiadoUsd > 0 && cliente ? { credito: { nombre: cliente.nombre, trabajador: cliente.tipo === "TRABAJADOR", montoUsd: fiadoUsd } } : {}),
     }, fiadoUsd > 0 ? cliente?.id : null);
   };

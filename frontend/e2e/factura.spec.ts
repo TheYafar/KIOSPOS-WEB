@@ -21,7 +21,7 @@ test("vender a crédito a un empleado: se elige en 'Empleados' y sale el N° de 
   await expect(page.getByLabel("Número de factura")).toContainText("0001");
   await expect(page.locator(".fac-cred")).toContainText("del empleado");
   await expect(page.locator(".fac-cred")).toContainText("Luis (empleado)");
-  await expect(page.locator(".receipt")).toContainText("Factura N°");
+  await expect(page.locator(".receipt")).toContainText("FACTURA #: 000001");
   expect(st.venta.clienteId).toBe(3);
 });
 

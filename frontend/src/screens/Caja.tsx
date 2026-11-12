@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { cobrar, facturaDe, getTasa, listarPresentaciones, listarProductos, type PagoCobro, type Presentacion, type Producto } from "../api";
+import { cobrar, facturaDe, getConfigNegocio, getTasa, listarPresentaciones, listarProductos, type PagoCobro, type Presentacion, type Producto } from "../api";
 import { ElegirBloque, comoProducto } from "./Bloques";
 import { conectorDisponible, imprimirTicket } from "../conector";
 import { Icono, UIcono, catInfo } from "../icons";
@@ -9,6 +9,7 @@ import { planSuspendido } from "../plan";
 import { Recargas } from "./Recargas";
 import { useAtras } from "../atras";
 import { numFactura } from "./Factura";
+import { armarTicket, type NegocioTicket } from "../ticket";
 
 // Un bloque (caja, media caja) va como "producto virtual" con id negativo; base y bloque
 // dicen qué producto y qué presentación se mandan al servidor.
@@ -46,6 +47,14 @@ export function Caja() {
   const buscarRef = useRef<HTMLInputElement>(null);
 
   const tasa = Number(getTasa()) || 1;
+  // Datos del negocio para el ticket (copia local para cobrar sin internet).
+  const [negocio, setNegocio] = useState<NegocioTicket>(() => { try { return JSON.parse(localStorage.getItem("kp_negocio") || "null") || { nombre: "" }; } catch { return { nombre: "" }; } });
+  useEffect(() => {
+    getConfigNegocio().then((c) => {
+      const n = { nombre: c.nombre, frase: c.mensajeTicket, rif: c.rif, direccion: c.direccion, telefono: c.telefono };
+      setNegocio(n); try { localStorage.setItem("kp_negocio", JSON.stringify(n)); } catch { /* sin espacio */ }
+    }).catch(() => {});
+  }, []);
   const isDesktop = useIsDesktop();
 
   // Catálogo siempre fresco: al entrar, cada 2 minutos, al volver a la ventana y al
@@ -192,23 +201,19 @@ export function Caja() {
         : { productoId: i.producto.id, cantidad: i.qty, precioUsd: i.producto.precioUsd });
       const codigo = await cobrar(its, pagos, clienteId, { totalUsd: total, productos: [...carrito.values()].map((i) => i.producto.nombre).join(", ").slice(0, 120) });
       window.dispatchEvent(new Event("kp-turno"));
-      setDone({ total, totalBs, payLine: resumen.payLine, change: resumen.change, changeNote: resumen.changeNote, receipt: recibo(resumen.payLine, resumen.change, facturaDe(codigo)), factura: facturaDe(codigo), credito: resumen.credito });
+      setDone({ total, totalBs, payLine: resumen.payLine, change: resumen.change, changeNote: resumen.changeNote, receipt: recibo(pagos, resumen, facturaDe(codigo)), factura: facturaDe(codigo), credito: resumen.credito });
       setView("done");
     } catch (e) { setErr((e as Error).message); }
   };
 
-  const recibo = (payLine: string, change: string, factura?: number) => {
-    const w = 40, pad = (l: string, r: string) => l.length + r.length >= w ? (l + " " + r).slice(0, w) : l + " ".repeat(w - l.length - r.length) + r;
-    const center = (s: string) => " ".repeat(Math.max(0, Math.floor((w - s.length) / 2))) + s;
-    const now = new Date();
-    const dt = `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()} ` + now.toLocaleTimeString("es-VE", { hour: "numeric", minute: "2-digit" });
-    const L = [center("BODEGA COCOA"), center("Valencia"), ...(factura != null ? [pad("Factura N°", numFactura(factura))] : []), dt, "-".repeat(w)];
-    [...carrito.values()].forEach((i) => { L.push(i.producto.nombre.slice(0, w)); L.push(pad("  " + cantTxt(i.producto, i.qty) + " x " + money(i.producto.precioUsd), usd(r2(i.producto.precioUsd * i.qty)))); });
-    L.push("-".repeat(w), pad("TOTAL", usd(total)), pad("En Bs (BCV " + tasa + ")", bs(totalBs)), payLine.slice(0, w));
-    if (change) L.push(pad("Vuelto", change));
-    L.push("-".repeat(w), center("Gracias por su compra"));
-    return L.join("\n");
-  };
+  const NOMBRE_PAGO: Record<string, string> = { FIADO: "CREDITO" };
+  const recibo = (pagos: PagoCobro[], resumen: ResumenPago, factura?: number) => armarTicket({
+    negocio, fecha: new Date(), numero: factura ?? null, cliente: resumen.credito?.nombre ?? null, tasa,
+    lineas: [...carrito.values()].map((i) => ({ cantidad: i.qty, nombre: i.producto.nombre, precioUsd: i.producto.precioUsd, subtotalUsd: r2(i.producto.precioUsd * i.qty) })),
+    totalBs, vueltoUsd: resumen.vueltoUsd, vueltoBs: resumen.vueltoBs,
+    pagos: pagos.map((p) => ({ nombre: p.metodo === "OTRO" && p.referencia ? p.referencia.toUpperCase() : NOMBRE_PAGO[p.metodo] || p.metodo,
+      moneda: p.moneda, monto: p.montoOriginal, ref: p.metodo === "PAGO_MOVIL" ? p.referencia : undefined })),
+  });
 
   const imprimir = async () => {
     if (!done) return;

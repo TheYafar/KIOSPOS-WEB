@@ -55,18 +55,19 @@ test("reportes: semana y mes con día por día, más vendidos, recargas y export
   await expect(page.getByText(/Vendido este mes/)).toBeVisible();
 });
 
-test("ajustes del negocio: nombre, RIF y mensaje salen en la vista del ticket", async ({ page }) => {
+test("ajustes del negocio: nombre, RIF y frase salen en la vista del ticket", async ({ page }) => {
   const st: Estado = { turnoAbierto: false };
   await preparar(page, st, { "kioskpos.sesion": sesionDueno });
   await ir(page);
   await page.getByRole("button", { name: /^Más/ }).first().click();
   await page.getByLabel("RIF").fill("J-12345678-9");
-  await page.getByLabel("Mensaje al pie del ticket").fill("¡Gracias, vecino!");
+  await page.getByLabel("Frase del ticket").fill("Dios todo poderoso");
   const vista = page.getByLabel("Vista del ticket");
   await expect(vista).toContainText("BODEGA COCOA");
   await expect(vista).toContainText("RIF: J-12345678-9");
-  await expect(vista).toContainText("¡Gracias, vecino!");
+  await expect(vista).toContainText("DIOS TODO PODEROSO");
+  await expect(vista).toContainText("FORMA DE PAGO");
   await page.getByRole("button", { name: "Guardar ajustes" }).click();
   await expect(page.getByText("Guardado ✓")).toBeVisible();
-  expect(st.configNeg).toMatchObject({ nombre: "Bodega Cocoa", rif: "J-12345678-9", mensajeTicket: "¡Gracias, vecino!" });
+  expect(st.configNeg).toMatchObject({ nombre: "Bodega Cocoa", rif: "J-12345678-9", mensajeTicket: "Dios todo poderoso" });
 });

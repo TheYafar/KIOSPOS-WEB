@@ -1,3 +1,4 @@
+import { armarTicket } from "../ticket";
 import { useEffect, useState } from "react";
 import { getConfigNegocio, putConfigNegocio } from "../api";
 
@@ -59,7 +60,7 @@ export function AjustesNegocio() {
       <label className="lbl">RIF<input className="inp" value={rif} onChange={(e) => setRif(e.target.value)} placeholder="Ej: J-12345678-9 (opcional)" maxLength={30} /></label>
       <label className="lbl">Teléfono<input className="inp" value={tel} onChange={(e) => setTel(e.target.value)} placeholder="Ej: 0412-1234567" /></label>
       <label className="lbl">Dirección / local<input className="inp" value={dir} onChange={(e) => setDir(e.target.value)} placeholder="Dónde queda la bodega" /></label>
-      <label className="lbl">Mensaje al pie del ticket<input className="inp" value={pie} onChange={(e) => setPie(e.target.value)} placeholder="Gracias por su compra. Vuelva pronto." maxLength={200} /></label>
+      <label className="lbl">Frase bajo el nombre <span className="opt">(opcional)</span><input className="inp" value={pie} onChange={(e) => setPie(e.target.value)} placeholder="Ej.: Dios todo poderoso" maxLength={200} aria-label="Frase del ticket" /></label>
       <div className="lbl"><span>Así sale el ticket</span><pre className="aj-ticket t" aria-label="Vista del ticket">{vistaTicket(nombre, rif, dir, tel, pie)}</pre></div>
       <div className="lbl"><span>Horarios de cierre de caja</span><HorariosCierre value={horarios} onChange={setHorarios} /></div>
       {err && <p className="pinmsg err">{err}</p>}
@@ -69,27 +70,13 @@ export function AjustesNegocio() {
   );
 }
 
-/** Encabezado y pie del ticket de 40 columnas, igual que TicketService del servidor. */
-export function vistaTicket(nombre: string, rif: string, dir: string, tel: string, pie: string): string {
-  const W = 40;
-  const cen = (t: string) => (t.length >= W ? t.slice(0, W) : " ".repeat(Math.floor((W - t.length) / 2)) + t);
-  const env = (t: string) => {
-    const out: string[] = []; let a = "";
-    for (let w of t.replace(/\s+/g, " ").trim().split(" ")) {
-      if (a && a.length + 1 + w.length > W) { out.push(a); a = ""; }
-      while (w.length > W) { out.push(w.slice(0, W)); w = w.slice(W); }
-      a = a ? a + " " + w : w;
-    }
-    if (a || !out.length) out.push(a);
-    return out;
-  };
-  const l: string[] = env((nombre || "Mi bodega").toUpperCase()).map(cen);
-  if (rif.trim()) l.push(cen("RIF: " + rif.trim()));
-  if (dir.trim()) l.push(...env(dir).map(cen));
-  if (tel.trim()) l.push(cen("Tel: " + tel.trim()));
-  l.push("-".repeat(W), "TICKET # 000123", "1 x Harina PAN" + " ".repeat(15) + "Bs. 900,00", "-".repeat(W));
-  l.push(...env(pie.trim() || "Gracias por su compra. Vuelva pronto.").map(cen));
-  return l.join("\n");
+/** Vista previa del ticket (mismo formato que imprime el servidor), con una venta de ejemplo. */
+export function vistaTicket(nombre: string, rif: string, dir: string, tel: string, frase: string): string {
+  return armarTicket({
+    negocio: { nombre, frase, rif, direccion: dir, telefono: tel }, fecha: new Date(), numero: 123, tasa: 157.5,
+    lineas: [{ cantidad: 2, nombre: "Copias", precioUsd: 1, subtotalUsd: 2 }], totalBs: 315,
+    pagos: [{ nombre: "PUNTO", moneda: "VES", monto: 315 }],
+  });
 }
 
 // ===== Aviso de cierre para el CAJERO en la caja =====
