@@ -657,3 +657,13 @@ el alta/venta/login (try/catch + log).
   cajero" (y aviso de crear una caja primero si tiene 0). Pie con el cupo del plan: "Tu plan permite N caja(s),
   tienes M registrada(s)" (de `miSuscripcion().cajasContratadas` + `listarCajas`) y enlace a Equipo y cajas.
 - Pruebas: `e2e/cajeros.spec.ts`; verificado contra Postgres real.
+
+## 33. Elegir impresora en Configuración
+
+- **Sección "Impresora"** en Configuración (`screens/Configuracion.tsx`, componente `Impresora`): lee
+  `GET /estado` del Conector (que YA devolvía `defecto:` + lista `- nombre`) vía `conector.ts estadoConector()`,
+  muestra las impresoras que detecta y deja elegir en cuál imprimir ("La del sistema" por defecto, o una de la
+  lista). La elección se guarda **solo en el equipo** (`localStorage kp_impresora`, `getImpresora/setImpresora`);
+  `imprimirTicket`/`abrirGaveta` ya la toman por defecto si no reciben una. Botones **Buscar de nuevo** e
+  **Imprimir prueba**. Si el Conector no está abierto, explica que es el programa local y ofrece reintentar.
+- No cambió el Conector Java (`/estado` ya listaba impresoras con `Impresora.listar()`). Pruebas: `e2e/impresora.spec.ts`.

@@ -3,6 +3,7 @@ import { UIcono } from "../icons";
 import { putCajaConfig } from "../api";
 import { getSesion } from "../session";
 import { aServidor, aplicarDelServidor, bcvActualizada, getBcv, getConfig, setConfig, tasaEfectiva, type ConfigCaja, type MetodoExtra, type MetodoId, type TasaModo } from "../config";
+import { estadoConector, getImpresora, imprimirTicket, setImpresora } from "../conector";
 
 // Configuración del NEGOCIO: formas de pago activas y tasa del dólar con la que se cobra.
 // Vive en el servidor y la comparten todas las cajas. Solo el dueño o el encargado la
@@ -203,8 +204,77 @@ export function Configuracion() {
               </label>
             </div>
           </section>
+
+          <Impresora />
         </fieldset>
       </div>
     </div>
+  );
+}
+
+/**
+ * Impresora del equipo: ve las impresoras que detecta el Conector (programa local) y elige
+ * en cuál imprimir. Se guarda SOLO en este equipo (no en el servidor), porque cada caja
+ * tiene su propia impresora. Si el Conector no está abierto, lo explica.
+ */
+function Impresora() {
+  const [estado, setEstado] = useState<"cargando" | "sin-conector" | "ok">("cargando");
+  const [defecto, setDefecto] = useState("");
+  const [impresoras, setImpresoras] = useState<string[]>([]);
+  const [elegida, setElegida] = useState(getImpresora());
+  const [msg, setMsg] = useState("");
+  const [err, setErr] = useState("");
+
+  const buscar = () => {
+    setEstado("cargando"); setErr("");
+    estadoConector()
+      .then((e) => { setDefecto(e.defecto); setImpresoras(e.impresoras); setEstado("ok"); })
+      .catch(() => setEstado("sin-conector"));
+  };
+  useEffect(() => { buscar(); }, []);
+
+  const elegir = (nombre: string) => { setElegida(nombre); setImpresora(nombre); setMsg(nombre ? "Imprimirá en: " + nombre : "Usará la impresora por defecto"); setTimeout(() => setMsg(""), 2500); };
+  const prueba = async () => {
+    setErr(""); setMsg("");
+    const t = ["=".repeat(40), "          KIOSKPOS — PRUEBA", "=".repeat(40),
+      "Si lees esto, la impresora quedó lista.", "Impresora: " + (elegida || defecto || "por defecto"),
+      new Date().toLocaleString("es-VE"), "=".repeat(40), "", ""].join("\n");
+    try { await imprimirTicket(t, false, elegida || undefined); setMsg("Prueba enviada a la impresora ✓"); }
+    catch (e) { setErr((e as Error).message); }
+  };
+
+  return (
+    <section className="card cfg-sec">
+      <h3 className="h3">Impresora</h3>
+      {estado === "cargando" && <span className="hint">Buscando impresoras…</span>}
+      {estado === "sin-conector" && (
+        <div className="imp-off">
+          <span className="hint"><b>No se detecta el Conector de impresión</b> en este equipo. Es un programa pequeño que va junto al navegador en la PC de la caja (Windows) y manda el ticket a la impresora térmica. Instálalo y ábrelo; luego toca “Buscar de nuevo”.</span>
+          <button className="btn2 press" onClick={buscar}>Buscar de nuevo</button>
+        </div>
+      )}
+      {estado === "ok" && (
+        <>
+          <span className="hint">Elige en cuál imprimir los tickets de este equipo. Lo detecta el Conector.</span>
+          <div className="imp-list" role="radiogroup" aria-label="Impresora">
+            <button role="radio" aria-checked={!elegida} className={"imp-op press" + (!elegida ? " on" : "")} onClick={() => elegir("")}>
+              <span className="imp-rad" /><span className="imp-nm"><b>La del sistema</b><small>{defecto ? "Por defecto: " + defecto : "La impresora por defecto de Windows"}</small></span>
+            </button>
+            {impresoras.map((n) => (
+              <button key={n} role="radio" aria-checked={elegida === n} className={"imp-op press" + (elegida === n ? " on" : "")} onClick={() => elegir(n)}>
+                <span className="imp-rad" /><span className="imp-nm"><b>{n}</b>{n === defecto && <small>por defecto del sistema</small>}</span>
+              </button>
+            ))}
+            {impresoras.length === 0 && <span className="hint">El Conector no ve ninguna impresora instalada. Conéctala e instálala en Windows, luego “Buscar de nuevo”.</span>}
+          </div>
+          <div className="imp-acc">
+            <button className="btn2 press" onClick={buscar}>Buscar de nuevo</button>
+            <button className="btn primary press" onClick={prueba}><UIcono k="print" />Imprimir prueba</button>
+          </div>
+        </>
+      )}
+      {msg && <span className="pill ok imp-msg"><UIcono k="check" sw={2.5} />{msg}</span>}
+      {err && <p className="pinmsg err">{err}</p>}
+    </section>
   );
 }
