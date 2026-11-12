@@ -3,39 +3,6 @@ import { ir, preparar, sesionCajero, sesionDueno, type Estado } from "./mock";
 
 test.use({ viewport: { width: 1366, height: 900 } });
 
-test("recarga desde la caja: operadora, número, monto y cobro con comisión", async ({ page }) => {
-  const st: Estado = { turnoAbierto: true };
-  await preparar(page, st, { "kioskpos.sesion": sesionCajero, "kioskpos.turno": "7" });
-  await ir(page);
-  await page.keyboard.press("F4");
-  const dlg = page.getByRole("dialog", { name: "Recargas" });
-  await expect(dlg.getByRole("button", { name: "Elige la operadora" })).toBeDisabled();
-  await dlg.getByRole("radio", { name: "Movistar" }).click();
-  await dlg.getByLabel("Número a recargar").fill("0414-1234567");
-  await dlg.getByRole("button", { name: "Bs 300" }).click();
-  await dlg.getByLabel("Comisión de la recarga").fill("10");
-  await expect(dlg.locator(".mov-av")).toContainText("Bs 330,00");
-  await expect(dlg.locator(".mov-av")).toContainText("Bs 30,00");
-  await dlg.getByRole("button", { name: /Registrar recarga/ }).click();
-  await expect(dlg.getByRole("status")).toContainText("Recarga Movistar de Bs 300,00 registrada");
-  expect(st.recargas?.[0]).toMatchObject({ operadora: "MOVISTAR", numero: "0414-1234567", montoBs: 300, metodoCobro: "EFECTIVO_BS", montoCobrado: 330, tasa: 900 });
-  await expect(dlg.locator(".rec-hist")).toContainText("ganancia Bs 30,00");
-
-  // En dólares: Bs 330 a 900 = $0,37 (redondeado hacia arriba)
-  await dlg.getByRole("radio", { name: "Digitel" }).click();
-  await dlg.getByLabel("Número a recargar").fill("04121112233");
-  await dlg.getByLabel("Monto de la recarga").fill("300");
-  await dlg.getByRole("button", { name: "Efectivo $" }).click();
-  await expect(dlg.locator(".mov-av")).toContainText("$ 0,37");
-  await page.keyboard.press("Enter");
-  await expect(dlg.locator(".rec-hist .movs-row")).toHaveCount(2);
-  expect(st.recargas?.[1]).toMatchObject({ operadora: "DIGITEL", metodoCobro: "EFECTIVO_USD", montoCobrado: 0.37 });
-
-  page.once("dialog", (d) => d.accept());
-  await dlg.getByRole("button", { name: "Anular recarga 04121112233" }).click();
-  await expect(dlg.locator(".rec-hist .movs-row.anulado")).toHaveCount(1);
-});
-
 test("reportes: semana y mes con día por día, más vendidos, recargas y exportar a Excel", async ({ page }) => {
   const st: Estado = { turnoAbierto: false };
   await preparar(page, st, { "kioskpos.sesion": sesionDueno });

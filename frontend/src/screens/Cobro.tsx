@@ -42,8 +42,8 @@ const limiteDe = (c: ClienteFiado) => (c.limiteUsd > 0 ? c.limiteUsd : c.tipo ==
 
 export interface ResumenPago { payLine: string; change: string; changeNote: string; vueltoUsd?: number; vueltoBs?: number; credito?: { nombre: string; trabajador: boolean; montoUsd: number }; }
 
-export function Cobro({ total, tasa, err, onBack, onConfirm }: {
-  total: number; tasa: number; isDesktop: boolean; err: string;
+export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
+  total: number; totalBs?: number; tasa: number; isDesktop: boolean; err: string;
   onBack: () => void;
   onConfirm: (pagos: PagoCobro[], resumen: ResumenPago, clienteId?: number | null) => void;
 }) {
@@ -66,7 +66,7 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   }));
   // Fiado: se anota en la cuenta de un cliente (en $). No entra dinero ni da vuelto.
   const fiado: Forma[] = metodoActivo("FIADO") ? [{ id: "FIADO", n: "Crédito", moneda: "USD", icon: "user", color: "var(--c-charcuteria)",
-    sub: cliente ? cliente.nombre + (cliente.saldoUsd > 0 ? " · debe " + usd(cliente.saldoUsd) : "") : "A cuenta de un cliente" }] : [];
+    sub: cliente ? cliente.nombre + (cliente.saldoUsd > 0 ? " · debe " + usd(cliente.saldoUsd) : "") : "A cuenta de un cliente o trabajador" }] : [];
   const formas = [...(activas.length ? activas : FORMAS), ...extras, ...fiado];
   const forma = (id: string) => formas.find((f) => f.id === id);
   const monedaDe = (id: string) => forma(id)?.moneda ?? "USD";
@@ -75,7 +75,7 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   const aCalc = (f: Forma, u: number) => (f.extra?.tipo === "OTRA" ? Math.round(u * (f.extra.tasaUsd || 0) * 100) / 100 : u);
   const deCalc = (f: Forma, v: number) => (f.extra?.tipo === "OTRA" ? (f.extra.tasaUsd > 0 ? Math.ceil((v / f.extra.tasaUsd) * 100 - 1e-6) / 100 : 0) : v);
   const montos: Montos = Object.fromEntries(formas.map((f) => [f.id, aCalc(f, unidades(f))])) as Montos;
-  const e = calcularCobro(total, tasa, montos, monedaDe);
+  const e = calcularCobro(total, tasa, montos, monedaDe, totalBs);
   const pmUsado = (montos.PAGO_MOVIL || 0) > 0;
   const refMala = pmUsado && !/^\d{4,6}$/.test(ref);
   const fiadoUsd = montos.FIADO || 0;
@@ -100,8 +100,8 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
   // "Resto aquí": SIEMPRE hace algo visible.
   //  - Si falta dinero con las demás formas: pone en esta lo que falta (y lo dice en el botón).
   //  - Si las demás ya cubren todo: "Todo aquí" pasa el cobro completo a esta forma.
-  const restoDe = (f: Forma) => deCalc(f, restoPara(f.id, total, tasa, montos, monedaDe));
-  const todoDe = (f: Forma) => deCalc(f, restoPara(f.id, total, tasa, {}, monedaDe));
+  const restoDe = (f: Forma) => deCalc(f, restoPara(f.id, total, tasa, montos, monedaDe, totalBs));
+  const todoDe = (f: Forma) => deCalc(f, restoPara(f.id, total, tasa, {}, monedaDe, totalBs));
   const accionResto = (id: string) => {
     const f = forma(id); if (!f) return;
     const r = restoDe(f);
@@ -164,7 +164,7 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
     <div className="view">
       {eligiendo && <ElegirCliente onClose={() => setEligiendo(false)} onElegir={(c) => {
         setCliente(c); setEligiendo(false);
-        if (!((montos.FIADO || 0) > 0)) { const r = restoPara("FIADO", total, tasa, montos, monedaDe); if (r > 0) set("FIADO", aTexto(r)); }
+        if (!((montos.FIADO || 0) > 0)) { const r = restoPara("FIADO", total, tasa, montos, monedaDe, totalBs); if (r > 0) set("FIADO", aTexto(r)); }
       }} />}
       <div className="co-head">
         <button className="back press" onClick={onBack}><UIcono k="back" sw={2} />Ticket <kbd className="kb">Esc</kbd></button>
@@ -217,7 +217,7 @@ export function Cobro({ total, tasa, err, onBack, onConfirm }: {
                       {cliente
                         ? <><span className="cb3-cli-nm"><UIcono k="user" sw={2} /><b>{cliente.nombre}</b>{cliente.limiteUsd > 0 && <small>límite {usd(cliente.limiteUsd)}</small>}</span>
                             <button className="press" onClick={() => setEligiendo(true)}>Cambiar</button></>
-                        : <button className="press cb3-cli-el" onClick={() => setEligiendo(true)}><UIcono k="search" sw={2} />Elegir cliente</button>}
+                        : <button className="press cb3-cli-el" onClick={() => setEligiendo(true)}><UIcono k="search" sw={2} />Elegir cliente o trabajador</button>}
                     </div>
                   )}
                   {f.billetes && (

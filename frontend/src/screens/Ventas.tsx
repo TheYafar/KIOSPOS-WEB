@@ -108,7 +108,7 @@ function DetalleVentaModal({ id, onClose, onCambio }: { id: number; onClose: () 
   const enCaja = getSesion()?.cajaId != null;
   const puedeAnular = v.estado === "COMPLETADA" && v.turnoAbierto && v.devoluciones.length === 0;
   const queda = (l: VentaDetalle["lineas"][number]) => Math.round((l.cantidad - l.devuelto) * 1000) / 1000;
-  const puedeDevolver = v.estado === "COMPLETADA" && v.lineas.some((l) => queda(l) > 0);
+  const puedeDevolver = v.estado === "COMPLETADA" && v.lineas.some((l) => !l.servicio && queda(l) > 0);
   const totalDev = Math.round(v.lineas.reduce((s, l) => s + Math.min(queda(l), leerMonto(cant[l.detalleId]) ?? 0) * l.precioUsd, 0) * 100) / 100;
   // Cómo se le devuelve: por defecto igual que pagó; o todo por una sola forma.
   const metodos = [
@@ -122,7 +122,7 @@ function DetalleVentaModal({ id, onClose, onCambio }: { id: number; onClose: () 
     : metodo === "EFECTIVO_USD" || metodo === "A_CUENTA" || metodo === "FUERA_DE_CAJA" ? [{ metodo, moneda: "USD", monto: totalDev }]
     : [{ metodo, moneda: "VES", monto: enBs(totalDev) }];
   const pideRef = partes.some((p) => p.metodo === "PAGO_MOVIL");
-  const devolverTodo = () => setCant(Object.fromEntries(v.lineas.filter((l) => queda(l) > 0).map((l) => [l.detalleId, String(queda(l))])));
+  const devolverTodo = () => setCant(Object.fromEntries(v.lineas.filter((l) => !l.servicio && queda(l) > 0).map((l) => [l.detalleId, String(queda(l))])));
 
   const correr = async (fn: () => Promise<unknown>, msg: string) => {
     setEnviando(true); setErr("");
@@ -146,8 +146,8 @@ function DetalleVentaModal({ id, onClose, onCambio }: { id: number; onClose: () 
           <div className="vt-lineas">
             {v.lineas.map((l) => (
               <div key={l.detalleId} className="vt-linea">
-                <span className="vt-ln"><b>{l.nombre}</b><small className="t">{money(l.cantidad)} × {usd(l.precioUsd)}{l.devuelto > 0 ? " · devuelto " + money(l.devuelto) : ""}</small></span>
-                {modo === "devolver" && queda(l) > 0 ? (
+                <span className="vt-ln"><b>{l.nombre}</b><small className="t">{l.servicio ? (l.servicio === "RECARGA" ? "Recarga" : "Avance de efectivo") + " · no se devuelve (anula la venta)" : money(l.cantidad) + " × " + usd(l.precioUsd)}{l.devuelto > 0 ? " · devuelto " + money(l.devuelto) : ""}</small></span>
+                {modo === "devolver" && !l.servicio && queda(l) > 0 ? (
                   <span className="vt-dev">
                     <button className="press" aria-label={"Menos " + l.nombre} onClick={() => setCant({ ...cant, [l.detalleId]: String(Math.max(0, (leerMonto(cant[l.detalleId]) ?? 0) - 1)) })}>−</button>
                     <input className="inp t" inputMode="decimal" value={cant[l.detalleId] ?? ""} placeholder="0" aria-label={"Devolver de " + l.nombre}
@@ -155,7 +155,7 @@ function DetalleVentaModal({ id, onClose, onCambio }: { id: number; onClose: () 
                     <button className="press" aria-label={"Más " + l.nombre} onClick={() => setCant({ ...cant, [l.detalleId]: String(Math.min(queda(l), (leerMonto(cant[l.detalleId]) ?? 0) + 1)) })}>+</button>
                     <button className="vt-todo press" title="Devolver solo este producto, todas sus unidades" onClick={() => setCant({ ...cant, [l.detalleId]: String(queda(l)) })}>Solo este</button>
                   </span>
-                ) : <b className="t">{usd(l.subtotalUsd)}</b>}
+                ) : <b className="t">{l.montoBs != null ? bs(l.montoBs) : usd(l.subtotalUsd)}</b>}
               </div>
             ))}
           </div>

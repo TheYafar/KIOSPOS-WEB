@@ -47,14 +47,15 @@ public class VentaController {
         if (principal == null || principal.cajaId() == null) {
             throw new IllegalArgumentException("Solo una caja puede cobrar");
         }
-        List<VentaService.ItemInput> items = req.items().stream()
+        List<VentaService.ItemInput> items = (req.items() == null ? List.<ItemRequest>of() : req.items()).stream()
                 .map(i -> new VentaService.ItemInput(i.productoId(), i.cantidad(), i.precioUsd(), i.nombre(), i.presentacionId()))
                 .toList();
         List<VentaService.PagoInput> pagos = req.pagos().stream()
                 .map(p -> new VentaService.PagoInput(p.metodo(), p.moneda(), p.montoOriginal(), p.referencia()))
                 .toList();
         Venta v = ventaService.registrar(principal, permiso,
-                new VentaService.VentaInput(req.codigoUnico(), req.tasaBcv(), items, pagos, req.creadoAt(), req.clienteId()));
+                new VentaService.VentaInput(req.codigoUnico(), req.tasaBcv(), items, pagos, req.creadoAt(), req.clienteId(),
+                        req.servicios()));
         return VentaResponse.de(v);
     }
 
@@ -134,7 +135,7 @@ public class VentaController {
 
     public record RegistrarVentaRequest(String codigoUnico, @NotNull BigDecimal tasaBcv,
                                         List<ItemRequest> items, List<PagoRequest> pagos,
-                                        Long creadoAt, Long clienteId) {
+                                        Long creadoAt, Long clienteId, List<VentaService.ServicioInput> servicios) {
     }
 
     public record VentaResponse(Long id, Integer numeroFactura, Instant fechaHora,

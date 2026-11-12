@@ -35,7 +35,7 @@ export function MovimientosCaja({ turnoId, tasa, onCambio }: { turnoId: number; 
       if (form || e.ctrlKey || e.metaKey || e.altKey) return;
       const el = e.target as HTMLElement;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT")) return;
-      const t = ({ g: "GASTO", r: "RETIRO", i: "INGRESO", a: "AVANCE" } as Record<string, TipoMov>)[e.key.toLowerCase()];
+      const t = ({ g: "GASTO", r: "RETIRO", i: "INGRESO" } as Record<string, TipoMov>)[e.key.toLowerCase()];
       if (t) { e.preventDefault(); setForm(t); }
     };
     window.addEventListener("keydown", h);
@@ -51,10 +51,10 @@ export function MovimientosCaja({ turnoId, tasa, onCambio }: { turnoId: number; 
   return (
     <div className="card movs">
       <div className="movs-head">
-        <div><h3 className="h3">Movimientos de caja</h3><span className="hint">Todo efectivo que entra o sale sin ser venta. <span className="kbtip">G gasto · R retiro · I ingreso · A avance</span></span></div>
+        <div><h3 className="h3">Movimientos de caja</h3><span className="hint">Todo efectivo que entra o sale sin ser venta. <span className="kbtip">G gasto · R retiro · I ingreso</span> Los avances de efectivo se cobran en Vender (F6), junto con la venta.</span></div>
       </div>
       <div className="movs-btns">
-        {(Object.keys(TIPOS) as TipoMov[]).map((t) => (
+        {(Object.keys(TIPOS) as TipoMov[]).filter((t) => t !== "AVANCE").map((t) => (
           <button key={t} className="movs-btn press" onClick={() => { setErr(""); setForm(t); }} style={{ ["--mc" as string]: TIPOS[t].color }}>
             <span className="co2-ic"><UIcono k={TIPOS[t].icon} sw={1.9} /></span>
             <span><b>{TIPOS[t].n}</b><small>{TIPOS[t].sub}</small></span>
@@ -67,7 +67,7 @@ export function MovimientosCaja({ turnoId, tasa, onCambio }: { turnoId: number; 
           {lista.map((m) => (
             <div key={m.id} className={"movs-row" + (m.anulado ? " anulado" : "")}>
               <span className="movs-tag" style={{ ["--mc" as string]: TIPOS[m.tipo].color }}>{TIPOS[m.tipo].n}</span>
-              <span className="movs-con">{m.concepto}{m.tipo === "AVANCE" && m.montoCobrado != null && <small> · cobrado Bs {money(m.montoCobrado)} por {m.metodoCobro === "PAGO_MOVIL" ? "pago móvil" : (m.metodoCobro || "").toLowerCase()} · ganancia Bs {money(m.comision || 0)}</small>}</span>
+              <span className="movs-con">{m.concepto}{m.tipo === "AVANCE" && m.montoCobrado != null && <small> · cobrado Bs {money(m.montoCobrado)} {m.metodoCobro === "VENTA" ? "en la venta" : "por " + (m.metodoCobro === "PAGO_MOVIL" ? "pago móvil" : (m.metodoCobro || "").toLowerCase())} · ganancia Bs {money(m.comision || 0)}</small>}</span>
               <b className={"t movs-m " + (TIPOS[m.tipo].signo === "+" ? "mas" : "menos")}>{TIPOS[m.tipo].signo} {fmt(m.moneda, m.monto)}</b>
               {m.anulado ? <span className="pill">Anulado</span> : <button className="hdel" aria-label={"Anular " + m.concepto} title="Anular" onClick={() => anular(m)}>✕</button>}
             </div>

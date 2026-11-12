@@ -21,8 +21,12 @@ public class NominaController {
         this.service = service;
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.kioskpos.web.cliente.TrabajadorSyncService trabajadorSync;
+
     @GetMapping
     public NominaService.Resumen resumen() {
+        trabajadorSync.asegurar(); // cajeros y encargados salen en la nómina
         return service.resumen();
     }
 

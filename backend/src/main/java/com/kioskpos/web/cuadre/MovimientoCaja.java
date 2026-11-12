@@ -84,4 +84,8 @@ public class MovimientoCaja {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
+
+    /** Venta en la que se cobró el avance (metodo_cobro = VENTA). */
+    @Column(name = "venta_id")
+    private Long ventaId;
 }

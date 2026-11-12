@@ -92,4 +92,12 @@ public class Negocio {
 
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
+
+    /** Comisión por defecto de las recargas (%). */
+    @Column(name = "comision_recarga_pct", nullable = false, precision = 5, scale = 2)
+    private java.math.BigDecimal comisionRecargaPct = new java.math.BigDecimal("20");
+
+    /** Comisión por defecto de los avances de efectivo (%). */
+    @Column(name = "comision_avance_pct", nullable = false, precision = 5, scale = 2)
+    private java.math.BigDecimal comisionAvancePct = new java.math.BigDecimal("10");
 }

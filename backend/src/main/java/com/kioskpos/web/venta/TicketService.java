@@ -95,8 +95,11 @@ public class TicketService {
             for (String r : envolver(cant + " x " + d.getNombre().toUpperCase(Locale.ROOT))) {
                 sb.append(r).append("\n");
             }
-            BigDecimal unitBs = d.getPrecioUnitarioUsd().multiply(tasa).setScale(2, RoundingMode.HALF_UP);
-            BigDecimal lineaBs = d.getSubtotalUsd().multiply(tasa).setScale(2, RoundingMode.HALF_UP);
+            // Recargas y avances llevan su monto exacto en Bs.
+            BigDecimal unitBs = d.getMontoBs() != null ? d.getMontoBs()
+                    : d.getPrecioUnitarioUsd().multiply(tasa).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal lineaBs = d.getMontoBs() != null ? d.getMontoBs()
+                    : d.getSubtotalUsd().multiply(tasa).setScale(2, RoundingMode.HALF_UP);
             sb.append(fila("  (" + cant + " x " + bsVE(unitBs) + ")", bsVE(lineaBs)));
         }
         sb.append(linea);

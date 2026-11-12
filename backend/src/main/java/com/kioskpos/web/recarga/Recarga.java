@@ -72,4 +72,8 @@ public class Recarga {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
+
+    /** Venta en la que se cobró (metodo_cobro = VENTA); null si se cobró sola (viejas). */
+    @Column(name = "venta_id")
+    private Long ventaId;
 }

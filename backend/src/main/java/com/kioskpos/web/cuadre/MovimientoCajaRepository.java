@@ -9,6 +9,8 @@ public interface MovimientoCajaRepository extends JpaRepository<MovimientoCaja, 
 
     List<MovimientoCaja> findByTurnoIdAndAnuladoFalse(Long turnoId);
 
+    List<MovimientoCaja> findByVentaId(Long ventaId);
+
     /** Del negocio (RLS) en un rango, para los reportes del día. */
     List<MovimientoCaja> findByAnuladoFalseAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(Instant desde, Instant hasta);
 }

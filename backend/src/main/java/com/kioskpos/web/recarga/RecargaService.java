@@ -94,6 +94,38 @@ public class RecargaService {
         return repo.save(r);
     }
 
+    /**
+     * Recarga cobrada DENTRO de una venta (junto con los productos). El dinero ya lo cuentan los
+     * pagos de la venta: aquí queda el registro (número, operadora, comisión) con metodo VENTA.
+     */
+    @Transactional
+    public Recarga registrarDeVenta(Long negocioId, Long turnoId, Long cajaId, Long usuarioId, Long ventaId,
+                                    String operadoraIn, String numeroIn, BigDecimal montoBs, BigDecimal cobradoBs, BigDecimal tasa) {
+        String operadora = operadoraIn == null ? "" : operadoraIn.trim().toUpperCase(Locale.ROOT);
+        if (!OPERADORAS.contains(operadora)) {
+            throw new IllegalArgumentException("Recarga: elige la operadora (Movistar, Digitel, Movilnet...)");
+        }
+        String numero = numeroIn == null ? "" : numeroIn.replaceAll("[^0-9A-Za-z-]", "");
+        if (numero.length() < 4 || numero.length() > 30) {
+            throw new IllegalArgumentException("Recarga: escribe el número de teléfono o contrato");
+        }
+        Recarga r = new Recarga();
+        r.setNegocioId(negocioId);
+        r.setTurnoId(turnoId);
+        r.setCajaId(cajaId);
+        r.setUsuarioId(usuarioId);
+        r.setVentaId(ventaId);
+        r.setOperadora(operadora);
+        r.setNumero(numero);
+        r.setMontoBs(montoBs);
+        r.setMetodoCobro("VENTA");
+        r.setMoneda("VES");
+        r.setMontoCobrado(cobradoBs);
+        r.setTasa(tasa);
+        r.setComisionBs(cobradoBs.subtract(montoBs).setScale(2, RoundingMode.HALF_UP));
+        return repo.save(r);
+    }
+
     /** Lo que gana la bodega, en Bs: lo cobrado (en Bs) − lo recargado. Hasta 1 Bs de redondeo cuenta como 0. */
     static BigDecimal comision(BigDecimal montoBs, String moneda, BigDecimal cobrado, BigDecimal tasa) {
         BigDecimal dif = comoBs(moneda, cobrado, tasa).subtract(montoBs);
@@ -116,6 +148,9 @@ public class RecargaService {
     @Transactional
     public Recarga anular(KioskPrincipal principal, Long id) {
         Recarga r = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Recarga no encontrada"));
+        if (r.getVentaId() != null) {
+            throw new IllegalStateException("Esa recarga se cobró en una venta: anula la venta en “Ventas”");
+        }
         if (principal == null || principal.cajaId() == null || !principal.cajaId().equals(r.getCajaId())) {
             throw new IllegalStateException("Solo se puede anular desde la caja donde se hizo");
         }

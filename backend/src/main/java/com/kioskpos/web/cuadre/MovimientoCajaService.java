@@ -100,6 +100,40 @@ public class MovimientoCajaService {
         return repo.save(m);
     }
 
+    /**
+     * Avance de efectivo cobrado DENTRO de una venta: el cliente paga (con los pagos de la venta)
+     * lo entregado + la comisión, y se le entrega efectivo de la gaveta. Aquí queda la salida de
+     * efectivo (y la comisión); lo cobrado ya lo cuentan los pagos de la venta (metodo VENTA).
+     */
+    @Transactional
+    public MovimientoCaja registrarAvanceDeVenta(Long negocioId, Turno turno, Long usuarioId, Long ventaId, String moneda,
+                                                 BigDecimal entregado, BigDecimal entregadoBs, BigDecimal cobradoBs,
+                                                 BigDecimal tasa, boolean verificarEfectivo) {
+        if (verificarEfectivo) {
+            var r = cuadreService.resumen(turno.getId());
+            BigDecimal hay = "USD".equals(moneda) ? r.esperadoUsd() : r.esperadoBs();
+            if (entregado.compareTo(hay) > 0) {
+                throw new IllegalArgumentException("Avance: no hay suficiente efectivo en " + ("USD".equals(moneda) ? "dólares" : "bolívares")
+                        + " en la caja (hay " + hay.toPlainString() + ").");
+            }
+        }
+        MovimientoCaja m = new MovimientoCaja();
+        m.setNegocioId(negocioId);
+        m.setTurnoId(turno.getId());
+        m.setCajaId(turno.getCajaId());
+        m.setUsuarioId(usuarioId);
+        m.setVentaId(ventaId);
+        m.setTipo(MovimientoCaja.Tipo.AVANCE.name());
+        m.setMoneda(moneda);
+        m.setMonto(entregado);
+        m.setMetodoCobro("VENTA");
+        m.setMontoCobrado(cobradoBs);
+        m.setComision(cobradoBs.subtract(entregadoBs).setScale(2, RoundingMode.HALF_UP));
+        m.setTasa(tasa);
+        m.setConcepto("Avance de efectivo (en la venta)");
+        return repo.save(m);
+    }
+
     @Transactional(readOnly = true)
     public List<MovimientoCaja> delTurno(Long turnoId) {
         return repo.findByTurnoIdOrderByIdAsc(turnoId);
@@ -109,6 +143,9 @@ public class MovimientoCajaService {
     @Transactional
     public MovimientoCaja anular(Long id) {
         MovimientoCaja m = repo.findById(id).orElseThrow(() -> new IllegalArgumentException("Movimiento no encontrado"));
+        if (m.getVentaId() != null) {
+            throw new IllegalStateException("Ese avance se cobró en una venta: anula la venta en “Ventas”");
+        }
         Turno t = turnoRepository.findById(m.getTurnoId()).orElseThrow();
         if (!Turno.Estado.ABIERTO.name().equals(t.getEstado())) {
             throw new IllegalStateException("El turno ya se cerró; no se puede anular");

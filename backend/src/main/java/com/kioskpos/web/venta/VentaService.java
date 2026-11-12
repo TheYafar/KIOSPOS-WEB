@@ -41,6 +41,8 @@ public class VentaService {
     private final ClienteService clienteService;
     private final com.kioskpos.web.suscripcion.SuscripcionService suscripcionService;
     private final com.kioskpos.web.inventario.PresentacionRepository presentacionRepository;
+    private final com.kioskpos.web.recarga.RecargaService recargaService;
+    private final com.kioskpos.web.cuadre.MovimientoCajaService movimientoCajaService;
 
     public VentaService(VentaRepository ventaRepository,
                         ProductoRepository productoRepository,
@@ -50,7 +52,11 @@ public class VentaService {
                         TasaNegocioService tasaNegocioService,
                         ClienteService clienteService,
                         com.kioskpos.web.suscripcion.SuscripcionService suscripcionService,
-                        com.kioskpos.web.inventario.PresentacionRepository presentacionRepository) {
+                        com.kioskpos.web.inventario.PresentacionRepository presentacionRepository,
+                        com.kioskpos.web.recarga.RecargaService recargaService,
+                        com.kioskpos.web.cuadre.MovimientoCajaService movimientoCajaService) {
+        this.recargaService = recargaService;
+        this.movimientoCajaService = movimientoCajaService;
         this.suscripcionService = suscripcionService;
         this.presentacionRepository = presentacionRepository;
         this.ventaRepository = ventaRepository;
@@ -80,14 +86,32 @@ public class VentaService {
      * clienteId: a quién se le fía (obligatorio si algún pago es FIADO).
      */
     public record VentaInput(String codigoUnico, BigDecimal tasaBcv,
-                             List<ItemInput> items, List<PagoInput> pagos, Long creadoAt, Long clienteId) {
+                             List<ItemInput> items, List<PagoInput> pagos, Long creadoAt, Long clienteId,
+                             List<ServicioInput> servicios) {
         public VentaInput(String codigoUnico, BigDecimal tasaBcv, List<ItemInput> items, List<PagoInput> pagos) {
-            this(codigoUnico, tasaBcv, items, pagos, null, null);
+            this(codigoUnico, tasaBcv, items, pagos, null, null, null);
         }
 
         public VentaInput(String codigoUnico, BigDecimal tasaBcv, List<ItemInput> items, List<PagoInput> pagos, Long creadoAt) {
-            this(codigoUnico, tasaBcv, items, pagos, creadoAt, null);
+            this(codigoUnico, tasaBcv, items, pagos, creadoAt, null, null);
         }
+
+        public VentaInput(String codigoUnico, BigDecimal tasaBcv, List<ItemInput> items, List<PagoInput> pagos, Long creadoAt, Long clienteId) {
+            this(codigoUnico, tasaBcv, items, pagos, creadoAt, clienteId, null);
+        }
+    }
+
+    /**
+     * Servicio cobrado dentro de la venta, en Bs exactos.
+     * RECARGA: operadora + numero, montoBs = lo recargado, cobradoBs = lo que paga el cliente.
+     * AVANCE: se le entrega efectivo (entregaMoneda USD/VES, entregaMonto), cobradoBs = lo que paga.
+     */
+    public record ServicioInput(String tipo, String operadora, String numero, BigDecimal montoBs,
+                                String entregaMoneda, BigDecimal entregaMonto, BigDecimal cobradoBs) {
+    }
+
+    /** Servicio ya validado, listo para guardar después de la venta. */
+    private record ServicioOk(ServicioInput in, String tipo, BigDecimal costoBs, BigDecimal cobradoBs, String moneda, BigDecimal entregado) {
     }
 
     /** Una venta cobrada hace más que esto llegó de la cola: el dinero ya se recibió con su tasa. */
@@ -142,6 +166,47 @@ public class VentaService {
         return pres;
     }
 
+    private static ServicioOk validarServicio(ServicioInput sv, BigDecimal tasa) {
+        String tipo = sv.tipo() == null ? "" : sv.tipo().trim().toUpperCase();
+        BigDecimal cobrado = sv.cobradoBs() == null ? BigDecimal.ZERO : sv.cobradoBs().setScale(2, RoundingMode.HALF_UP);
+        if ("RECARGA".equals(tipo)) {
+            BigDecimal monto = sv.montoBs() == null ? BigDecimal.ZERO : sv.montoBs().setScale(2, RoundingMode.HALF_UP);
+            if (monto.signum() <= 0) {
+                throw new IllegalArgumentException("El monto de la recarga debe ser mayor a 0");
+            }
+            if (cobrado.compareTo(monto) < 0) {
+                throw new IllegalArgumentException("Lo cobrado por la recarga no puede ser menor que lo recargado");
+            }
+            return new ServicioOk(sv, tipo, monto, cobrado, "VES", null);
+        }
+        if ("AVANCE".equals(tipo)) {
+            String moneda = "USD".equals(sv.entregaMoneda()) ? "USD" : "VES";
+            BigDecimal entregado = sv.entregaMonto() == null ? BigDecimal.ZERO : sv.entregaMonto().setScale(2, RoundingMode.HALF_UP);
+            if (entregado.signum() <= 0) {
+                throw new IllegalArgumentException("El efectivo del avance debe ser mayor a 0");
+            }
+            BigDecimal entregadoBs = "USD".equals(moneda) ? entregado.multiply(tasa).setScale(2, RoundingMode.HALF_UP) : entregado;
+            if (cobrado.compareTo(entregadoBs) < 0) {
+                throw new IllegalArgumentException("Lo cobrado por el avance no puede ser menor que el efectivo entregado");
+            }
+            return new ServicioOk(sv, tipo, entregadoBs, cobrado, moneda, entregado);
+        }
+        throw new IllegalArgumentException("Servicio desconocido (recarga o avance)");
+    }
+
+    private static String nombreServicio(ServicioOk ok) {
+        if ("RECARGA".equals(ok.tipo())) {
+            String op = ok.in().operadora() == null ? "" : ok.in().operadora().trim().toUpperCase().replace('_', ' ');
+            String num = ok.in().numero() == null ? "" : ok.in().numero().replaceAll("[^0-9A-Za-z-]", "");
+            String n = "Recarga " + op + " " + num;
+            return n.length() > 150 ? n.substring(0, 150) : n;
+        }
+        java.text.DecimalFormatSymbols sym = new java.text.DecimalFormatSymbols(java.util.Locale.US);
+        sym.setDecimalSeparator(',');
+        sym.setGroupingSeparator('.');
+        return "Avance de efectivo " + ("USD".equals(ok.moneda()) ? "$ " : "Bs ") + new java.text.DecimalFormat("#,##0.00", sym).format(ok.entregado());
+    }
+
     /** "Cigarros Belmont (Caja x20)": lo que se lee en el ticket y en la factura. */
     static String nombreConBloque(String producto, com.kioskpos.web.inventario.Presentacion p) {
         String n = producto + " (" + p.getNombre() + " x" + p.getCantidad().stripTrailingZeros().toPlainString() + ")";
@@ -157,7 +222,9 @@ public class VentaService {
                 return existente.get();
             }
         }
-        if (input.items() == null || input.items().isEmpty()) {
+        List<ItemInput> itemsIn = input.items() == null ? List.of() : input.items();
+        List<ServicioInput> serviciosIn = input.servicios() == null ? List.of() : input.servicios();
+        if (itemsIn.isEmpty() && serviciosIn.isEmpty()) {
             throw new IllegalArgumentException("La venta no tiene productos");
         }
         BigDecimal tasa = input.tasaBcv();
@@ -194,7 +261,7 @@ public class VentaService {
 
         // 3. Líneas: el servidor pone el precio (autoridad), salvo el cobro rápido (por monto).
         BigDecimal totalUsd = BigDecimal.ZERO;
-        for (ItemInput item : input.items()) {
+        for (ItemInput item : itemsIn) {
             BigDecimal cantidad = item.cantidad();
             if (cantidad == null || cantidad.signum() <= 0) {
                 throw new IllegalArgumentException("Cantidad inválida");
@@ -252,6 +319,33 @@ public class VentaService {
 
         totalUsd = totalUsd.setScale(2, RoundingMode.HALF_UP);
         BigDecimal totalBs = totalUsd.multiply(tasa).setScale(2, RoundingMode.HALF_UP);
+
+        // 3b. Servicios (recargas y avances) en Bs exactos: una línea cada uno en la venta.
+        List<ServicioOk> servicios = new ArrayList<>();
+        BigDecimal serviciosBs = BigDecimal.ZERO;
+        for (ServicioInput sv : serviciosIn) {
+            ServicioOk ok = validarServicio(sv, tasa);
+            servicios.add(ok);
+            serviciosBs = serviciosBs.add(ok.cobradoBs());
+            DetalleVenta d = new DetalleVenta();
+            d.setCantidad(BigDecimal.ONE);
+            d.setProductoId(null);
+            d.setServicio(ok.tipo());
+            d.setMontoBs(ok.cobradoBs());
+            d.setNombre(nombreServicio(ok));
+            BigDecimal enUsd = ok.cobradoBs().divide(tasa, 2, RoundingMode.HALF_UP);
+            d.setPrecioUnitarioUsd(enUsd);
+            d.setSubtotalUsd(enUsd);
+            // La ganancia de recargas/avances se cuenta aparte (su comisión): aquí margen 0.
+            d.setCostoUnitarioUsd(ok.cobradoBs().divide(tasa, 4, RoundingMode.HALF_UP));
+            venta.addDetalle(d);
+        }
+        BigDecimal totalBsExacto = null;
+        if (!servicios.isEmpty()) {
+            totalBs = totalBs.add(serviciosBs).setScale(2, RoundingMode.HALF_UP);
+            totalUsd = totalBs.divide(tasa, 2, RoundingMode.HALF_UP);
+            totalBsExacto = totalBs;
+        }
         venta.setTotalUsd(totalUsd);
         venta.setTotalBs(totalBs);
 
@@ -282,7 +376,8 @@ public class VentaService {
             clienteFiado = clienteService.validarFiado(input.clienteId(), fiadoUsd);
             venta.setClienteId(clienteFiado.getId());
         }
-        CobroCalculadora.Resultado cobro = CobroCalculadora.calcular(totalUsd.subtract(fiadoUsd), tasa, pagosCobro);
+        CobroCalculadora.Resultado cobro = CobroCalculadora.calcular(totalUsd.subtract(fiadoUsd),
+                totalBsExacto == null || fiadoUsd.signum() > 0 ? null : totalBsExacto, tasa, pagosCobro);
         if (!cobro.cubre()) {
             throw new IllegalArgumentException(String.format(
                     "Pago insuficiente. Falta cubrir el total de $%.2f (Bs. %.2f)", totalUsd, totalBs));
@@ -308,6 +403,22 @@ public class VentaService {
                 : ventaRepository.maxNumeroFacturaDeCaja(principal.cajaId())) + 1);
 
         Venta guardada = ventaRepository.save(venta);
+        // Recargas y avances: su registro (comisión, número, efectivo que sale de la gaveta).
+        if (!servicios.isEmpty()) {
+            Turno turno = guardada.getTurnoId() == null ? null : turnoRepository.findById(guardada.getTurnoId()).orElse(null);
+            if (turno == null) {
+                throw new IllegalStateException("Abre la caja para cobrar recargas o avances");
+            }
+            for (ServicioOk ok : servicios) {
+                if ("RECARGA".equals(ok.tipo())) {
+                    recargaService.registrarDeVenta(principal.negocioId(), turno.getId(), principal.cajaId(), principal.usuarioId(),
+                            guardada.getId(), ok.in().operadora(), ok.in().numero(), ok.costoBs(), ok.cobradoBs(), tasa);
+                } else {
+                    movimientoCajaService.registrarAvanceDeVenta(principal.negocioId(), turno, principal.usuarioId(), guardada.getId(),
+                            ok.moneda(), ok.entregado(), ok.costoBs(), ok.cobradoBs(), tasa, !enCola);
+                }
+            }
+        }
         if (clienteFiado != null) {
             clienteService.cargar(clienteFiado.getId(), fiadoUsd, guardada.getId(), guardada.getTurnoId(),
                     principal.cajaId(), principal.usuarioId());

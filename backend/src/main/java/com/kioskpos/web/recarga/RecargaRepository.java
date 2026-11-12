@@ -9,5 +9,7 @@ public interface RecargaRepository extends JpaRepository<Recarga, Long> {
 
     List<Recarga> findByTurnoIdAndAnuladaFalse(Long turnoId);
 
+    List<Recarga> findByVentaId(Long ventaId);
+
     List<Recarga> findByAnuladaFalseAndCreatedAtGreaterThanEqualAndCreatedAtLessThan(Instant desde, Instant hasta);
 }

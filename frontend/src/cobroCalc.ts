@@ -44,9 +44,10 @@ function sumas(montos: Montos, excepto: string | undefined, mon: MonedaDe) {
   return { usdC, bsC };
 }
 
-export function calcularCobro(total: number, tasa: number, montos: Montos, mon: MonedaDe = monedaFija): EstadoCobro {
+/** totalBsFijo: total exacto en Bs cuando la venta lleva recargas/avances (el servidor también lo usa). */
+export function calcularCobro(total: number, tasa: number, montos: Montos, mon: MonedaDe = monedaFija, totalBsFijo?: number): EstadoCobro {
   const totalC = cent(total);
-  const totalBsC = Math.round(total * tasa * 100);
+  const totalBsC = totalBsFijo != null ? Math.round(totalBsFijo * 100) : Math.round(total * tasa * 100);
   const { usdC, bsC } = sumas(montos, undefined, mon);
   const t = tasa > 0 ? tasa : 1;
   // Igual que el servidor: pagadoUsd + (pagadoBs / tasa con 4 decimales), a 2 decimales.
@@ -73,11 +74,11 @@ export function calcularCobro(total: number, tasa: number, montos: Montos, mon: 
 }
 
 /** Cuánto hay que poner en `metodo` (en SU moneda) para completar el total con lo demás. */
-export function restoPara(metodo: string, total: number, tasa: number, montos: Montos, mon: MonedaDe = monedaFija): number {
+export function restoPara(metodo: string, total: number, tasa: number, montos: Montos, mon: MonedaDe = monedaFija, totalBsFijo?: number): number {
   const t = tasa > 0 ? tasa : 1;
   const { usdC, bsC } = sumas(montos, metodo, mon);
   if (mon(metodo) === "VES") {
-    const faltaBsC = Math.round(total * t * 100) - bsC - usdC * t;
+    const faltaBsC = (totalBsFijo != null ? Math.round(totalBsFijo * 100) : Math.round(total * t * 100)) - bsC - usdC * t;
     return Math.max(0, Math.ceil(faltaBsC - 1e-6)) / 100;
   }
   const faltaC = cent(total) - usdC - bsC / t;

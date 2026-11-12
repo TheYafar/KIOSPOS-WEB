@@ -48,9 +48,13 @@ public class ClienteController {
     public record FiadoHecho(Long ventaId, Integer numeroFactura, java.math.BigDecimal totalUsd, java.math.BigDecimal totalBs) {
     }
 
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.kioskpos.web.cliente.TrabajadorSyncService trabajadorSync;
+
     @GetMapping
     public List<ClienteService.ClienteVista> listar(@RequestParam(required = false) String q,
                                                     @RequestParam(required = false) String tipo) {
+        trabajadorSync.asegurar(); // el personal del sistema también aparece como trabajador
         return service.listar(q, tipo);
     }
 

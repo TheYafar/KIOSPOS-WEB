@@ -179,8 +179,22 @@ public class MiNegocioController {
         n.setTasaAjuste(ajuste);
         n.setTasaManual(manual);
         n.setMetodosPago(req.metodosPago());
+        // Comisiones por defecto de recargas y avances (si vienen; null = no se tocan).
+        if (req.comisionRecargaPct() != null) {
+            n.setComisionRecargaPct(pct(req.comisionRecargaPct(), "recargas"));
+        }
+        if (req.comisionAvancePct() != null) {
+            n.setComisionAvancePct(pct(req.comisionAvancePct(), "avances"));
+        }
         negocioRepository.save(n);
         return aCajaConfig(n);
+    }
+
+    private static BigDecimal pct(BigDecimal v, String que) {
+        if (v.signum() < 0 || v.compareTo(BigDecimal.valueOf(100)) > 0) {
+            throw new IllegalArgumentException("La comisión de " + que + " debe estar entre 0 y 100%");
+        }
+        return v.setScale(2, java.math.RoundingMode.HALF_UP);
     }
 
     private Negocio negocio(KioskPrincipal principal) {
@@ -190,15 +204,18 @@ public class MiNegocioController {
 
     private CajaConfig aCajaConfig(Negocio n) {
         return new CajaConfig(n.getMetodosPago(), n.getTasaModo(), n.getTasaAjusteTipo(), n.getTasaAjuste(),
-                n.getTasaManual(), tasaService.bcv(), tasaNegocioService.efectiva(n));
+                n.getTasaManual(), tasaService.bcv(), tasaNegocioService.efectiva(n),
+                n.getComisionRecargaPct(), n.getComisionAvancePct());
     }
 
     /** metodosPago: JSON opaco de la PWA (qué formas están activas + monedas extra). */
     public record CajaConfig(String metodosPago, String tasaModo, String ajusteTipo, BigDecimal ajuste,
-                             BigDecimal tasaManual, Integer tasaBcv, BigDecimal tasaEfectiva) {
+                             BigDecimal tasaManual, Integer tasaBcv, BigDecimal tasaEfectiva,
+                             BigDecimal comisionRecargaPct, BigDecimal comisionAvancePct) {
     }
 
     public record ActualizarCajaConfig(String metodosPago, String tasaModo, String ajusteTipo,
-                                       BigDecimal ajuste, BigDecimal tasaManual) {
+                                       BigDecimal ajuste, BigDecimal tasaManual,
+                                       BigDecimal comisionRecargaPct, BigDecimal comisionAvancePct) {
     }
 }

@@ -24,6 +24,8 @@ export function Configuracion() {
   const [c, setC] = useState<ConfigCaja>(getConfig());
   const [ajTxt, setAjTxt] = useState(c.ajuste ? String(c.ajuste).replace(".", ",") : "");
   const [manTxt, setManTxt] = useState(c.tasaManual ? String(c.tasaManual).replace(".", ",") : "");
+  const [recTxt, setRecTxt] = useState(String(c.comisionRecargaPct).replace(".", ","));
+  const [avTxt, setAvTxt] = useState(String(c.comisionAvancePct).replace(".", ","));
   const [msg, setMsg] = useState("");
   const rol = getSesion()?.rol;
   const puede = rol === "DUENO" || rol === "ENCARGADO";
@@ -37,6 +39,7 @@ export function Configuracion() {
       setC(n);
       setAjTxt(n.ajuste ? String(n.ajuste).replace(".", ",") : "");
       setManTxt(n.tasaManual ? String(n.tasaManual).replace(".", ",") : "");
+      setRecTxt(String(n.comisionRecargaPct).replace(".", ",")); setAvTxt(String(n.comisionAvancePct).replace(".", ","));
     };
     window.addEventListener("kp-config", on);
     return () => { window.removeEventListener("kp-config", on); window.clearTimeout(pendiente.current); };
@@ -182,6 +185,23 @@ export function Configuracion() {
                 {[1, 5, 10, 20, 50].map((d) => <div key={d}><span>$ {d}</span><b className="t">Bs {money(d * efectiva)}</b></div>)}
               </div>
             )}
+          </section>
+
+          <section className="card cfg-sec">
+            <h3 className="h3">Recargas y avances de efectivo</h3>
+            <span className="hint">Lo que cobras de más por hacerlas. Al vender se pone solo; el cajero lo puede cambiar en cada una.</span>
+            <div className="two">
+              <label className="lbl">Comisión de recargas (%)
+                <input className="inp t" inputMode="decimal" value={recTxt} aria-label="Comisión de recargas"
+                  onChange={(e) => { const v = e.target.value.replace(/[^\d.,]/g, ""); setRecTxt(v); guardar({ ...c, comisionRecargaPct: Math.min(100, leer(v)) }); }} />
+                <span className="hint t">Recarga Bs 500 → cobras Bs {money(500 * (1 + c.comisionRecargaPct / 100))}</span>
+              </label>
+              <label className="lbl">Comisión de avances (%)
+                <input className="inp t" inputMode="decimal" value={avTxt} aria-label="Comisión de avances"
+                  onChange={(e) => { const v = e.target.value.replace(/[^\d.,]/g, ""); setAvTxt(v); guardar({ ...c, comisionAvancePct: Math.min(100, leer(v)) }); }} />
+                <span className="hint t">Avance Bs 1.000 → cobras Bs {money(1000 * (1 + c.comisionAvancePct / 100))}</span>
+              </label>
+            </div>
           </section>
         </fieldset>
       </div>

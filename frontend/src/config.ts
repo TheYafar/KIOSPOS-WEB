@@ -22,6 +22,8 @@ export interface ConfigCaja {
   ajusteTipo: "pct" | "bs";   // aumento sobre la BCV: porcentaje o bolívares fijos
   ajuste: number;
   tasaManual: number;
+  comisionRecargaPct: number; // comisión por defecto de las recargas (%)
+  comisionAvancePct: number;  // comisión por defecto de los avances de efectivo (%)
 }
 
 const KEY = "kp_config";
@@ -29,7 +31,7 @@ const BCV_KEY = "kp_bcv";
 export const DEFAULT_CONFIG: ConfigCaja = {
   metodos: { EFECTIVO_USD: true, EFECTIVO_BS: true, PAGO_MOVIL: true, PUNTO: true, BIOPAGO: true, FIADO: true },
   extras: [],
-  tasaModo: "bcv", ajusteTipo: "pct", ajuste: 0, tasaManual: 0,
+  tasaModo: "bcv", ajusteTipo: "pct", ajuste: 0, tasaManual: 0, comisionRecargaPct: 20, comisionAvancePct: 10,
 };
 
 export function getConfig(): ConfigCaja {
@@ -47,7 +49,8 @@ export function setConfig(c: ConfigCaja): void {
 }
 
 // ---- Copia del servidor <-> equipo ----
-interface CfgServidor { metodosPago: string | null; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number; tasaBcv: number | null; tasaEfectiva: number | null; }
+interface CfgServidor { metodosPago: string | null; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number; tasaBcv: number | null; tasaEfectiva: number | null;
+  comisionRecargaPct?: number | null; comisionAvancePct?: number | null; }
 
 /** Convierte la config del servidor a la de la PWA (sin metodosPago → todas activas). */
 export function desdeServidor(r: CfgServidor): ConfigCaja {
@@ -61,6 +64,8 @@ export function desdeServidor(r: CfgServidor): ConfigCaja {
     ajusteTipo: (r.ajusteTipo || "PCT").toLowerCase() === "bs" ? "bs" : "pct",
     ajuste: Number(r.ajuste) || 0,
     tasaManual: Number(r.tasaManual) || 0,
+    comisionRecargaPct: r.comisionRecargaPct == null ? DEFAULT_CONFIG.comisionRecargaPct : Number(r.comisionRecargaPct),
+    comisionAvancePct: r.comisionAvancePct == null ? DEFAULT_CONFIG.comisionAvancePct : Number(r.comisionAvancePct),
   };
 }
 export function aServidor(c: ConfigCaja) {
@@ -68,6 +73,7 @@ export function aServidor(c: ConfigCaja) {
     metodosPago: JSON.stringify({ metodos: c.metodos, extras: c.extras }),
     tasaModo: c.tasaModo.toUpperCase(), ajusteTipo: c.ajusteTipo.toUpperCase(),
     ajuste: c.ajuste, tasaManual: c.tasaManual,
+    comisionRecargaPct: c.comisionRecargaPct, comisionAvancePct: c.comisionAvancePct,
   };
 }
 /** Guarda en el equipo lo que dice el servidor (y su BCV). Devuelve la tasa con que se cobra. */

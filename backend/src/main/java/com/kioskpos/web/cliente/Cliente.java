@@ -53,4 +53,8 @@ public class Cliente {
 
     @Column(name = "created_at", nullable = false)
     private Instant createdAt = Instant.now();
+
+    /** Si el trabajador es personal del sistema (cajero/encargado), su usuario. */
+    @Column(name = "usuario_id")
+    private Long usuarioId;
 }

@@ -12,7 +12,7 @@ const abrirCobro = async (page: Page) => {
   await expect(page.locator(".cb3-card").first()).toBeVisible();
 };
 
-test("gasto con la tecla G y avance de efectivo desde el cierre", async ({ page }) => {
+test("gasto con la tecla G desde el cierre (el avance va en la venta)", async ({ page }) => {
   const st: Estado = { turnoAbierto: true };
   await preparar(page, st, { "kioskpos.sesion": sesionCajero, "kioskpos.turno": "7" });
   await ir(page);
@@ -26,14 +26,8 @@ test("gasto con la tecla G y avance de efectivo desde el cierre", async ({ page 
   await expect(page.locator(".movs-row")).toContainText("Hielo");
   expect(st.movs![0]).toMatchObject({ tipo: "GASTO", moneda: "USD", monto: 5, concepto: "Hielo" });
 
-  await page.getByRole("button", { name: /Avance/ }).click();
-  await page.getByLabel("Monto del movimiento").fill("1000");
-  await expect(page.locator(".mov-av")).toContainText("Bs 1.100,00");
-  await expect(page.locator(".mov-av .ok")).toContainText("Bs 100,00");
-  await page.getByRole("button", { name: "Pago móvil" }).click();
-  await page.getByRole("button", { name: /Registrar avance/ }).click();
-  await expect(page.locator(".movs-row").nth(1)).toContainText("ganancia Bs 100,00");
-  expect(st.movs![1]).toMatchObject({ tipo: "AVANCE", moneda: "VES", monto: 1000, metodoCobro: "PAGO_MOVIL", montoCobrado: 1100 });
+  // El avance ya no está aquí: se cobra en Vender (F6), junto con la venta.
+  await expect(page.locator(".movs-btn", { hasText: "Avance" })).toHaveCount(0);
 });
 
 test("cobrar fiado: elegir cliente con el teclado y la venta lleva clienteId", async ({ page }) => {
@@ -41,7 +35,7 @@ test("cobrar fiado: elegir cliente con el teclado y la venta lleva clienteId", a
   await preparar(page, st, { "kioskpos.sesion": sesionCajero });
   await ir(page); await abrirCobro(page);
   const card = page.locator(".cb3-card", { has: page.locator('.cb3-nm b:text-is("Crédito")') });
-  await card.getByRole("button", { name: "Elegir cliente" }).click();
+  await card.getByRole("button", { name: "Elegir cliente o trabajador" }).click();
   await expect(page.getByLabel("Buscar cliente para crédito")).toBeFocused();
   await expect(page.locator(".cli-pick-row")).toHaveCount(3);
   await page.keyboard.type("josé");
@@ -59,7 +53,7 @@ test("no deja fiar por encima del límite del cliente", async ({ page }) => {
   await preparar(page, { turnoAbierto: true }, { "kioskpos.sesion": sesionCajero });
   await ir(page); await abrirCobro(page);
   const card = page.locator(".cb3-card", { has: page.locator('.cb3-nm b:text-is("Crédito")') });
-  await card.getByRole("button", { name: "Elegir cliente" }).click();
+  await card.getByRole("button", { name: "Elegir cliente o trabajador" }).click();
   await page.locator(".cli-pick-row", { hasText: "María Pérez" }).click(); // debe $8, límite $10
   await expect(page.locator(".cb3-go")).toHaveText(/Pasa el límite de crédito de María Pérez/);
   await page.getByLabel("Monto en Crédito").fill("1");
@@ -106,8 +100,8 @@ test("al cobrar, a un trabajador no se le fía más que su sueldo", async ({ pag
   await preparar(page, st, { "kioskpos.sesion": sesionCajero });
   await ir(page); await abrirCobro(page);
   const card = page.locator(".cb3-card", { has: page.locator('.cb3-nm b:text-is("Crédito")') });
-  await card.getByRole("button", { name: "Elegir cliente" }).click();
-  await expect(page.locator(".cli-pick-row .cli-badge")).toHaveText("Empleado");
+  await card.getByRole("button", { name: "Elegir cliente o trabajador" }).click();
+  await expect(page.locator(".cli-pick-row .cli-badge")).toHaveText("Trabajador");
   await page.locator(".cli-pick-row", { hasText: "Luis" }).click(); // debe $13 + $2,75 > sueldo $15
   await expect(page.locator(".cb3-go")).toHaveText(/Pasa el límite de crédito de Luis \(empleado\) \(\$ 15,00\)/);
   await page.getByLabel("Monto en Crédito").fill("2");

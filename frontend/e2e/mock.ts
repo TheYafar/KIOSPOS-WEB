@@ -17,7 +17,7 @@ export const productos = [
 ];
 
 /** Config de caja del negocio tal como la guarda el servidor (PUT /api/mi-negocio/caja-config). */
-export interface CajaCfg { metodosPago: string | null; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number; }
+export interface CajaCfg { metodosPago: string | null; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number; comisionRecargaPct?: number; comisionAvancePct?: number; }
 export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: any; cierre?: any; tasa?: number | null; cajaConfig?: CajaCfg; puts?: CajaCfg[];
   movs?: any[]; clientes?: any[]; abonos?: any[]; nuevoCliente?: any;
   anulada?: any; devuelta?: any; compra?: any; descuento?: any; fiado?: any; producto?: any; categoria?: any; nomina?: any;
@@ -205,7 +205,7 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     if (u.includes("/api/ventas") && m === "POST") { st.venta = JSON.parse(r.request().postData() || "{}"); return r.fulfill({ json: { id: 99, numeroFactura: 1 } }); }
     if (u.includes("/api/mi-negocio/caja-config")) {
       if (m === "PUT") { st.cajaConfig = JSON.parse(r.request().postData() || "{}"); (st.puts ??= []).push(st.cajaConfig!); }
-      const c = st.cajaConfig ?? { metodosPago: null, tasaModo: "BCV", ajusteTipo: "PCT", ajuste: 0, tasaManual: 0 };
+      const c = { comisionRecargaPct: 20, comisionAvancePct: 10, ...(st.cajaConfig ?? { metodosPago: null, tasaModo: "BCV", ajusteTipo: "PCT", ajuste: 0, tasaManual: 0 }) };
       const bcv = st.tasa === undefined ? 900 : st.tasa;
       return r.fulfill({ json: { ...c, tasaBcv: bcv, tasaEfectiva: efectiva(c, bcv) } });
     }

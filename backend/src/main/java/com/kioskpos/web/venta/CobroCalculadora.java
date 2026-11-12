@@ -33,11 +33,20 @@ public final class CobroCalculadora {
      * @param pagos    pagos recibidos
      */
     public static Resultado calcular(BigDecimal totalUsd, BigDecimal tasa, List<Pago> pagos) {
+        return calcular(totalUsd, null, tasa, pagos);
+    }
+
+    /**
+     * Igual, pero con el total en Bs exacto cuando la venta lleva servicios cobrados en Bs
+     * (recargas, avances): así "Bs 600" se cobra con Bs 600 y no con su redondeo en $.
+     */
+    public static Resultado calcular(BigDecimal totalUsd, BigDecimal totalBsExacto, BigDecimal tasa, List<Pago> pagos) {
         if (tasa == null || tasa.signum() <= 0) {
             throw new IllegalArgumentException("La tasa del día debe ser mayor a 0");
         }
         BigDecimal total = sane(totalUsd).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal totalBs = total.multiply(tasa).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalBs = totalBsExacto != null ? totalBsExacto.setScale(2, RoundingMode.HALF_UP)
+                : total.multiply(tasa).setScale(2, RoundingMode.HALF_UP);
 
         BigDecimal pagadoUsdDirecto = BigDecimal.ZERO;
         BigDecimal pagadoBsDirecto = BigDecimal.ZERO;

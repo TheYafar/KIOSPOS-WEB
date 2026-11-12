@@ -6,14 +6,14 @@ import { Icono, UIcono, catInfo } from "../icons";
 import { Cobro, type ResumenPago } from "./Cobro";
 import { CantidadPesable, cantTxt } from "./Pesable";
 import { planSuspendido } from "../plan";
-import { Recargas } from "./Recargas";
+import { AvanceEfectivo, Recargas, type ServicioCarrito } from "./Recargas";
 import { useAtras } from "../atras";
 import { numFactura } from "./Factura";
 import { armarTicket, type NegocioTicket } from "../ticket";
 
 // Un bloque (caja, media caja) va como "producto virtual" con id negativo; base y bloque
 // dicen qué producto y qué presentación se mandan al servidor.
-interface Item { producto: Producto; qty: number; base?: Producto; bloque?: Presentacion; }
+interface Item { producto: Producto; qty: number; base?: Producto; bloque?: Presentacion; servicio?: ServicioCarrito; }
 
 const money = (n: number) => n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const usd = (n: number) => "$ " + money(n);
@@ -41,6 +41,8 @@ export function Caja() {
   const [carrito, setCarrito] = useState<Map<number, Item>>(new Map());
   const [view, setView] = useState<"caja" | "ticket" | "checkout" | "done">("caja");
   const [recargas, setRecargas] = useState(false);
+  const [avance, setAvance] = useState(false);
+  const idServicio = useRef(-1_000_000_000);
   const [done, setDone] = useState<Done | null>(null);
   const [err, setErr] = useState("");
   const [selIdx, setSelIdx] = useState(0); // producto resaltado con ↑↓ al buscar
@@ -104,8 +106,19 @@ export function Caja() {
       (!t || p.nombre.toLowerCase().includes(t) || p.codigoBarras.includes(t)));
   }, [productos, q, cat]);
 
-  const total = useMemo(() => r2([...carrito.values()].reduce((s, i) => s + i.producto.precioUsd * i.qty, 0)), [carrito]);
-  const totalBs = r2(total * tasa);
+  // Recargas y avances van en Bs exactos: si hay alguno, el total manda en Bs (igual que el servidor).
+  const prodUsd = useMemo(() => r2([...carrito.values()].filter((i) => !i.servicio).reduce((s, i) => s + i.producto.precioUsd * i.qty, 0)), [carrito]);
+  const servBs = r2([...carrito.values()].reduce((s, i) => s + (i.servicio ? i.servicio.servicio.cobradoBs : 0), 0));
+  const hayServ = servBs > 0;
+  const totalBs = hayServ ? r2(r2(prodUsd * tasa) + servBs) : r2(prodUsd * tasa);
+  const total = hayServ ? r2(totalBs / (tasa || 1)) : prodUsd;
+  const agregarServicio = (sv: ServicioCarrito) => {
+    const id = --idServicio.current;
+    const producto: Producto = { id, codigoBarras: "", nombre: sv.nombre, precioUsd: r2(sv.servicio.cobradoBs / (tasa || 1)), costoUsd: 0,
+      stockActual: 1, stockMinimo: 0, categoria: "Servicios", esPesable: false, unidadMedida: "UND", activo: true };
+    const c = new Map(carrito); c.set(id, { producto, qty: 1, servicio: sv }); setCarrito(c);
+    setRecargas(false); setAvance(false);
+  };
   const unidades = [...carrito.values()].reduce((s, i) => s + (i.producto.esPesable ? 1 : i.qty), 0);
 
   // Por peso o medida (kg, litro, metro): se pregunta cuánto y se calcula el precio.
@@ -130,6 +143,7 @@ export function Caja() {
   };
   const paso = (id: number, d: number) => {
     const c = new Map(carrito); const it = c.get(id); if (!it) return;
+    if (it.servicio) { if (d < 0) { c.delete(id); setCarrito(c); } return; } // recarga/avance: solo se quita
     if (it.producto.esPesable) { if (d < 0) { c.delete(id); setCarrito(c); } else setPesar({ p: it.producto, inicial: it.qty }); return; }
     const q2 = it.qty + d; if (q2 <= 0) c.delete(id); else c.set(id, { ...it, qty: q2 }); setCarrito(c);
   };
@@ -169,6 +183,7 @@ export function Caja() {
       }
       if (e.key === "F2") { e.preventDefault(); buscarRef.current?.focus(); buscarRef.current?.select(); return; }
       if (e.key === "F4") { e.preventDefault(); if (!planSuspendido()) setRecargas(true); return; }
+      if (e.key === "F6") { e.preventDefault(); if (!planSuspendido()) setAvance(true); return; }
       if (escribiendo && !enBuscar) return;
       const sinTexto = !enBuscar || q === "";
       if ((e.key === "+" || e.key === "-") && sinTexto && !e.ctrlKey && !e.metaKey) {
@@ -196,10 +211,11 @@ export function Caja() {
     try {
       // Se manda también el precio con que se cobró: si la venta se queda en la cola sin
       // internet y el catálogo cambia mientras tanto, el servidor respeta lo que se cobró.
-      const its = [...carrito.values()].map((i) => i.bloque && i.base
+      const servicios = [...carrito.values()].filter((i) => i.servicio).map((i) => i.servicio!.servicio);
+      const its = [...carrito.values()].filter((i) => !i.servicio).map((i) => i.bloque && i.base
         ? { productoId: i.base.id, presentacionId: i.bloque.id, cantidad: i.qty, precioUsd: i.producto.precioUsd }
         : { productoId: i.producto.id, cantidad: i.qty, precioUsd: i.producto.precioUsd });
-      const codigo = await cobrar(its, pagos, clienteId, { totalUsd: total, productos: [...carrito.values()].map((i) => i.producto.nombre).join(", ").slice(0, 120) });
+      const codigo = await cobrar(its, pagos, clienteId, { totalUsd: total, productos: [...carrito.values()].map((i) => i.producto.nombre).join(", ").slice(0, 120) }, servicios);
       window.dispatchEvent(new Event("kp-turno"));
       setDone({ total, totalBs, payLine: resumen.payLine, change: resumen.change, changeNote: resumen.changeNote, receipt: recibo(pagos, resumen, facturaDe(codigo)), factura: facturaDe(codigo), credito: resumen.credito });
       setView("done");
@@ -209,7 +225,8 @@ export function Caja() {
   const NOMBRE_PAGO: Record<string, string> = { FIADO: "CREDITO" };
   const recibo = (pagos: PagoCobro[], resumen: ResumenPago, factura?: number) => armarTicket({
     negocio, fecha: new Date(), numero: factura ?? null, cliente: resumen.credito?.nombre ?? null, tasa,
-    lineas: [...carrito.values()].map((i) => ({ cantidad: i.qty, nombre: i.producto.nombre, precioUsd: i.producto.precioUsd, subtotalUsd: r2(i.producto.precioUsd * i.qty) })),
+    lineas: [...carrito.values()].map((i) => ({ cantidad: i.qty, nombre: i.producto.nombre, precioUsd: i.producto.precioUsd, subtotalUsd: r2(i.producto.precioUsd * i.qty),
+      montoBs: i.servicio ? i.servicio.servicio.cobradoBs : undefined })),
     totalBs, vueltoUsd: resumen.vueltoUsd, vueltoBs: resumen.vueltoBs,
     pagos: pagos.map((p) => ({ nombre: p.metodo === "OTRO" && p.referencia ? p.referencia.toUpperCase() : NOMBRE_PAGO[p.metodo] || p.metodo,
       moneda: p.moneda, monto: p.montoOriginal, ref: p.metodo === "PAGO_MOVIL" ? p.referencia : undefined })),
@@ -265,7 +282,7 @@ export function Caja() {
   // ----- COBRO (pago dividido, pantalla 02 / 06-07) -----
   if (view === "checkout") {
     return (
-      <Cobro total={total} tasa={tasa} isDesktop={isDesktop} err={err}
+      <Cobro total={total} totalBs={hayServ ? totalBs : undefined} tasa={tasa} isDesktop={isDesktop} err={err}
         onBack={() => setView(isDesktop ? "caja" : "ticket")}
         onConfirm={confirmar} />
     );
@@ -284,7 +301,9 @@ export function Caja() {
           else if (e.key === "Escape") { e.preventDefault(); setQ(""); }
         }} /></div>
       <button className="btn2 press rec-btn" onClick={() => setRecargas(true)} disabled={planSuspendido()} title="Recarga de saldo (F4)"><UIcono k="phone" sw={1.9} /><span>Recarga</span> <kbd className="kb">F4</kbd></button>
-      {recargas && <Recargas onClose={() => setRecargas(false)} />}
+      <button className="btn2 press rec-btn" onClick={() => setAvance(true)} disabled={planSuspendido()} title="Avance de efectivo (F6)"><UIcono k="bills" sw={1.9} /><span>Avance</span> <kbd className="kb">F6</kbd></button>
+      {recargas && <Recargas onClose={() => setRecargas(false)} onAgregar={agregarServicio} />}
+      {avance && <AvanceEfectivo tasa={tasa} onClose={() => setAvance(false)} onAgregar={agregarServicio} />}
     </div>
   );
   const chips = (
@@ -323,6 +342,21 @@ export function Caja() {
 
   // líneas del ticket (reutilizadas en panel y hoja)
   const lineaTicket = (i: Item, variante: "panel" | "sheet") => {
+    if (i.servicio) {
+      const quitar = <button className="ghost press srv-x" aria-label={"Quitar " + i.producto.nombre} onClick={() => paso(i.producto.id, -1)}>✕</button>;
+      const ic = <span className={"pi" + (variante === "sheet" ? " sm" : "") + " srv-ic"}><UIcono k={i.servicio.servicio.tipo === "RECARGA" ? "phone" : "bills"} sw={1.8} /></span>;
+      return variante === "panel" ? (
+        <div className="tkp-ln srv-ln" key={i.producto.id}>{ic}
+          <div className="tkp-txt"><b>{i.producto.nombre}</b><span className="t">{i.servicio.detalle}</span></div>
+          <div className="tkp-r"><strong className="t">{bs(i.servicio.servicio.cobradoBs)}</strong>{quitar}</div>
+        </div>
+      ) : (
+        <div className="ln srv-ln" key={i.producto.id}>{ic}
+          <div style={{ minWidth: 0 }}><div className="ln-n">{i.producto.nombre}</div><div className="ln-s t">{i.servicio.detalle}</div></div>
+          <div className="ln-r"><div className="ln-a t">{bs(i.servicio.servicio.cobradoBs)}</div>{quitar}</div>
+        </div>
+      );
+    }
     const info = catInfo(i.producto.categoria);
     if (variante === "panel") {
       return (

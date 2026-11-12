@@ -54,4 +54,12 @@ public class DetalleVenta {
     /** Unidades del producto que trae cada cosa vendida en esta línea (1 = suelto; 20 = caja de 20). */
     @Column(nullable = false, precision = 12, scale = 3)
     private BigDecimal unidades = BigDecimal.ONE;
+
+    /** Monto exacto en Bs de una línea de servicio (recarga / avance). Null en productos. */
+    @Column(name = "monto_bs", precision = 14, scale = 2)
+    private BigDecimal montoBs;
+
+    /** RECARGA o AVANCE si la línea es un servicio cobrado en la venta; null en productos. */
+    @Column(length = 10)
+    private String servicio;
 }

@@ -3,7 +3,7 @@ import { ir, preparar, sesionCajero, sesionDueno, type Estado } from "./mock";
 
 test.use({ viewport: { width: 1440, height: 900 } });
 
-test("vender a crédito a un empleado: se elige en 'Empleados' y sale el N° de factura", async ({ page }) => {
+test("vender a crédito a un empleado: se elige en 'Trabajadores' y sale el N° de factura", async ({ page }) => {
   const st: Estado = { turnoAbierto: true };
   await preparar(page, st, { "kioskpos.sesion": sesionCajero });
   await ir(page);
@@ -12,8 +12,8 @@ test("vender a crédito a un empleado: se elige en 'Empleados' y sale el N° de 
   await page.locator(".pcard", { hasText: "Harina PAN" }).click();
   await page.keyboard.press("F9");
   const card = page.locator(".cb3-card", { has: page.locator('.cb3-nm b:text-is("Crédito")') });
-  await card.getByRole("button", { name: "Elegir cliente" }).click();
-  await page.getByRole("tab", { name: "Empleados" }).click();
+  await card.getByRole("button", { name: "Elegir cliente o trabajador" }).click();
+  await page.getByRole("tab", { name: /^Trabajadores/ }).click();
   await expect(page.locator(".cli-pick-row")).toHaveCount(1);
   await page.locator(".cli-pick-row", { hasText: "Luis" }).click();
   await page.keyboard.press("Enter");

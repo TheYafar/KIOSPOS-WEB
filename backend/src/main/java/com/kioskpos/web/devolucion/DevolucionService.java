@@ -82,7 +82,8 @@ public class DevolucionService {
     }
 
     public record LineaVenta(Long detalleId, Long productoId, String nombre, BigDecimal cantidad,
-                             BigDecimal precioUsd, BigDecimal subtotalUsd, BigDecimal devuelto) {
+                             BigDecimal precioUsd, BigDecimal subtotalUsd, BigDecimal devuelto,
+                             String servicio, BigDecimal montoBs) {
     }
 
     public record PagoLinea(String metodo, String moneda, BigDecimal monto, String referencia) {
@@ -112,7 +113,8 @@ public class DevolucionService {
                 v.getTurnoId(), abierto, v.getTasaBcv(), v.getTotalUsd(), v.getTotalBs(), v.getVueltoUsd(), v.getVueltoBs(),
                 v.getClienteId(), v.getMotivoAnulacion(),
                 v.getDetalles().stream().map(d -> new LineaVenta(d.getId(), d.getProductoId(), d.getNombre(), d.getCantidad(),
-                        d.getPrecioUnitarioUsd(), d.getSubtotalUsd(), devuelto.getOrDefault(d.getId(), BigDecimal.ZERO))).toList(),
+                        d.getPrecioUnitarioUsd(), d.getSubtotalUsd(), devuelto.getOrDefault(d.getId(), BigDecimal.ZERO),
+                        d.getServicio(), d.getMontoBs())).toList(),
                 v.getPagos().stream().map(p -> new PagoLinea(p.getMetodo().name(), p.getMoneda().name(), p.getMontoOriginal(),
                         p.getReferencia())).toList(),
                 devs.stream().map(d -> new DevolucionHecha(d, partes.getOrDefault(d.getId(), List.of()))).toList(),
@@ -131,6 +133,11 @@ public class DevolucionService {
         }
         return r;
     }
+
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.kioskpos.web.recarga.RecargaRepository recargasDeVenta;
+    @org.springframework.beans.factory.annotation.Autowired
+    private com.kioskpos.web.cuadre.MovimientoCajaRepository movimientosDeVenta;
 
     @Transactional
     public Venta anular(KioskPrincipal principal, Long ventaId, String motivo) {
@@ -158,6 +165,15 @@ public class DevolucionService {
         BigDecimal fiado = fiadoDe(v);
         if (v.getClienteId() != null && fiado.signum() > 0) {
             clientes.descontarPorVenta(v.getClienteId(), fiado, v.getId(), "ANULACION", usuario);
+        }
+        // Recargas y avances cobrados en esta venta se anulan con ella.
+        for (var r : recargasDeVenta.findByVentaId(v.getId())) {
+            r.setAnulada(true);
+            recargasDeVenta.save(r);
+        }
+        for (var m : movimientosDeVenta.findByVentaId(v.getId())) {
+            m.setAnulado(true);
+            movimientosDeVenta.save(m);
         }
         v.setEstado("ANULADA");
         v.setAnuladaPor(usuario);
@@ -190,6 +206,9 @@ public class DevolucionService {
             DetalleVenta d = porId.get(it.detalleId());
             if (d == null) {
                 throw new IllegalArgumentException("Ese producto no está en la venta");
+            }
+            if (d.getServicio() != null) {
+                throw new IllegalArgumentException("Las recargas y los avances no se devuelven: si fue un error, anula la venta");
             }
             BigDecimal cant = it.cantidad() == null ? BigDecimal.ZERO : it.cantidad();
             if (cant.signum() <= 0) {

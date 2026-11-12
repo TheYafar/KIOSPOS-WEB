@@ -191,9 +191,15 @@ function nuevoCodigo(): string {
 }
 
 /** Registra una venta: la encola (durable) y trata de enviarla ya. */
-export async function cobrar(items: LineaCobro[], pagos: PagoCobro[], clienteId?: number | null, resumen?: { totalUsd: number; productos: string }): Promise<string> {
+/** Recarga o avance de efectivo cobrado dentro de la venta (montos exactos en Bs). */
+export interface ServicioCobro {
+  tipo: "RECARGA" | "AVANCE"; operadora?: string; numero?: string; montoBs?: number;
+  entregaMoneda?: "USD" | "VES"; entregaMonto?: number; cobradoBs: number;
+}
+export async function cobrar(items: LineaCobro[], pagos: PagoCobro[], clienteId?: number | null, resumen?: { totalUsd: number; productos: string }, servicios?: ServicioCobro[]): Promise<string> {
   const codigoUnico = nuevoCodigo();
-  await encolar(codigoUnico, { codigoUnico, tasaBcv: Number(getTasa()) || 1, items, pagos, ...(clienteId ? { clienteId } : {}) }, resumen);
+  await encolar(codigoUnico, { codigoUnico, tasaBcv: Number(getTasa()) || 1, items, pagos, ...(clienteId ? { clienteId } : {}),
+    ...(servicios && servicios.length ? { servicios } : {}) }, resumen);
   await sincronizar();
   return codigoUnico;
 }
@@ -262,7 +268,7 @@ export interface TurnoResumen {
 // ---------- Recargas de saldo ----------
 export type Operadora = "MOVISTAR" | "DIGITEL" | "MOVILNET" | "CANTV" | "SIMPLE_TV" | "INTER" | "OTRA";
 export interface RecargaV { id: number; turnoId: number; operadora: Operadora; numero: string; montoBs: number; metodoCobro: string; moneda: "USD" | "VES";
-  montoCobrado: number; tasa: number; comisionBs: number; referencia: string | null; anulada: boolean; createdAt: string; }
+  montoCobrado: number; tasa: number; comisionBs: number; referencia: string | null; anulada: boolean; createdAt: string; ventaId?: number | null; }
 export async function registrarRecarga(body: { operadora: Operadora; numero: string; montoBs: number; metodoCobro: string; montoCobrado: number; tasa: number; referencia?: string }): Promise<RecargaV> {
   return parse(await fetch("/api/recargas", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
 }
@@ -288,7 +294,7 @@ export async function anularMovimiento(id: number): Promise<MovimientoCaja> {
 
 // ---------- Ventas del día: anular y devolver ----------
 export interface VentaFila { id: number; numeroFactura: number; fechaHora: string; cajaId: number; totalUsd: number; totalBs: number; estado: "COMPLETADA" | "ANULADA"; clienteId: number | null; pagos: string; items: number; devueltoUsd: number; productos?: string; }
-export interface LineaVentaDet { detalleId: number; productoId: number | null; nombre: string; cantidad: number; precioUsd: number; subtotalUsd: number; devuelto: number; }
+export interface LineaVentaDet { detalleId: number; productoId: number | null; nombre: string; cantidad: number; precioUsd: number; subtotalUsd: number; devuelto: number; servicio?: "RECARGA" | "AVANCE" | null; montoBs?: number | null; }
 export interface DevolucionReg { id: number; totalUsd: number; metodoReembolso: string; montoReembolso: number; motivo: string | null; createdAt: string; }
 export interface VentaDetalle {
   id: number; numeroFactura: number; fechaHora: string; estado: "COMPLETADA" | "ANULADA"; cajaId: number; turnoId: number | null; turnoAbierto: boolean;
@@ -459,9 +465,10 @@ export interface CajaConfigServidor {
   metodosPago: string | null; // JSON { metodos, extras } de la PWA
   tasaModo: "BCV" | "AJUSTE" | "MANUAL"; ajusteTipo: "PCT" | "BS"; ajuste: number; tasaManual: number;
   tasaBcv: number | null; tasaEfectiva: number | null;
+  comisionRecargaPct?: number | null; comisionAvancePct?: number | null;
 }
 export async function getCajaConfig(): Promise<CajaConfigServidor> { return parse(await fetch("/api/mi-negocio/caja-config", { headers: auth() })); }
-export async function putCajaConfig(body: { metodosPago: string; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number }): Promise<CajaConfigServidor> {
+export async function putCajaConfig(body: { metodosPago: string; tasaModo: string; ajusteTipo: string; ajuste: number; tasaManual: number; comisionRecargaPct?: number; comisionAvancePct?: number }): Promise<CajaConfigServidor> {
   return parse(await fetch("/api/mi-negocio/caja-config", { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
 }
 // ---------- Seguridad del super admin ----------

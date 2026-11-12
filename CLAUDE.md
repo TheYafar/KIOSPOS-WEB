@@ -596,3 +596,26 @@ el alta/venta/login (try/catch + log).
   ticket, cerrar pide confirmar ("Cerrar sin ticket"). Dueño: pestaña **Puntos** (Alt+8; Más pasó a Alt+9) con
   Hoy/Ayer/7 días/Este mes/un día, agrupado por día con fecha, día y hora, el ticket como el papel y la
   diferencia contra el sistema. Pruebas: `CierrePuntoTest` (CI) y `e2e/puntos.spec.ts`.
+
+## 29. Recargas y avances dentro de la venta + personal como trabajador
+
+- **Recargas y avances de efectivo se cobran JUNTO con los productos** (una sola cuenta, el cliente paga como
+  quiera). `POST /api/ventas` acepta `servicios: [{tipo: RECARGA, operadora, numero, montoBs, cobradoBs} |
+  {tipo: AVANCE, entregaMoneda USD/VES, entregaMonto, cobradoBs}]` (`VentaService.validarServicio`). Cada uno es
+  una línea de la venta con su **monto exacto en Bs** (V27 `detalle_ventas.monto_bs` + `servicio`); con servicios
+  el total manda en Bs (`CobroCalculadora.calcular(totalUsd, totalBsExacto, …)`, igual en la PWA
+  `cobroCalc.ts` con `totalBsFijo`). Además se registra la recarga (`RecargaService.registrarDeVenta`) y el avance
+  (`MovimientoCajaService.registrarAvanceDeVenta`, sale efectivo de la gaveta, valida que alcance en vivo) con
+  `metodo_cobro = 'VENTA'` y `venta_id` (V27): el cuadre NO vuelve a sumar lo cobrado (ya está en los pagos de la
+  venta) pero sí resta el efectivo del avance y cuenta las comisiones. La línea de servicio lleva costo = cobrado
+  (la ganancia va por su comisión, sin contarla dos veces). **Anular la venta** anula su recarga y su avance; las
+  líneas de servicio **no se devuelven**. Recargas/avances de una venta no se anulan por separado.
+- **Comisiones por defecto** en Configuración ("Recargas y avances de efectivo"): V27
+  `negocios.comision_recarga_pct` (20) y `comision_avance_pct` (10), en `GET|PUT /api/mi-negocio/caja-config`.
+- **PWA:** en Vender, **Recarga (F4)** y **Avance (F6)** (`screens/Recargas.tsx`: `Recargas`, `AvanceEfectivo`)
+  ya no preguntan "¿cómo te paga?": "Agregar a la venta · Bs X" pone la línea en el ticket (se quita con ✕). El
+  botón Avance salió de "Movimientos de caja" en el Cierre.
+- **Personal = trabajadores** (`cliente/TrabajadorSyncService`, V27 `clientes.usuario_id`): cada cajero/encargado
+  activo tiene su ficha TRABAJADOR (se crea o se liga por nombre al listar Crédito o Nómina), así sale al dar
+  crédito al cobrar (selector con pestañas Todos | Clientes | **Trabajadores**) y en Nómina, donde se le descuenta.
+- Pruebas: `ServiciosEnVentaTest` (CI), `e2e/servicios.spec.ts`; probado contra Postgres real.

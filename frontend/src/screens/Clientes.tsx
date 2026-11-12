@@ -293,7 +293,6 @@ export function ElegirCliente({ onElegir, onClose }: { onElegir: (c: ClienteFiad
   const [filtro, setFiltro] = useState<"TODOS" | "CLIENTE" | "TRABAJADOR">("TODOS");
   useEffect(() => { listarClientes().then(setLista).catch((e) => setErr((e as Error).message)); }, []);
   const f = q.trim().toLowerCase();
-  const hayEmpleados = lista.some((c) => c.tipo === "TRABAJADOR" && c.activo);
   const vis = lista.filter((c) => c.activo && (filtro === "TODOS" || (c.tipo || "CLIENTE") === filtro) && (!f || c.nombre.toLowerCase().includes(f) || (c.cedula || "").toLowerCase().includes(f) || (c.telefono || "").includes(f)));
   const key = (e: React.KeyboardEvent) => {
     e.stopPropagation();
@@ -306,28 +305,29 @@ export function ElegirCliente({ onElegir, onClose }: { onElegir: (c: ClienteFiad
   return (
     <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card" onKeyDown={key}>
-        <div className="modal-head"><h2>¿A quién le das crédito?</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="modal-head"><h2>¿A quién le das crédito? <small className="cli-sub">Cliente o trabajador</small></h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
         <div className="modal-body">
           <label className="search">
             <UIcono k="search" sw={2} />
             <input autoFocus value={q} onChange={(e) => { setQ(e.target.value); setSel(0); }} placeholder="Nombre, cédula o teléfono…" aria-label="Buscar cliente para crédito" />
           </label>
-          {hayEmpleados && (
-            <div className="seg" role="tablist" aria-label="Clientes o empleados">
-              {([["TODOS", "Todos"], ["CLIENTE", "Clientes"], ["TRABAJADOR", "Empleados"]] as const).map(([id, n]) => (
-                <button key={id} role="tab" aria-selected={filtro === id} className={filtro === id ? "on" : ""} onClick={() => { setFiltro(id); setSel(0); }}>{n}</button>
-              ))}
-            </div>
-          )}
+          <div className="seg" role="tablist" aria-label="Clientes o trabajadores">
+            {([["TODOS", "Todos"], ["CLIENTE", "Clientes"], ["TRABAJADOR", "Trabajadores"]] as const).map(([id, n]) => (
+              <button key={id} role="tab" aria-selected={filtro === id} className={filtro === id ? "on" : ""} onClick={() => { setFiltro(id); setSel(0); }}>
+                {n} <small className="t">{lista.filter((c) => c.activo && (id === "TODOS" || (c.tipo || "CLIENTE") === id)).length}</small></button>
+            ))}
+          </div>
           {err && <p className="pinmsg err">{err}</p>}
           <div className="cli-pick">
             {vis.slice(0, 30).map((c, i) => (
               <button key={c.id} className={"cli-pick-row press" + (i === sel ? " sel" : "")} onClick={() => onElegir(c)}>
-                <b>{c.nombre}{c.tipo === "TRABAJADOR" && <span className="pill info cli-badge">Empleado</span>}</b><small>{c.cedula || c.telefono || ""}</small>
+                <b>{c.nombre}{c.tipo === "TRABAJADOR" && <span className="pill info cli-badge">Trabajador</span>}</b><small>{c.cedula || c.telefono || ""}</small>
                 <span className={"t " + (c.saldoUsd > 0 ? "mg-bad" : "")}>{c.saldoUsd > 0 ? "debe " + usd(c.saldoUsd) : "al día"}</span>
               </button>
             ))}
-            {vis.length === 0 && <span className="hint">{lista.length ? "Nadie coincide." : "No hay clientes todavía."}</span>}
+            {vis.length === 0 && <span className="hint">{filtro === "TRABAJADOR" && !q.trim()
+              ? "No hay trabajadores. Tus cajeros y encargados salen aquí solos; los demás se anotan en Crédito → Trabajadores (o en Nómina)."
+              : lista.length ? "Nadie coincide." : "No hay clientes todavía."}</span>}
           </div>
         </div>
         <div className="modal-foot"><button className="btn2 big press" onClick={() => setNuevo(true)}><UIcono k="plus" sw={2.2} />Anotar cliente nuevo{q.trim() ? ": " + q.trim() : ""}</button></div>

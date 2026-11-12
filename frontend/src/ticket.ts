@@ -4,7 +4,7 @@
 
 export const W = 40;
 export interface NegocioTicket { nombre: string; frase?: string | null; rif?: string | null; direccion?: string | null; telefono?: string | null; }
-export interface LineaTicket { cantidad: number; nombre: string; precioUsd: number; subtotalUsd: number; }
+export interface LineaTicket { cantidad: number; nombre: string; precioUsd: number; subtotalUsd: number; montoBs?: number; }
 export interface PagoTicket { nombre: string; moneda: "USD" | "VES"; monto: number; ref?: string; }
 export interface DatosTicket {
   negocio: NegocioTicket; fecha: Date; numero?: number | null; cliente?: string | null;
@@ -57,7 +57,8 @@ export function armarTicket(t: DatosTicket): string {
   for (const l of t.lineas) {
     const c = cantVE(l.cantidad);
     L.push(...envolver(c + " x " + l.nombre.toUpperCase()));
-    L.push(fila("  (" + c + " x " + bsVE(l.precioUsd * t.tasa) + ")", bsVE(l.subtotalUsd * t.tasa)));
+    const unit = l.montoBs != null ? l.montoBs : l.precioUsd * t.tasa, sub = l.montoBs != null ? l.montoBs : l.subtotalUsd * t.tasa;
+    L.push(fila("  (" + c + " x " + bsVE(unit) + ")", bsVE(sub)));
   }
   L.push(linea, fila("TOTAL EN BOLIVARES", bsVE(t.totalBs)), doble);
   const pagos = t.pagos.filter((p) => p.monto > 0);
