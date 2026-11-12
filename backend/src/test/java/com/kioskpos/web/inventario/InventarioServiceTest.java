@@ -76,6 +76,10 @@ class InventarioServiceTest extends PostgresRlsTestBase {
             var r1 = inventarioService.importarCsv(csv);
             assertThat(r1.creados()).isEqualTo(2);
             assertThat(r1.actualizados()).isZero();
+            // El stock y el mínimo no se intercambian: stock=30, stock_minimo=5.
+            Producto arroz = inventarioService.buscar("B-1").stream().findFirst().orElseThrow();
+            assertThat(arroz.getStockActual()).isEqualByComparingTo("30");
+            assertThat(arroz.getStockMinimo()).isEqualByComparingTo("5");
 
             // Reimportar con precio cambiado -> actualiza, no duplica.
             String csv2 = "codigo_barras,nombre,precio_usd,costo_usd,categoria,stock,stock_minimo\nB-1,Arroz,1.80,1.00,Viveres,30,5\n";

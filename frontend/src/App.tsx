@@ -6,9 +6,16 @@ import { Login } from "./screens/Login";
 import { Shell } from "./screens/Shell";
 import { SuperAdmin } from "./screens/SuperAdmin";
 
+/** Un enlace de emparejar caja (#caja=) o de clave nueva (#reset=) debe llevar SIEMPRE a la
+ *  pantalla de entrada: si no, estando logueado el link "no hace nada". */
+const linkDeEntrada = typeof window !== "undefined" && /(?:^|[#&])(?:caja|reset)=/.test(window.location.hash);
+
 export function App() {
-  const [sesion, setSesion] = useState<Sesion | null>(getSesion());
+  const [sesion, setSesion] = useState<Sesion | null>(linkDeEntrada ? null : getSesion());
   const [, setTick] = useState(0); // fuerza re-render al llegar la tasa nueva
+
+  // Si el link llegó con sesión abierta: la cerramos (sin borrar el hash) para que Login lo lea.
+  useEffect(() => { if (linkDeEntrada && getSesion()) cerrarSesion(); }, []);
 
   const salir = useCallback(() => {
     cerrarSesion();

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { actualizarProducto, ajustarStock, borrarCategoria, crearCategoria, crearProducto, guardarPresentaciones, importarCsv, listarCategorias, listarPresentaciones, listarProductos, renombrarCategoria, type Categoria, type Producto } from "../api";
+import { actualizarProducto, ajustarStock, borrarCategoria, crearCategoria, crearProducto, eliminarProducto, guardarPresentaciones, importarCsv, listarCategorias, listarPresentaciones, listarProductos, renombrarCategoria, type Categoria, type Producto } from "../api";
 import { EditorBloques, filasDe, leerBloques, type FilaBloque } from "./Bloques";
 import { cantTxt } from "./Pesable";
 import { Icono, UIcono, catInfo } from "../icons";
@@ -10,6 +10,21 @@ const num = (s: string) => (s ? parseFloat(s.replace(",", ".")) || 0 : 0);
 type Modal = null | { tipo: "nuevo" } | { tipo: "editar"; p: Producto } | { tipo: "ajuste"; p: Producto } | { tipo: "csv" } | { tipo: "categorias" };
 const UNIDAD_N: Record<string, string> = { KG: "kilo", G: "gramo", L: "litro", M: "metro" };
 const UNIDAD_C: Record<string, string> = { KG: "kg", G: "g", L: "L", M: "m" };
+
+const CSV_COLS = ["codigo_barras", "nombre", "precio_usd", "costo_usd", "categoria", "stock", "stock_minimo"];
+/** Escapa un valor para CSV (comillas si tiene coma, comilla o salto). */
+const celda = (v: string | number) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+
+/** Descarga el inventario como CSV (mismas columnas que acepta la importación). */
+function exportarCsv(productos: Producto[]) {
+  const filas = productos.map((p) => [p.codigoBarras, p.nombre, p.precioUsd, p.costoUsd, p.categoria, p.stockActual, p.stockMinimo].map(celda).join(","));
+  const csv = "﻿" + [CSV_COLS.join(","), ...filas].join("\r\n");
+  const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = "inventario-" + new Date().toISOString().slice(0, 10) + ".csv";
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 export function Inventario() {
   const [productos, setProductos] = useState<Producto[]>([]);
@@ -46,7 +61,8 @@ export function Inventario() {
         <div className="search" style={{ flex: 1 }}><UIcono k="search" /><input placeholder="Buscar producto o código…" value={q} onChange={(e) => setQ(e.target.value)} /></div>
         <button className="btn primary press" onClick={() => setModal({ tipo: "nuevo" })}><UIcono k="plus" sw={2.2} />Nuevo</button>
         <button className="btn outline press" onClick={() => setModal({ tipo: "categorias" })}>Categorías</button>
-        <button className="btn outline press" onClick={() => setModal({ tipo: "csv" })}>CSV</button>
+        <button className="btn outline press" onClick={() => setModal({ tipo: "csv" })}>Importar CSV</button>
+        <button className="btn outline press" disabled={productos.length === 0} onClick={() => exportarCsv(productos)}>Exportar</button>
       </div>
       {cats.length > 1 && (
         <div className="inv-cats" role="tablist" aria-label="Filtrar por categoría">
@@ -89,7 +105,7 @@ export function Inventario() {
 
       {modal?.tipo === "nuevo" && <FormProducto cats={cats} onClose={() => setModal(null)} onSaved={() => { setModal(null); setMsg("Producto creado"); cargar(); }} />}
       {modal?.tipo === "editar" && <FormProducto p={modal.p} cats={cats} onClose={() => setModal(null)} onSaved={() => { setModal(null); setMsg("Producto actualizado"); cargar(); }} />}
-      {modal?.tipo === "ajuste" && <FormAjuste p={modal.p} onEditar={() => setModal({ tipo: "editar", p: modal.p })} onClose={() => setModal(null)} onSaved={() => { setModal(null); setMsg("Stock ajustado"); cargar(); }} onErr={setErr} />}
+      {modal?.tipo === "ajuste" && <FormAjuste p={modal.p} onEditar={() => setModal({ tipo: "editar", p: modal.p })} onClose={() => setModal(null)} onSaved={() => { setModal(null); setMsg("Stock ajustado"); cargar(); }} onEliminado={() => { setModal(null); setMsg("Producto eliminado"); cargar(); }} onErr={setErr} />}
       {modal?.tipo === "categorias" && <FormCategorias cats={cats} onClose={() => setModal(null)} onCambio={(t) => { setMsg(t); cargar(); }} />}
       {modal?.tipo === "csv" && <FormCsv onClose={() => setModal(null)} onSaved={(r) => { setModal(null); setMsg(`Importados: ${r.creados} nuevos, ${r.actualizados} actualizados`); cargar(); }} onErr={setErr} />}
     </div>
@@ -229,12 +245,16 @@ function FormCategorias({ cats, onClose, onCambio }: { cats: Categoria[]; onClos
   );
 }
 
-function FormAjuste({ p, onEditar, onClose, onSaved, onErr }: { p: Producto; onEditar: () => void; onClose: () => void; onSaved: () => void; onErr: (s: string) => void }) {
+function FormAjuste({ p, onEditar, onClose, onSaved, onEliminado, onErr }: { p: Producto; onEditar: () => void; onClose: () => void; onSaved: () => void; onEliminado: () => void; onErr: (s: string) => void }) {
   const [tipo, setTipo] = useState<"ENTRADA" | "SALIDA" | "FIJAR">("ENTRADA");
   const [cant, setCant] = useState("");
   const [motivo, setMotivo] = useState("");
   const guardar = async () => {
     try { await ajustarStock(p.id, tipo, num(cant), motivo); onSaved(); } catch (e) { onErr((e as Error).message); onClose(); }
+  };
+  const eliminar = async () => {
+    if (!window.confirm(`¿Eliminar "${p.nombre}" para siempre? Deja de salir en la caja y en el inventario. Lo ya vendido no se borra.`)) return;
+    try { await eliminarProducto(p.id); onEliminado(); } catch (e) { onErr((e as Error).message); onClose(); }
   };
   const tipos: { id: typeof tipo; n: string }[] = [{ id: "ENTRADA", n: "Entra" }, { id: "SALIDA", n: "Sale" }, { id: "FIJAR", n: "Fijar" }];
   return (
@@ -250,6 +270,7 @@ function FormAjuste({ p, onEditar, onClose, onSaved, onErr }: { p: Producto; onE
           </div>
           <label className="lbl">{tipo === "FIJAR" ? "Dejar el stock en" : "Cantidad"}<input className="inp" inputMode="decimal" value={cant} onChange={(e) => setCant(e.target.value)} /></label>
           <label className="lbl">Motivo (opcional)<input className="inp" value={motivo} onChange={(e) => setMotivo(e.target.value)} placeholder="Compra, merma, conteo…" /></label>
+          <button className="btn2 press inv-del" onClick={eliminar}><UIcono k="del" sw={2} />Eliminar producto</button>
         </div>
         <div className="modal-foot"><button className="btn primary big press" disabled={num(cant) < 0 || !cant} onClick={guardar}>Ajustar</button></div>
       </div>
@@ -258,17 +279,34 @@ function FormAjuste({ p, onEditar, onClose, onSaved, onErr }: { p: Producto; onE
 }
 
 function FormCsv({ onClose, onSaved, onErr }: { onClose: () => void; onSaved: (r: { creados: number; actualizados: number }) => void; onErr: (s: string) => void }) {
-  const [csv, setCsv] = useState("codigo_barras,nombre,precio_usd,costo_usd,categoria,stock,stock_minimo\n");
-  const subir = async () => { try { onSaved(await importarCsv(csv)); } catch (e) { onErr((e as Error).message); onClose(); } };
+  const [csv, setCsv] = useState(CSV_COLS.join(",") + "\n");
+  const [enviando, setEnviando] = useState(false);
+  const [nombreArch, setNombreArch] = useState("");
+  const cargarArchivo = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    try { setCsv(await f.text()); setNombreArch(f.name); } catch { onErr("No se pudo leer el archivo"); }
+    e.target.value = ""; // permite volver a elegir el mismo archivo
+  };
+  const filas = csv.replace(/\r\n|\r/g, "\n").split("\n").filter((l) => l.trim()).length;
+  const subir = async () => {
+    if (enviando) return;
+    setEnviando(true);
+    try { onSaved(await importarCsv(csv)); } catch (e) { onErr((e as Error).message); onClose(); }
+    finally { setEnviando(false); }
+  };
   return (
     <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card">
         <div className="modal-head"><h2>Importar CSV</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
         <div className="modal-body">
-          <span className="hint">Columnas: codigo_barras, nombre, precio_usd, costo_usd, categoria, stock, stock_minimo. Si el código ya existe, se actualiza.</span>
-          <textarea className="inp" style={{ height: 180, padding: 12, fontFamily: "var(--mono)", fontSize: 12, lineHeight: 1.5 }} value={csv} onChange={(e) => setCsv(e.target.value)} />
+          <span className="hint">Columnas: codigo_barras, nombre, precio_usd, costo_usd, categoria, stock, stock_minimo. Si el código ya existe, se actualiza su precio y datos. Puedes <b>Exportar</b> primero para tener la plantilla con tus productos.</span>
+          <label className="btn2 press csv-file"><UIcono k="box" sw={1.9} />Elegir archivo CSV<input type="file" accept=".csv,text/csv" hidden onChange={cargarArchivo} aria-label="Archivo CSV" /></label>
+          {nombreArch && <span className="pill ok csv-arch">{nombreArch} · {Math.max(0, filas - 1)} fila(s)</span>}
+          <span className="hint">O pega/edita el CSV aquí:</span>
+          <textarea className="inp" style={{ height: 150, padding: 12, fontFamily: "var(--mono)", fontSize: 12, lineHeight: 1.5 }} value={csv} onChange={(e) => { setCsv(e.target.value); setNombreArch(""); }} aria-label="Contenido del CSV" />
         </div>
-        <div className="modal-foot"><button className="btn primary big press" onClick={subir}>Importar</button></div>
+        <div className="modal-foot"><button className="btn primary big press" disabled={enviando || filas <= 1} onClick={subir}>{enviando ? "Importando…" : "Importar " + Math.max(0, filas - 1) + " producto(s)"}</button></div>
       </div>
     </div>
   );

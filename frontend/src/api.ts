@@ -135,6 +135,9 @@ export async function crearProducto(d: DatosProducto): Promise<Producto> {
 export async function actualizarProducto(id: number, d: DatosProducto): Promise<Producto> {
   return parse(await fetch("/api/inventario/productos/" + id, { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(d) }));
 }
+export async function eliminarProducto(id: number): Promise<void> {
+  await parse(await fetch("/api/inventario/productos/" + id, { method: "DELETE", headers: auth() }));
+}
 // ---------- Categorías ----------
 export interface Categoria { nombre: string; productos: number; }
 export async function listarCategorias(): Promise<Categoria[]> { return parse(await fetch("/api/inventario/categorias", { headers: auth() })); }

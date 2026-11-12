@@ -146,10 +146,10 @@ public class InventarioService {
                     num(c, 2),
                     num(c, 3),
                     celda(c, 4, "General"),
-                    num(c, 6),
+                    num(c, 5),
                     false,
                     "UND",
-                    num(c, 5));
+                    num(c, 6));
             Producto existente = productoRepository.findByCodigoBarras(codigo).orElse(null);
             if (existente == null) {
                 crear(datos);

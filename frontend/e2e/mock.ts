@@ -26,7 +26,8 @@ export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: a
   contab?: Record<string, { contenido: string; version: number }>; contabPuts?: number;
   prueba?: boolean; planCambio?: any; sesionVencida?: boolean;
   bloques?: any[]; bloquesPut?: { productoId: number; lista: any[] }; puntos?: any[];
-  usuarios?: any[]; cajasLista?: any[]; usuarioBorrado?: number; usuarioEditado?: any; cajaBorrada?: number; cajaEditada?: any; }
+  usuarios?: any[]; cajasLista?: any[]; usuarioBorrado?: number; usuarioEditado?: any; cajaBorrada?: number; cajaEditada?: any;
+  csvImport?: string; productoBorrado?: number; }
 
 export const ventasDemo = [
   { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
@@ -130,6 +131,8 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
       st.bloquesPut = { productoId, lista };
       return r.fulfill({ json: lista.map((b: any, i: number) => ({ id: 100 + i, productoId, ...b })) });
     }
+    if (u.includes("/api/inventario/importar")) { st.csvImport = r.request().postData() || ""; return r.fulfill({ json: { creados: 2, actualizados: 1 } }); }
+    if (/\/api\/inventario\/productos\/\d+$/.test(u) && m === "DELETE") { st.productoBorrado = Number(u.split("/").pop()); return r.fulfill({ json: { eliminado: true } }); }
     if (u.includes("/api/inventario/productos") && (m === "POST" || m === "PUT")) { st.producto = { metodo: m, ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: productos[0] }); }
     if (u.includes("/api/inventario")) return r.fulfill({ json: productos });
     if (u.includes("/api/tasa")) return r.fulfill({ json: { bs: st.tasa === undefined ? 900 : st.tasa } });

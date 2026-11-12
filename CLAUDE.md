@@ -631,3 +631,19 @@ el alta/venta/login (try/catch + log).
   `CajaService.renombrar` y `borrar` (desactiva la caja y **borra su CajaToken** → libera cupo del plan; el equipo
   debe registrarse de nuevo). En la UI cada fila trae Editar/Eliminar; el dueño y Soporte no se editan/borran, ni
   uno a sí mismo. Prueba: `e2e/equipo.spec.ts`; verificado contra Postgres real.
+
+## 31. Inventario CSV (import archivo + export) + eliminar producto + enlaces con sesión
+
+- **Importar CSV desde archivo** (`screens/Inventario.tsx` FormCsv): botón "Elegir archivo CSV" (`<input type=file>`
+  → textarea) además de pegar/editar; botón "Importar N producto(s)". Columnas:
+  codigo_barras,nombre,precio_usd,costo_usd,categoria,stock,stock_minimo (upsert por código).
+- **Exportar CSV** (`exportarCsv`, botón "Exportar" en la barra): descarga `inventario-YYYY-MM-DD.csv` con esas mismas
+  columnas (BOM + CRLF, escape de comas/comillas), para editar en Excel y reimportar.
+- **Bug corregido:** `InventarioService.importarCsv` intercambiaba **stock** y **stock_minimo** (num(c,6)↔num(c,5));
+  ahora stock=col 5, stock_minimo=col 6. Aserción en `InventarioServiceTest.importarCsvHaceUpsert`.
+- **Eliminar producto** (FormAjuste → botón "Eliminar producto", `DELETE /api/inventario/productos/{id}` ya existía;
+  nueva `api.ts eliminarProducto`): borra "para siempre" (desenlaza líneas de venta, que guardan nombre/monto).
+- **Enlaces con sesión abierta** (`App.tsx`): un `#caja=TOKEN` (emparejar caja) o `#reset=TOKEN` (clave nueva) ahora
+  lleva SIEMPRE a la pantalla de entrada aunque ya haya sesión (antes el link "no hacía nada" si estabas logueado):
+  `linkDeEntrada` arranca sin sesión y cierra la guardada sin borrar el hash, para que Login lo lea.
+- Pruebas: `e2e/inventario2.spec.ts` (eliminar, importar archivo, exportar) y `e2e/link.spec.ts`; verificado contra Postgres real.
