@@ -26,7 +26,7 @@ export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: a
   contab?: Record<string, { contenido: string; version: number }>; contabPuts?: number;
   prueba?: boolean; planCambio?: any; sesionVencida?: boolean;
   bloques?: any[]; bloquesPut?: { productoId: number; lista: any[] }; puntos?: any[];
-  usuarios?: any[]; cajasLista?: any[]; usuarioBorrado?: number; usuarioEditado?: any; cajaBorrada?: number; cajaEditada?: any;
+  usuarios?: any[]; cajasLista?: any[]; usuarioBorrado?: number; usuarioEditado?: any; usuarioCreado?: any; cajaBorrada?: number; cajaEditada?: any;
   csvImport?: string; productoBorrado?: number; }
 
 export const ventasDemo = [
@@ -226,6 +226,7 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
       const id = Number(u.split("/").pop());
       if (m === "DELETE") { st.usuarioBorrado = id; st.usuarios = st.usuarios.filter((x) => x.id !== id); return r.fulfill({ json: { borrado: true } }); }
       if (m === "PUT") { const b = JSON.parse(r.request().postData() || "{}"); st.usuarioEditado = { id, ...b }; const x = st.usuarios.find((y) => y.id === id); if (x && b.nombreCompleto) x.nombreCompleto = b.nombreCompleto; return r.fulfill({ json: x ?? {} }); }
+      if (m === "POST") { const b = JSON.parse(r.request().postData() || "{}"); st.usuarioCreado = b; const nu = { id: (st.usuarios.length ? Math.max(...st.usuarios.map((x) => x.id)) : 0) + 1, nombreCompleto: b.nombreCompleto, rol: b.rol, activo: true, esSoporte: false }; st.usuarios.push(nu); return r.fulfill({ json: nu }); }
       return r.fulfill({ json: st.usuarios });
     }
     if (u.includes("/api/cajas")) {

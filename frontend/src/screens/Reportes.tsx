@@ -3,6 +3,7 @@ import { listarProductos, reporteDia, reporteRango, type Producto, type ReporteD
 import { descargarCsv, rangoDe, reporteCsv, type Periodo } from "../reporte-export";
 import { UIcono } from "../icons";
 import { PrimerosPasos } from "./PrimerosPasos";
+import { Cajeros } from "./Cajeros";
 
 const usd = (n: number) => "$ " + n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const bs = (n: number) => "Bs " + n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -40,6 +41,7 @@ export function Reportes({ onIr }: { onIr?: (tab: string) => void }) {
     <div className="caja">
       <div className="scroll pad rep">
         {onIr && <PrimerosPasos onIr={onIr} />}
+        {onIr && <Cajeros onIrEquipo={() => onIr("mas")} />}
         <div className="rep-bar">
           <div className="seg rep-per" role="tablist" aria-label="Período">
             {(["hoy", "semana", "mes"] as Periodo[]).map((p) => (

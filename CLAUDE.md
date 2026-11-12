@@ -647,3 +647,13 @@ el alta/venta/login (try/catch + log).
   lleva SIEMPRE a la pantalla de entrada aunque ya haya sesión (antes el link "no hacía nada" si estabas logueado):
   `linkDeEntrada` arranca sin sesión y cierra la guardada sin borrar el hash, para que Login lo lea.
 - Pruebas: `e2e/inventario2.spec.ts` (eliminar, importar archivo, exportar) y `e2e/link.spec.ts`; verificado contra Postgres real.
+
+## 32. Cajeros a la vista en el inicio del dueño
+
+- **Tarjeta "Tus cajeros"** (`screens/Cajeros.tsx`) arriba de Reportes (solo dueño/encargado, donde ya va
+  `PrimerosPasos`): al entrar con la cuenta de dueño ve la lista de sus cajeros (nombre + "entra con PIN"), con
+  Editar/Eliminar por fila (reusa `editarUsuario`/`borrarUsuario`). **Agregar cajero** abre un formulario corto
+  (nombre + PIN 4 dígitos → `crearUsuario({rol:"CAJERO"})`). Si no hay cajeros, estado vacío con "Agrega mi primer
+  cajero" (y aviso de crear una caja primero si tiene 0). Pie con el cupo del plan: "Tu plan permite N caja(s),
+  tienes M registrada(s)" (de `miSuscripcion().cajasContratadas` + `listarCajas`) y enlace a Equipo y cajas.
+- Pruebas: `e2e/cajeros.spec.ts`; verificado contra Postgres real.
