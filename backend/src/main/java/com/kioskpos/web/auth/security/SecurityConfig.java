@@ -41,7 +41,11 @@ public class SecurityConfig {
                         .requestMatchers("/api/admin/**").hasRole("SUPER_ADMIN")
                         // Crear cajas/usuarios y reportar pagos: solo dueño o encargado.
                         .requestMatchers(HttpMethod.POST, "/api/cajas").hasAnyRole("DUENO", "ENCARGADO")
+                        .requestMatchers(HttpMethod.PUT, "/api/cajas/**").hasAnyRole("DUENO", "ENCARGADO")
+                        .requestMatchers(HttpMethod.DELETE, "/api/cajas/**").hasAnyRole("DUENO", "ENCARGADO")
                         .requestMatchers(HttpMethod.POST, "/api/usuarios").hasAnyRole("DUENO", "ENCARGADO")
+                        .requestMatchers(HttpMethod.PUT, "/api/usuarios/**").hasAnyRole("DUENO", "ENCARGADO")
+                        .requestMatchers(HttpMethod.DELETE, "/api/usuarios/**").hasAnyRole("DUENO", "ENCARGADO")
                         .requestMatchers(HttpMethod.POST, "/api/mi-negocio/pagos").hasAnyRole("DUENO", "ENCARGADO")
                         // Editar config del negocio: solo dueño/encargado (el GET lo lee el cajero).
                         .requestMatchers(HttpMethod.PUT, "/api/mi-negocio/config").hasAnyRole("DUENO", "ENCARGADO")

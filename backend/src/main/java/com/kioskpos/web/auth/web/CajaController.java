@@ -4,8 +4,12 @@ import com.kioskpos.web.auth.Caja;
 import com.kioskpos.web.auth.CajaService;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
+import java.util.Map;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -37,6 +41,18 @@ public class CajaController {
                 .map(c -> new CajaResponse(c.getId(), c.getNombre(), c.getLocalId(),
                         c.isAutorizada(), c.isActiva()))
                 .toList();
+    }
+
+    @PutMapping("/{id}")
+    public CajaResponse renombrar(@PathVariable Long id, @RequestBody CrearCajaRequest req) {
+        Caja c = cajaService.renombrar(id, req.nombre());
+        return new CajaResponse(c.getId(), c.getNombre(), c.getLocalId(), c.isAutorizada(), c.isActiva());
+    }
+
+    @DeleteMapping("/{id}")
+    public Map<String, Object> borrar(@PathVariable Long id) {
+        cajaService.borrar(id);
+        return Map.of("borrada", true);
     }
 
     public record CrearCajaRequest(@NotBlank String nombre, Long localId) {

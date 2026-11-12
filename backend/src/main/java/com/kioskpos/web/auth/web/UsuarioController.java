@@ -6,8 +6,12 @@ import com.kioskpos.web.auth.UsuarioService;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import java.util.List;
+import java.util.Map;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,12 +39,26 @@ public class UsuarioController {
         return usuarioService.listar().stream().map(UsuarioResponse::de).toList();
     }
 
+    @PutMapping("/{id}")
+    public UsuarioResponse editar(@PathVariable Long id, @RequestBody EditarUsuarioRequest req) {
+        return UsuarioResponse.de(usuarioService.editar(id, req.nombreCompleto(), req.pin(), req.password()));
+    }
+
+    @DeleteMapping("/{id}")
+    public Map<String, Object> borrar(@PathVariable Long id) {
+        usuarioService.borrar(id);
+        return Map.of("borrado", true);
+    }
+
     public record CrearUsuarioRequest(
             @NotNull RolUsuario rol,
             @NotBlank String nombreCompleto,
             String email,
             String password,
             String pin) {
+    }
+
+    public record EditarUsuarioRequest(String nombreCompleto, String password, String pin) {
     }
 
     public record UsuarioResponse(Long id, String nombreCompleto, RolUsuario rol,

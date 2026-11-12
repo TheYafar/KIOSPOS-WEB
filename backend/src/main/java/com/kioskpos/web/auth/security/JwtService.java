@@ -43,7 +43,7 @@ public class JwtService {
 
     public JwtService(
             @Value("${kioskpos.jwt.secret}") String secret,
-            @Value("${kioskpos.jwt.ttl-minutes:720}") long sesionTtlMinutes,
+            @Value("${kioskpos.jwt.ttl-minutes:129600}") long sesionTtlMinutes,
             @Value("${kioskpos.permiso.lease-minutes:10}") long permisoTtlMinutes,
             @Value("${kioskpos.jwt.secret-anterior:}") String secretAnterior) {
         this.key = clave(secret);

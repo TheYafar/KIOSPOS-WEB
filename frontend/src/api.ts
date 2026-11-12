@@ -403,12 +403,24 @@ export async function listarUsuarios(): Promise<Usuario[]> { return parse(await 
 export async function crearUsuario(body: { rol: Rol; nombreCompleto: string; email?: string; password?: string; pin?: string }): Promise<Usuario> {
   return parse(await fetch("/api/usuarios", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
 }
+export async function editarUsuario(id: number, body: { nombreCompleto?: string; password?: string; pin?: string }): Promise<Usuario> {
+  return parse(await fetch(`/api/usuarios/${id}`, { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+export async function borrarUsuario(id: number): Promise<void> {
+  await parse(await fetch(`/api/usuarios/${id}`, { method: "DELETE", headers: auth() }));
+}
 
 export interface CajaInfo { id: number; nombre: string; localId: number; autorizada: boolean; activa: boolean; }
 export interface CajaCreada extends CajaInfo { cajaToken: string; }
 export async function listarCajas(): Promise<CajaInfo[]> { return parse(await fetch("/api/cajas", { headers: auth() })); }
 export async function crearCaja(nombre: string): Promise<CajaCreada> {
   return parse(await fetch("/api/cajas", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ nombre }) }));
+}
+export async function renombrarCaja(id: number, nombre: string): Promise<CajaInfo> {
+  return parse(await fetch(`/api/cajas/${id}`, { method: "PUT", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ nombre }) }));
+}
+export async function borrarCaja(id: number): Promise<void> {
+  await parse(await fetch(`/api/cajas/${id}`, { method: "DELETE", headers: auth() }));
 }
 
 // ---------- Super admin ----------

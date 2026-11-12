@@ -139,6 +139,47 @@ public class UsuarioService {
         usuarioRepository.save(usuario);
     }
 
+    /**
+     * Edita un usuario: nombre, y opcionalmente el PIN (cajero) o la contraseña (dueño/encargado).
+     * No cambia el rol. El dueño/encargado edita a los suyos.
+     */
+    @Transactional
+    public Usuario editar(Long id, String nombreCompleto, String pin, String password) {
+        Usuario u = usuarioRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Usuario no encontrado"));
+        if (u.isEsSoporte()) {
+            throw new IllegalArgumentException("El usuario de Soporte Técnico no se edita; puedes desactivarlo.");
+        }
+        if (nombreCompleto != null && !nombreCompleto.trim().isEmpty()) {
+            u.setNombreCompleto(nombreCompleto.trim());
+        }
+        if (u.getRol() == RolUsuario.CAJERO) {
+            if (pin != null && !pin.trim().isEmpty()) {
+                exigirPin(pin);
+                u.setPinHash(passwordEncoder.encode(pin.trim()));
+            }
+        } else if (password != null && !password.trim().isEmpty()) {
+            if (password.trim().length() < 6) {
+                throw new IllegalArgumentException("La contraseña debe tener al menos 6 caracteres");
+            }
+            CuentaLogin cuenta = cuentaLoginRepository.findByUsuarioId(id)
+                    .orElseThrow(() -> new IllegalArgumentException("Ese usuario no tiene cuenta de correo"));
+            cuenta.setPasswordHash(passwordEncoder.encode(password.trim()));
+            cuentaLoginRepository.save(cuenta);
+        }
+        return usuarioRepository.save(u);
+    }
+
+    /**
+     * Borra (desactiva) un usuario: deja de salir en la lista y no puede entrar. También
+     * desactiva su cuenta de correo. No permite quedarse sin ningún dueño activo.
+     */
+    @Transactional
+    public void borrar(Long id) {
+        desactivar(id);
+        cuentaLoginRepository.findByUsuarioId(id).ifPresent(c -> { c.setActivo(false); cuentaLoginRepository.save(c); });
+    }
+
     private void exigirTexto(String v, String msg) {
         if (v == null || v.trim().isEmpty()) {
             throw new IllegalArgumentException(msg);

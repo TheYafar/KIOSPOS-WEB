@@ -71,7 +71,7 @@ kioskpos:
     secret: ${KIOSKPOS_JWT_SECRET:dev-secret-cambiar-en-produccion-min-32-bytes!!}
     # Rotación: la clave VIEJA aquí unas horas (se acepta, no se firma con ella). Ver DESPLIEGUE.md.
     secret-anterior: ${KIOSKPOS_JWT_SECRET_ANTERIOR:}
-    ttl-minutes: ${KIOSKPOS_JWT_TTL_MINUTES:720}
+    ttl-minutes: ${KIOSKPOS_JWT_TTL_MINUTES:129600}
   mail:
     # El correo solo se envía si enabled=true Y hay MAIL_HOST configurado.
     enabled: ${MAIL_ENABLED:false}

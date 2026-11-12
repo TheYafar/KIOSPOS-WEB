@@ -25,7 +25,8 @@ export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: a
   recargas?: any[]; rango?: any; configNeg?: any;
   contab?: Record<string, { contenido: string; version: number }>; contabPuts?: number;
   prueba?: boolean; planCambio?: any; sesionVencida?: boolean;
-  bloques?: any[]; bloquesPut?: { productoId: number; lista: any[] }; puntos?: any[]; }
+  bloques?: any[]; bloquesPut?: { productoId: number; lista: any[] }; puntos?: any[];
+  usuarios?: any[]; cajasLista?: any[]; usuarioBorrado?: number; usuarioEditado?: any; cajaBorrada?: number; cajaEditada?: any; }
 
 export const ventasDemo = [
   { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
@@ -217,7 +218,21 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
       return r.fulfill({ json: { ...situacionDemo(st), plan: p.codigo, planNombre: p.nombre, cajasContratadas: st.planCambio.cajas, mensualidad: p.precioBase + Math.max(0, st.planCambio.cajas - p.cajasIncluidas) * p.precioCajaExtra } });
     }
     if (u.includes("/api/mi-negocio/suscripcion")) return r.fulfill({ json: situacionDemo(st) });
-    if (/\/api\/(usuarios|cajas|reportes\/cierres|mi-negocio\/pagos|admin\/pagos-pendientes)/.test(u)) return r.fulfill({ json: [] });
+    if (u.includes("/api/usuarios")) {
+      st.usuarios ??= [{ id: 1, nombreCompleto: "Diego Hernández", rol: "DUENO", activo: true, esSoporte: false }, { id: 2, nombreCompleto: "cajero1", rol: "CAJERO", activo: true, esSoporte: false }];
+      const id = Number(u.split("/").pop());
+      if (m === "DELETE") { st.usuarioBorrado = id; st.usuarios = st.usuarios.filter((x) => x.id !== id); return r.fulfill({ json: { borrado: true } }); }
+      if (m === "PUT") { const b = JSON.parse(r.request().postData() || "{}"); st.usuarioEditado = { id, ...b }; const x = st.usuarios.find((y) => y.id === id); if (x && b.nombreCompleto) x.nombreCompleto = b.nombreCompleto; return r.fulfill({ json: x ?? {} }); }
+      return r.fulfill({ json: st.usuarios });
+    }
+    if (u.includes("/api/cajas")) {
+      st.cajasLista ??= [{ id: 1, nombre: "Caja 1", localId: 1, autorizada: true, activa: true }];
+      const id = Number(u.split("/").pop());
+      if (m === "DELETE") { st.cajaBorrada = id; st.cajasLista = st.cajasLista.filter((x) => x.id !== id); return r.fulfill({ json: { borrada: true } }); }
+      if (m === "PUT") { const b = JSON.parse(r.request().postData() || "{}"); st.cajaEditada = { id, ...b }; const x = st.cajasLista.find((y) => y.id === id); if (x) x.nombre = b.nombre; return r.fulfill({ json: x ?? {} }); }
+      return r.fulfill({ json: st.cajasLista });
+    }
+    if (/\/api\/(reportes\/cierres|mi-negocio\/pagos|admin\/pagos-pendientes)/.test(u)) return r.fulfill({ json: [] });
     if (u.includes("/api/reportes/dia")) return r.fulfill({ json: { fecha: "2026-11-10", cantidadVentas: 0, totalUsd: 0, totalBs: 0, costoUsd: 0, gananciaUsd: 0, pagos: [] } });
     return r.fulfill({ json: {} });
   });

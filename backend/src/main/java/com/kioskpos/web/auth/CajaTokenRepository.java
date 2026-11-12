@@ -9,4 +9,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
  */
 public interface CajaTokenRepository extends JpaRepository<CajaToken, Long> {
     Optional<CajaToken> findByTokenHash(String tokenHash);
+    void deleteByCajaId(Long cajaId);
 }

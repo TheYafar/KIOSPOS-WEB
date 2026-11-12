@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { crearCaja, crearUsuario, listarCajas, listarUsuarios, type CajaInfo, type Usuario } from "../api";
-import { type Rol } from "../session";
+import { borrarCaja, borrarUsuario, crearCaja, crearUsuario, editarUsuario, listarCajas, listarUsuarios, renombrarCaja, type CajaInfo, type Usuario } from "../api";
+import { getSesion, type Rol } from "../session";
+import { UIcono } from "../icons";
 import { MiPlan } from "./MiPlan";
 import { AjustesNegocio } from "./negocio";
 
@@ -10,12 +11,24 @@ export function Usuarios({ onSalir }: { onSalir: () => void }) {
   const [usuarios, setUsuarios] = useState<Usuario[]>([]);
   const [cajas, setCajas] = useState<CajaInfo[]>([]);
   const [modal, setModal] = useState<null | "usuario" | "caja">(null);
+  const [editUsuario, setEditUsuario] = useState<Usuario | null>(null);
+  const [editCaja, setEditCaja] = useState<CajaInfo | null>(null);
   const [tokenNuevo, setTokenNuevo] = useState<string | null>(null);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
+  const miId = getSesion()?.usuarioId;
 
   const cargar = async () => { try { setUsuarios(await listarUsuarios()); setCajas(await listarCajas()); } catch (e) { setErr((e as Error).message); } };
   useEffect(() => { cargar(); }, []);
+  const avisar = (t: string) => { setMsg(t); setTimeout(() => setMsg(""), 2500); };
+  const eliminarUsuario = async (u: Usuario) => {
+    if (!window.confirm(`¿Eliminar a ${u.nombreCompleto}? No podrá entrar y dejará de salir en la lista.`)) return;
+    try { await borrarUsuario(u.id); avisar("Usuario eliminado"); cargar(); } catch (e) { setErr((e as Error).message); }
+  };
+  const eliminarCaja = async (c: CajaInfo) => {
+    if (!window.confirm(`¿Eliminar la caja "${c.nombre}"? El equipo que la tiene configurada ya no podrá cobrar y tendrás que registrarla de nuevo.`)) return;
+    try { await borrarCaja(c.id); avisar("Caja eliminada"); cargar(); } catch (e) { setErr((e as Error).message); }
+  };
 
   return (
     <div className="caja">
@@ -34,14 +47,24 @@ export function Usuarios({ onSalir }: { onSalir: () => void }) {
         {err && <p className="noresult">{err}</p>}
         <span className="k" style={{ color: "var(--text-2)", fontWeight: 500 }}>Usuarios</span>
         {usuarios.map((u) => (
-          <div className="irow" key={u.id} style={{ gridTemplateColumns: "1fr auto" }}>
-            <div><div className="nm">{u.nombreCompleto}</div><div className="mt"><span className="pill upd" style={{ background: "var(--surface-3)", color: "var(--text-2)", height: 22, padding: "0 8px" }}>{ROL_N[u.rol] || u.rol}</span>{!u.activo && <span className="mg-bad">inactivo</span>}</div></div>
+          <div className="irow eq-row" key={u.id}>
+            <div><div className="nm">{u.nombreCompleto}</div><div className="mt"><span className="pill upd" style={{ background: "var(--surface-3)", color: "var(--text-2)", height: 22, padding: "0 8px" }}>{ROL_N[u.rol] || u.rol}</span>{!u.activo && <span className="mg-bad">inactivo</span>}{u.id === miId && <small> · tú</small>}</div></div>
+            {!u.esSoporte && u.rol !== "DUENO" && (
+              <div className="eq-acc">
+                <button className="btn2 sm press" onClick={() => setEditUsuario(u)}>Editar</button>
+                {u.id !== miId && <button className="btn2 sm press eq-del" aria-label={"Eliminar " + u.nombreCompleto} onClick={() => eliminarUsuario(u)}><UIcono k="del" sw={2} /></button>}
+              </div>
+            )}
           </div>
         ))}
         <span className="k" style={{ color: "var(--text-2)", fontWeight: 500, marginTop: 8 }}>Cajas</span>
         {cajas.map((c) => (
-          <div className="irow" key={c.id} style={{ gridTemplateColumns: "1fr auto" }}>
+          <div className="irow eq-row" key={c.id}>
             <div><div className="nm">{c.nombre}</div><div className="mt">{c.autorizada ? "Autorizada" : "Sin autorizar"} · {c.activa ? "activa" : "inactiva"}</div></div>
+            <div className="eq-acc">
+              <button className="btn2 sm press" onClick={() => setEditCaja(c)}>Editar</button>
+              <button className="btn2 sm press eq-del" aria-label={"Eliminar " + c.nombre} onClick={() => eliminarCaja(c)}><UIcono k="del" sw={2} /></button>
+            </div>
           </div>
         ))}
         {cajas.length === 0 && <p className="noresult">Sin cajas. Crea una para registrar un equipo.</p>}
@@ -50,8 +73,10 @@ export function Usuarios({ onSalir }: { onSalir: () => void }) {
         </div>
       </div>
 
-      {modal === "usuario" && <FormUsuario onClose={() => setModal(null)} onSaved={() => { setModal(null); setMsg("Usuario creado"); cargar(); }} onErr={setErr} />}
-      {modal === "caja" && <FormCaja onClose={() => setModal(null)} onToken={(t) => { setModal(null); setTokenNuevo(t); setMsg("Caja creada"); cargar(); }} onErr={setErr} />}
+      {modal === "usuario" && <FormUsuario onClose={() => setModal(null)} onSaved={() => { setModal(null); avisar("Usuario creado"); cargar(); }} onErr={setErr} />}
+      {modal === "caja" && <FormCaja onClose={() => setModal(null)} onToken={(t) => { setModal(null); setTokenNuevo(t); avisar("Caja creada"); cargar(); }} onErr={setErr} />}
+      {editUsuario && <EditarUsuario usuario={editUsuario} onClose={() => setEditUsuario(null)} onSaved={() => { setEditUsuario(null); avisar("Usuario actualizado"); cargar(); }} onErr={setErr} />}
+      {editCaja && <EditarCaja caja={editCaja} onClose={() => setEditCaja(null)} onSaved={() => { setEditCaja(null); avisar("Caja actualizada"); cargar(); }} onErr={setErr} />}
       {tokenNuevo && <TokenCaja token={tokenNuevo} onClose={() => setTokenNuevo(null)} />}
     </div>
   );
@@ -88,6 +113,48 @@ function FormUsuario({ onClose, onSaved, onErr }: { onClose: () => void; onSaved
               </>}
         </div>
         <div className="modal-foot"><button className="cta center press" disabled={!ok} onClick={guardar}>Guardar</button></div>
+      </div>
+    </div>
+  );
+}
+
+function EditarUsuario({ usuario, onClose, onSaved, onErr }: { usuario: Usuario; onClose: () => void; onSaved: () => void; onErr: (s: string) => void }) {
+  const esCajero = usuario.rol === "CAJERO";
+  const [nombre, setNombre] = useState(usuario.nombreCompleto);
+  const [pin, setPin] = useState("");
+  const [password, setPassword] = useState("");
+  const ok = nombre.trim() && (!pin || /^\d{4}$/.test(pin)) && (!password || password.length >= 6);
+  const guardar = async () => {
+    try {
+      await editarUsuario(usuario.id, { nombreCompleto: nombre.trim(), ...(esCajero ? (pin ? { pin } : {}) : (password ? { password } : {})) });
+      onSaved();
+    } catch (e) { onErr((e as Error).message); onClose(); }
+  };
+  return (
+    <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-card">
+        <div className="modal-head"><h2>Editar {ROL_N[usuario.rol] || usuario.rol}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="modal-body">
+          <label className="lbl">Nombre completo<input className="inp" autoFocus value={nombre} onChange={(e) => setNombre(e.target.value)} /></label>
+          {esCajero
+            ? <label className="lbl">Cambiar PIN <span className="opt">(déjalo vacío para no cambiarlo)</span><input className="inp t" inputMode="numeric" value={pin} placeholder="4 dígitos" onChange={(e) => setPin(e.target.value.replace(/\D/g, "").slice(0, 4))} /></label>
+            : <label className="lbl">Cambiar contraseña <span className="opt">(vacío = no cambiar)</span><input className="inp" type="password" value={password} placeholder="mín. 6" onChange={(e) => setPassword(e.target.value)} /></label>}
+        </div>
+        <div className="modal-foot"><button className="cta center press" disabled={!ok} onClick={guardar}>Guardar</button></div>
+      </div>
+    </div>
+  );
+}
+
+function EditarCaja({ caja, onClose, onSaved, onErr }: { caja: CajaInfo; onClose: () => void; onSaved: () => void; onErr: (s: string) => void }) {
+  const [nombre, setNombre] = useState(caja.nombre);
+  const guardar = async () => { try { await renombrarCaja(caja.id, nombre.trim()); onSaved(); } catch (e) { onErr((e as Error).message); onClose(); } };
+  return (
+    <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-card">
+        <div className="modal-head"><h2>Editar caja</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="modal-body"><label className="lbl">Nombre de la caja<input className="inp" autoFocus value={nombre} onChange={(e) => setNombre(e.target.value)} /></label></div>
+        <div className="modal-foot"><button className="cta center press" disabled={!nombre.trim()} onClick={guardar}>Guardar</button></div>
       </div>
     </div>
   );

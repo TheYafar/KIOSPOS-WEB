@@ -66,6 +66,31 @@ public class CajaService {
         return cajaRepository.findByActivaTrue();
     }
 
+    /** Cambia el nombre de una caja. */
+    @Transactional
+    public Caja renombrar(Long id, String nombre) {
+        if (nombre == null || nombre.trim().isEmpty()) {
+            throw new IllegalArgumentException("El nombre de la caja es obligatorio");
+        }
+        Caja caja = cajaRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Caja no encontrada"));
+        caja.setNombre(nombre.trim());
+        return cajaRepository.save(caja);
+    }
+
+    /**
+     * Borra (desactiva) una caja y elimina su token: deja de contar para el plan y el
+     * equipo que la tenía configurada ya no puede cobrar (hay que registrarla de nuevo).
+     */
+    @Transactional
+    public void borrar(Long id) {
+        Caja caja = cajaRepository.findById(id)
+                .orElseThrow(() -> new IllegalArgumentException("Caja no encontrada"));
+        caja.setActiva(false);
+        cajaRepository.save(caja);
+        cajaTokenRepository.deleteByCajaId(id);
+    }
+
     private Long localPorDefecto(Long negocioId) {
         return localRepository.findByActivoTrue().stream()
                 .findFirst()

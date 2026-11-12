@@ -619,3 +619,15 @@ el alta/venta/login (try/catch + log).
   activo tiene su ficha TRABAJADOR (se crea o se liga por nombre al listar Crédito o Nómina), así sale al dar
   crédito al cobrar (selector con pestañas Todos | Clientes | **Trabajadores**) y en Nómina, donde se le descuenta.
 - Pruebas: `ServiciosEnVentaTest` (CI), `e2e/servicios.spec.ts`; probado contra Postgres real.
+
+## 30. Editar/eliminar equipo y sesión más larga
+
+- **Sesión larga:** `kioskpos.jwt.ttl-minutes` default 720→**129600 (90 días)** (JwtService + application.yml), para
+  que no se cierre la sesión del dueño/cajero a diario. Override por `KIOSKPOS_JWT_TTL_MINUTES`.
+- **Editar/eliminar usuarios y cajas** (pestaña Más → "Equipo y cajas", `screens/Usuarios.tsx`):
+  `PUT/DELETE /api/usuarios/{id}` y `PUT/DELETE /api/cajas/{id}` (solo dueño/encargado, SecurityConfig).
+  `UsuarioService.editar` (nombre + PIN del cajero o clave del dueño/encargado; no cambia rol; Soporte no se edita)
+  y `borrar` (desactiva usuario + su `cuenta_login`; `desactivar` ya impedía quedarse sin dueño activo).
+  `CajaService.renombrar` y `borrar` (desactiva la caja y **borra su CajaToken** → libera cupo del plan; el equipo
+  debe registrarse de nuevo). En la UI cada fila trae Editar/Eliminar; el dueño y Soporte no se editan/borran, ni
+  uno a sí mismo. Prueba: `e2e/equipo.spec.ts`; verificado contra Postgres real.

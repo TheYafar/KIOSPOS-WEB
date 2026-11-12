@@ -12,4 +12,6 @@ public interface CuentaLoginRepository extends JpaRepository<CuentaLogin, Long> 
     boolean existsByEmail(String email);
     /** La primera cuenta de un negocio es la del dueño (la crea el alta). Solo para el super admin. */
     Optional<CuentaLogin> findFirstByNegocioIdOrderByIdAsc(Long negocioId);
+    /** La cuenta de login de un usuario (para editar su correo/clave o desactivarla al borrarlo). */
+    Optional<CuentaLogin> findByUsuarioId(Long usuarioId);
 }
