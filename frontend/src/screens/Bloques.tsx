@@ -93,15 +93,28 @@ export function EditorBloques({ filas, setFilas, producto }: { filas: FilaBloque
         const precio = Number(f.precio.replace(",", ".")) || 0;
         const suelto = Math.round(producto.precioUsd * cant * 100) / 100;
         return (
-          <div className="blq-fila" key={i}>
-            <input className="inp" value={f.nombre} maxLength={60} placeholder="Nombre (Caja)" aria-label={"Nombre del bloque " + (i + 1)} onChange={(e) => cambiar(i, "nombre", e.target.value)} />
-            <div className="inpw"><input className="inp t" inputMode="decimal" value={f.cantidad} placeholder="Trae" aria-label={"Cuántas trae el bloque " + (i + 1)}
-              onChange={(e) => cambiar(i, "cantidad", e.target.value.replace(/[^\d.,]/g, ""))} /><i className="suf">{u}</i></div>
-            <div className="inpw"><i>$</i><input className="inp t pre" inputMode="decimal" value={f.precio} placeholder={suelto > 0 ? money(suelto) : "Precio"} aria-label={"Precio del bloque " + (i + 1)}
-              onChange={(e) => cambiar(i, "precio", e.target.value.replace(/[^\d.,]/g, ""))} /></div>
-            <input className="inp" value={f.codigo} placeholder="Código (opcional)" aria-label={"Código de barras del bloque " + (i + 1)} onChange={(e) => cambiar(i, "codigo", e.target.value)} />
-            <button className="ghost press blq-x" aria-label={"Quitar bloque " + (i + 1)} onClick={() => setFilas(filas.filter((_, j) => j !== i))}><UIcono k="close" sw={2} /></button>
-            {cant > 0 && precio > 0 && suelto > 0 && <small className="blq-nota t">{precio < suelto ? "Ahorra " + usd(suelto - precio) + " frente a " + cantBloque(cant) + " sueltos" : precio > suelto ? "Ojo: sale más caro que " + cantBloque(cant) + " sueltos (" + usd(suelto) + ")" : "Igual que sueltos"}</small>}
+          <div className="blq-card" key={i}>
+            <div className="blq-card-top">
+              <span className="blq-n">Bloque {i + 1}</span>
+              <button className="ghost press blq-x" aria-label={"Quitar bloque " + (i + 1)} onClick={() => setFilas(filas.filter((_, j) => j !== i))}><UIcono k="close" sw={2} /> Quitar</button>
+            </div>
+            <label className="lbl">Nombre
+              <input className="inp" value={f.nombre} maxLength={60} placeholder="Ej.: Caja, Media caja, Bulto" aria-label={"Nombre del bloque " + (i + 1)} onChange={(e) => cambiar(i, "nombre", e.target.value)} />
+            </label>
+            <div className="two blq-two">
+              <label className="lbl">Trae ({u})
+                <input className="inp t" inputMode="decimal" value={f.cantidad} placeholder="Ej.: 20" aria-label={"Cuántas trae el bloque " + (i + 1)}
+                  onChange={(e) => cambiar(i, "cantidad", e.target.value.replace(/[^\d.,]/g, ""))} />
+              </label>
+              <label className="lbl">Precio $
+                <input className="inp t" inputMode="decimal" value={f.precio} placeholder={suelto > 0 ? "Ej.: " + money(suelto) : "Ej.: 25"} aria-label={"Precio del bloque " + (i + 1)}
+                  onChange={(e) => cambiar(i, "precio", e.target.value.replace(/[^\d.,]/g, ""))} />
+              </label>
+            </div>
+            <label className="lbl">Código de barras <span className="opt">(opcional, si la caja trae el suyo)</span>
+              <input className="inp" value={f.codigo} placeholder="Escanéalo o déjalo vacío" aria-label={"Código de barras del bloque " + (i + 1)} onChange={(e) => cambiar(i, "codigo", e.target.value)} />
+            </label>
+            {cant > 0 && precio > 0 && suelto > 0 && <small className={"blq-nota t" + (precio > suelto ? " mal" : "")}>{precio < suelto ? "Ahorra " + usd(suelto - precio) + " frente a " + cantBloque(cant) + " sueltos" : precio > suelto ? "Ojo: sale más caro que " + cantBloque(cant) + " sueltos (" + usd(suelto) + ")" : "Igual que sueltos"}</small>}
           </div>
         );
       })}
