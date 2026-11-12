@@ -1661,8 +1661,6 @@ html[data-tam="muy-grande"] body { zoom:1.3; }
 .blq-card-top { display:flex; justify-content:space-between; align-items:center; }
 .blq-n { font-size:13px; font-weight:700; color:var(--primary); text-transform:uppercase; letter-spacing:.04em; }
 .blq-card .inp { min-width:0; width:100%; }
-.blq-nota { color:var(--ok, var(--text-2)); font-size:12.5px; font-weight:500; }
-.blq-nota.mal { color:var(--bad); }
 .blq-x { display:inline-flex; align-items:center; gap:4px; padding:6px 10px; font-size:13px; }
 .blq-x svg { width:15px; height:15px; }
 .blq-sug { display:flex; flex-wrap:wrap; gap:6px; }

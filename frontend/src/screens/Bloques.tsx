@@ -90,7 +90,6 @@ export function EditorBloques({ filas, setFilas, producto }: { filas: FilaBloque
       <div className="blq-ed-head"><b>Se vende también por bloques</b><small>Ej.: una caja trae 20 y la media caja 10. Suelto se vende al precio normal.</small></div>
       {filas.map((f, i) => {
         const cant = Number(f.cantidad.replace(",", ".")) || 0;
-        const precio = Number(f.precio.replace(",", ".")) || 0;
         const suelto = Math.round(producto.precioUsd * cant * 100) / 100;
         return (
           <div className="blq-card" key={i}>
@@ -114,7 +113,6 @@ export function EditorBloques({ filas, setFilas, producto }: { filas: FilaBloque
             <label className="lbl">Código de barras <span className="opt">(opcional, si la caja trae el suyo)</span>
               <input className="inp" value={f.codigo} placeholder="Escanéalo o déjalo vacío" aria-label={"Código de barras del bloque " + (i + 1)} onChange={(e) => cambiar(i, "codigo", e.target.value)} />
             </label>
-            {cant > 0 && precio > 0 && suelto > 0 && <small className={"blq-nota t" + (precio > suelto ? " mal" : "")}>{precio < suelto ? "Ahorra " + usd(suelto - precio) + " frente a " + cantBloque(cant) + " sueltos" : precio > suelto ? "Ojo: sale más caro que " + cantBloque(cant) + " sueltos (" + usd(suelto) + ")" : "Igual que sueltos"}</small>}
           </div>
         );
       })}

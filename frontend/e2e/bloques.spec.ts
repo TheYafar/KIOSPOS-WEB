@@ -20,7 +20,6 @@ test("el dueño le pone bloques a un producto (caja de 20) al editarlo", async (
   await expect(page.getByLabel("Nombre del bloque 1")).toHaveValue("Caja");
   await expect(page.getByLabel("Cuántas trae el bloque 1")).toHaveValue("20");
   await page.getByLabel("Precio del bloque 1").fill("18");
-  await expect(page.locator(".blq-nota")).toContainText("Ahorra $ 2,00 frente a 20 sueltos");
   await page.getByRole("button", { name: "Guardar" }).click();
   await expect(page.locator(".pill.ok")).toContainText("Producto actualizado");
   expect(st.bloquesPut).toEqual({ productoId: 1, lista: [{ nombre: "Caja", cantidad: 20, precioUsd: 18, codigoBarras: null }] });

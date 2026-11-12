@@ -569,7 +569,7 @@ el alta/venta/login (try/catch + log).
   `cantidad` = bloques, precio del bloque, nombre "Producto (Caja x20)" y **`detalle_ventas.unidades`** (V25):
   el stock se mueve `cantidad × unidades` al vender, **anular** y **devolver**; el costo de la línea es
   costo × unidades (ganancia correcta). PWA: editor en Inventario → Editar (`screens/Bloques.tsx`, sugerencias
-  Caja/Media caja/Bulto/Paquete, avisa el ahorro), y en la Caja tocar un producto con bloques abre "¿Cómo se lo
+  Caja/Media caja/Bulto/Paquete), y en la Caja tocar un producto con bloques abre "¿Cómo se lo
   lleva?" (teclas 1..n); el código de barras de un bloque lo agrega directo. Copia local `kp_bloques` para vender
   sin internet. Prueba: `PresentacionVentaTest` (CI) + `e2e/bloques.spec.ts`, `e2e/factura.spec.ts`.
 - **Pendiente:** "Dar a crédito" desde el perfil del cliente todavía vende solo por unidad (la venta normal con
