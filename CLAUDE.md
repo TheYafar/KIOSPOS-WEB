@@ -574,3 +574,25 @@ el alta/venta/login (try/catch + log).
   sin internet. Prueba: `PresentacionVentaTest` (CI) + `e2e/bloques.spec.ts`, `e2e/factura.spec.ts`.
 - **Pendiente:** "Dar a crédito" desde el perfil del cliente todavía vende solo por unidad (la venta normal con
   crédito sí admite bloques).
+
+## 28. Ticket con formato Cocoa + tickets de cierre del punto
+
+- **Ticket de venta** con el formato de Bodegas Cocoa (`TicketService.armar`, y el mismo en la PWA `src/ticket.ts`
+  para la vista previa de la caja y de Ajustes): líneas `=` arriba y abajo del encabezado (nombre + **frase bajo
+  el nombre** = `negocios.mensaje_ticket`, ej. "DIOS TODO PODEROSO", + RIF/dirección/teléfono), `FECHA : dd/MM/yyyy
+  hh:mm a. m.`, `FACTURA #: 000001`, `CLIENTE: Consumidor Final` (o el de crédito), `CANT  DESCRIPCION  PRECIO (Bs)`,
+  cada producto en MAYÚSCULAS con `(cant x Bs. unit)` y su total, `TOTAL EN BOLIVARES`, `FORMA DE PAGO` (`PUNTO
+  VES 315,00`…, vuelto). Ya no hay pie ni total en $. Pruebas: `TicketFormatoTest` (Java) y `ticket.test.ts`.
+- **Tickets de cierre del punto / Biopago** (**V26** `cierres_punto`, RLS; `cuadre/CierrePuntoService`):
+  comercio (titular), afiliado, lotes crédito/débito/Master-Visa, fecha/hora del ticket y 3 secciones (Tarjeta
+  crédito, Tarjeta débito, Debit Master/Visa) con compras y anulaciones (suma y monto); total = compras −
+  anulaciones. `POST /api/cierres-punto` (la caja: se ata a su turno abierto; dueño/encargado: sin turno),
+  `GET /api/cierres-punto/turno/{id}`, `GET /api/cierres-punto?desde&hasta` (**solo dueño/encargado**, trae caja,
+  cajero y lo que el sistema registró por ese medio en el turno), `DELETE /api/cierres-punto/{id}` (caja: solo los
+  de su turno abierto; dueño: cualquiera).
+- **PWA:** en **Cierre** la tarjeta "Tickets de cierre del punto" (`screens/CierresPunto.tsx`, formulario en el
+  mismo orden que el papel; recuerda comercio/afiliado por equipo; el lote de crédito se copia a los otros dos);
+  al guardar, "Contaste" de Punto/Biopago se llena con el total; si hubo ventas por punto/Biopago y no se anotó su
+  ticket, cerrar pide confirmar ("Cerrar sin ticket"). Dueño: pestaña **Puntos** (Alt+8; Más pasó a Alt+9) con
+  Hoy/Ayer/7 días/Este mes/un día, agrupado por día con fecha, día y hora, el ticket como el papel y la
+  diferencia contra el sistema. Pruebas: `CierrePuntoTest` (CI) y `e2e/puntos.spec.ts`.

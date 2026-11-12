@@ -512,3 +512,30 @@ export async function guardarDocContab(clave: "libro" | "hojas", contenido: stri
   if (r.status === 409) { const b = await r.json().catch(() => ({})); throw new ConflictoDoc(b?.actual ?? null); }
   return parse(r);
 }
+
+// ---------- Cierres del punto de venta / Biopago (tickets del banco) ----------
+export interface SeccionPunto { comprasN: number; compras: number; anulN: number; anul: number; }
+export interface CierrePunto {
+  id: number; turnoId: number | null; cajaId: number | null; usuarioId: number | null; tipo: "PUNTO" | "BIOPAGO";
+  titular: string | null; afiliado: string | null; loteCredito: string | null; loteDebito: string | null; loteMasterVisa: string | null;
+  fechaHora: string; credComprasN: number; credCompras: number; credAnulN: number; credAnul: number;
+  debComprasN: number; debCompras: number; debAnulN: number; debAnul: number;
+  mvComprasN: number; mvCompras: number; mvAnulN: number; mvAnul: number; totalBs: number; nota: string | null; createdAt: string;
+}
+export interface NuevoCierrePunto {
+  tipo: "PUNTO" | "BIOPAGO"; titular?: string; afiliado?: string; loteCredito?: string; loteDebito?: string; loteMasterVisa?: string;
+  fechaHora: string; credito: SeccionPunto; debito: SeccionPunto; masterVisa: SeccionPunto; nota?: string;
+}
+export interface CierrePuntoVista { cierre: CierrePunto; caja: string | null; cajero: string | null; sistemaBs: number | null; }
+export async function registrarCierrePunto(body: NuevoCierrePunto): Promise<CierrePunto> {
+  return parse(await fetch("/api/cierres-punto", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
+}
+export async function cierresPuntoDelTurno(turnoId: number): Promise<CierrePunto[]> {
+  return parse(await fetch(`/api/cierres-punto/turno/${turnoId}`, { headers: auth() }));
+}
+export async function cierresPuntoEntre(desde: string, hasta: string): Promise<CierrePuntoVista[]> {
+  return parse(await fetch(`/api/cierres-punto?desde=${desde}&hasta=${hasta}`, { headers: auth() }));
+}
+export async function borrarCierrePunto(id: number): Promise<void> {
+  await parse(await fetch(`/api/cierres-punto/${id}`, { method: "DELETE", headers: auth() }));
+}

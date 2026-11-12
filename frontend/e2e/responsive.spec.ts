@@ -6,7 +6,7 @@ const tamanos = [["movil", 390, 844], ["tablet", 820, 1180], ["pc", 1920, 1080]]
 const pantallas = [
   { n: "vender", ses: sesionCajero, tecla: "Alt+1" }, { n: "cierre", ses: sesionCajero, tecla: "Alt+2" },
   { n: "ventas", ses: sesionCajero, tecla: "Alt+3" }, { n: "fiado", ses: sesionDueno, tecla: "Alt+5" }, { n: "config", ses: sesionDueno, tecla: "Alt+7" }, { n: "nomina", ses: sesionDueno, tecla: "Alt+6" }, { n: "reportes", ses: sesionDueno, tecla: "Alt+1" },
-  { n: "productos", ses: sesionDueno, tecla: "Alt+3" }, { n: "mas", ses: sesionDueno, tecla: "Alt+8" },
+  { n: "productos", ses: sesionDueno, tecla: "Alt+3" }, { n: "puntos", ses: sesionDueno, tecla: "Alt+8" }, { n: "mas", ses: sesionDueno, tecla: "Alt+9" },
 ];
 for (const [t, w, h] of tamanos) {
   for (const p of pantallas) {

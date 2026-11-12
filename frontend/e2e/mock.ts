@@ -25,7 +25,7 @@ export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: a
   recargas?: any[]; rango?: any; configNeg?: any;
   contab?: Record<string, { contenido: string; version: number }>; contabPuts?: number;
   prueba?: boolean; planCambio?: any; sesionVencida?: boolean;
-  bloques?: any[]; bloquesPut?: { productoId: number; lista: any[] }; }
+  bloques?: any[]; bloquesPut?: { productoId: number; lista: any[] }; puntos?: any[]; }
 
 export const ventasDemo = [
   { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
@@ -104,6 +104,24 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     if (u.includes("/api/inventario/categorias")) {
       if (m !== "GET") { st.categoria = { metodo: m, ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { nombre: "x", productos: 0 } }); }
       return r.fulfill({ json: [{ nombre: "Bebidas", productos: 1 }, { nombre: "Charcutería", productos: 1 }, { nombre: "General", productos: 0 }, { nombre: "Víveres", productos: 2 }] });
+    }
+    if (u.includes("/api/cierres-punto")) {
+      const lista = (st.puntos ??= []);
+      if (m === "POST") {
+        const b = JSON.parse(r.request().postData() || "{}");
+        const sec = (x: any) => ({ n: x?.comprasN || 0, c: x?.compras || 0, an: x?.anulN || 0, a: x?.anul || 0 });
+        const cr = sec(b.credito), de = sec(b.debito), mv = sec(b.masterVisa);
+        const c = { id: lista.length + 1, turnoId: 7, cajaId: 1, usuarioId: 2, tipo: b.tipo, titular: b.titular ?? null, afiliado: b.afiliado ?? null,
+          loteCredito: b.loteCredito ?? null, loteDebito: b.loteDebito ?? null, loteMasterVisa: b.loteMasterVisa ?? null, fechaHora: b.fechaHora,
+          credComprasN: cr.n, credCompras: cr.c, credAnulN: cr.an, credAnul: cr.a, debComprasN: de.n, debCompras: de.c, debAnulN: de.an, debAnul: de.a,
+          mvComprasN: mv.n, mvCompras: mv.c, mvAnulN: mv.an, mvAnul: mv.a, totalBs: Math.round((cr.c - cr.a + de.c - de.a + mv.c - mv.a) * 100) / 100,
+          nota: b.nota ?? null, createdAt: new Date().toISOString(), _body: b };
+        lista.push(c);
+        return r.fulfill({ json: c });
+      }
+      if (m === "DELETE") { const id = Number(u.split("/").pop()); st.puntos = lista.filter((x) => x.id !== id); return r.fulfill({ json: { borrado: true } }); }
+      if (u.includes("/turno/")) return r.fulfill({ json: lista });
+      return r.fulfill({ json: lista.map((c) => ({ cierre: c, caja: "Caja 1", cajero: "Ana Pérez", sistemaBs: 13500 })) });
     }
     if (u.includes("/api/inventario/presentaciones")) return r.fulfill({ json: st.bloques ?? [] });
     if (/\/api\/inventario\/productos\/\d+\/presentaciones/.test(u)) {

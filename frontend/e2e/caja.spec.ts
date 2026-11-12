@@ -41,6 +41,9 @@ test("la caja completa se usa solo con teclado: entrar, vender, cobrar y cerrar"
   await expect(page.locator(".arq-alerta")).toContainText("Falta $ 2,00 en Efectivo $");
   await page.keyboard.type("Faltan $2");
   await k("Control+Enter");
+  // Hubo ventas por punto y no se anotó su ticket de cierre: pide confirmar.
+  await expect(page.getByText(/Falta anotar el ticket de cierre de Punto de venta/)).toBeVisible();
+  await k("Control+Enter");
   await expect(page.getByText("Detalle del cierre")).toBeVisible();
   expect(st.cierre).toMatchObject({ declaradoUsd: 60, declaradoBs: 9000, observaciones: "Faltan $2" });
   const det = JSON.parse(st.cierre.arqueoDetalle);

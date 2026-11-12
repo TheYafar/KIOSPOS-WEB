@@ -6,6 +6,7 @@ import { calcularArqueo, leerMonto, type FilaArqueo } from "../arqueo";
 import { conectorDisponible, imprimirTicket } from "../conector";
 import { metodoActivo } from "../config";
 import { MovimientosCaja } from "./MovimientosCaja";
+import { CierresPuntoTurno } from "./CierresPunto";
 
 /** Días (calendario de Venezuela) que lleva abierto un turno: 0 = abierto hoy. */
 export function diasAbierto(iso?: string): number {
@@ -81,6 +82,9 @@ export function Cuadre() {
   const [cerrando, setCerrando] = useState(false);
   const [confirmar, setConfirmar] = useState(false);
   const [aviso, setAviso] = useState("");
+  // Tickets de cierre del punto / Biopago anotados en el turno (total y cuántos por tipo).
+  const [puntos, setPuntos] = useState<Record<string, { total: number; n: number }>>({});
+  const [sinTicketOk, setSinTicketOk] = useState(false);
   const inputs = useRef<(HTMLInputElement | null)[]>([]);
   const obsRef = useRef<HTMLTextAreaElement>(null);
   const fondoRef = useRef<HTMLInputElement>(null);
@@ -120,7 +124,12 @@ export function Cuadre() {
     try { setTurno(await resumenTurno(turno.turnoId)); setErr(""); } catch (e) { setErr((e as Error).message); }
   };
 
-  const nuevo = () => { setCerrado(null); setTurno(null); setCont({}); setObs(""); setConfirmar(false); setAviso(""); };
+  const nuevo = () => { setCerrado(null); setTurno(null); setCont({}); setObs(""); setConfirmar(false); setAviso(""); setPuntos({}); setSinTicketOk(false); };
+  // Al anotar los tickets del punto, "Contaste" de Punto/Biopago se llena con su total.
+  const alTotalesPunto = (t: Record<string, { total: number; n: number }>) => {
+    setPuntos(t);
+    setCont((c) => { const n = { ...c }; for (const k of ["PUNTO", "BIOPAGO"]) if (t[k]) n[k] = money(t[k].total); return n; });
+  };
 
   if (cargando) return <div className="stub">Cargando…</div>;
 
@@ -229,8 +238,15 @@ export function Cuadre() {
     if (nx) nx.focus(); else obsRef.current?.focus();
   };
 
+  // Se vendió por punto/Biopago pero no se anotó su ticket de cierre.
+  const faltaTicket = ["PUNTO", "BIOPAGO"].filter((k) => metodos.some((m) => m.metodo === k && m.esperado > 0) && !puntos[k]);
   const cerrar = async () => {
     if (cerrando) return;
+    if (faltaTicket.length && !sinTicketOk) {
+      setSinTicketOk(true);
+      setAviso("Falta anotar el ticket de cierre de " + faltaTicket.map((k) => INFO[k].n).join(" y ") + ". Anótalo arriba (“Anotar ticket del punto”) o pulsa “Cerrar sin ticket”.");
+      return;
+    }
     if (!a.listo && !confirmar) {
       setConfirmar(true);
       setAviso("Te falta contar: " + a.filas.filter((f) => f.estado === "sin-contar").map((f) => INFO[f.metodo]?.n || f.metodo).join(", ") + ". Cuéntalas o pulsa “Cerrar igual”.");
@@ -284,6 +300,8 @@ export function Cuadre() {
 
       <MovimientosCaja turnoId={turno.turnoId} tasa={tasa} onCambio={refrescar} />
 
+      <CierresPuntoTurno turnoId={turno.turnoId} onTotales={alTotalesPunto} />
+
       <div className="card arq">
         <div className="arq-head">
           <div><h3 className="h3">Cuenta cada forma de pago</h3><span className="hint">Escribe lo que tienes en la mano. La app te dice si cuadra. <span className="kbtip">Enter: siguiente · F8: contar billetes · Ctrl+Enter: cerrar</span></span></div>
@@ -332,7 +350,7 @@ export function Cuadre() {
         {aviso && <p className="pinmsg err">{aviso}</p>}
         {err && <p className="pinmsg err">{err}</p>}
         <button className={"cta center press cz-cerrar" + (confirmar && !a.listo ? " warn" : "")} disabled={cerrando} onClick={cerrar}>
-          <UIcono k="check" sw={2.2} />{cerrando ? "Cerrando…" : confirmar && !a.listo ? "Cerrar igual" : "Cerrar turno"} <kbd className="kb">Ctrl+Enter</kbd>
+          <UIcono k="check" sw={2.2} />{cerrando ? "Cerrando…" : sinTicketOk && faltaTicket.length ? "Cerrar sin ticket" : confirmar && !a.listo ? "Cerrar igual" : "Cerrar turno"} <kbd className="kb">Ctrl+Enter</kbd>
         </button>
       </div>
 

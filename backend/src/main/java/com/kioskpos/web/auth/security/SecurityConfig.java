@@ -53,6 +53,8 @@ public class SecurityConfig {
                         // Nómina: solo dueño o encargado.
                         .requestMatchers("/api/nomina", "/api/nomina/**").hasAnyRole("DUENO", "ENCARGADO")
                         .requestMatchers("/api/contabilidad/**").hasAnyRole("DUENO", "ENCARGADO")
+                        // Panel de cierres de punto por fecha: solo dueño o encargado (la caja anota y ve los de su turno).
+                        .requestMatchers(HttpMethod.GET, "/api/cierres-punto").hasAnyRole("DUENO", "ENCARGADO")
                         // Compras y proveedores: solo dueño o encargado.
                         .requestMatchers("/api/compras/**", "/api/proveedores/**").hasAnyRole("DUENO", "ENCARGADO")
                         // Inventario: leer lo puede todo usuario; crear/editar/borrar/importar solo dueño/encargado.

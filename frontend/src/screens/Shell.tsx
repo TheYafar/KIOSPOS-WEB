@@ -5,6 +5,7 @@ import { cargarPlan, getPlan } from "../plan";
 import { TamBtn } from "../TamBtn";
 import { getBcv, metodoActivo } from "../config";
 import { Configuracion } from "./Configuracion";
+import { PanelCierresPunto } from "./CierresPunto";
 import { Clientes } from "./Clientes";
 import { Ventas } from "./Ventas";
 import { Compras } from "./Compras";
@@ -35,7 +36,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
     // El cajero solo ve lo de su caja: vender, cerrar y el historial para devoluciones.
     // Fiado, configuración, productos y lo demás es del dueño.
     ? [{ id: "caja", n: "Vender", icon: "cart" }, { id: "cuadre", n: "Cierre", icon: "cash" }, { id: "ventas", n: "Ventas", icon: "recibo" }]
-    : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "ventas", n: "Ventas", icon: "recibo" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "contabilidad", n: "Cuentas", icon: "cash" }, { id: "fiado", n: "Crédito", icon: "user" }, { id: "nomina", n: "Nómina", icon: "equipo" }, { id: "config", n: "Config.", icon: "config" }, { id: "mas", n: "Más", icon: "more" }];
+    : [{ id: "reportes", n: "Reportes", icon: "chart" }, { id: "ventas", n: "Ventas", icon: "recibo" }, { id: "inventario", n: "Productos", icon: "box" }, { id: "contabilidad", n: "Cuentas", icon: "cash" }, { id: "fiado", n: "Crédito", icon: "user" }, { id: "nomina", n: "Nómina", icon: "equipo" }, { id: "config", n: "Config.", icon: "config" }, { id: "puntos", n: "Puntos", icon: "card" }, { id: "mas", n: "Más", icon: "more" }];
   // La pestaña vive en la URL (#/ventas, #/inventario…) para que el botón Atrás del
   // teléfono o del navegador vuelva a la pestaña anterior en vez de salir de la app.
   const tabDeUrl = () => {
@@ -158,6 +159,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
           {tab === "contabilidad" && <Contabilidad />}
           {tab === "config" && <Configuracion />}
           {tab === "fiado" && <Clientes />}
+          {tab === "puntos" && !esCaja && <PanelCierresPunto />}
           {tab === "nomina" && <Nomina onIrFiado={() => setTab("fiado")} />}
           {tab === "mas" && (esCaja
             ? <div className="stub"><b>Más</b><p>El manejo de usuarios y cajas lo hace el dueño desde su panel.</p><button className="btn ghost" onClick={onSalir}>Cerrar sesión</button></div>
