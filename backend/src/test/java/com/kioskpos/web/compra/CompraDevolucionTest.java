@@ -124,7 +124,7 @@ class CompraDevolucionTest extends PostgresRlsTestBase {
         assertThat(prov.getRif()).isEqualTo("J-123456789");
 
         var c = en(m.negocioId(), () -> compraService.registrar(m.dueno(), new CompraService.NuevaCompra(prov.getId(), "A-001",
-                null, new BigDecimal("40"), false, null,
+                null, null, new BigDecimal("40"), false, null,
                 List.of(new CompraService.ItemCompra(m.productoId(), new BigDecimal("10"), new BigDecimal("2.00"), new BigDecimal("3.00"))))));
         assertThat(c.compra().getTotalUsd()).isEqualByComparingTo("20.00");
 
@@ -142,6 +142,56 @@ class CompraDevolucionTest extends PostgresRlsTestBase {
         assertThat(producto(m).getStockActual()).isEqualByComparingTo("10");
         assertThatThrownBy(() -> en(m.negocioId(), () -> compraService.anular(m.dueno(), c.compra().getId())))
                 .isInstanceOf(IllegalStateException.class);
+    }
+
+    @Test
+    void abonarCompraBajaSaldoYLaDejaPagadaAlCubrirla() {
+        M m = montar("abono1@ejemplo.com");
+        // Factura por pagar de $20, con fecha de pago.
+        var c = en(m.negocioId(), () -> compraService.registrar(m.dueno(), new CompraService.NuevaCompra(null, "F-9",
+                null, LocalDate.now().plusDays(3), new BigDecimal("40"), false, null,
+                List.of(new CompraService.ItemCompra(m.productoId(), new BigDecimal("10"), new BigDecimal("2.00"), null)))));
+        Long id = c.compra().getId();
+        assertThat(c.saldoUsd()).isEqualByComparingTo("20.00");
+        assertThat(c.compra().getVence()).isEqualTo(LocalDate.now().plusDays(3));
+
+        // Aparece como aviso de pago pendiente con su saldo.
+        assertThat(en(m.negocioId(), () -> compraService.pagosPendientes()))
+                .anyMatch(x -> x.compraId().equals(id) && x.saldoUsd().compareTo(new BigDecimal("20.00")) == 0);
+
+        // Abono parcial de $12 -> saldo $8, sigue por pagar.
+        var v1 = en(m.negocioId(), () -> compraService.abonar(m.dueno(), id, new BigDecimal("12"), "EFECTIVO_USD", null));
+        assertThat(v1.saldoUsd()).isEqualByComparingTo("8.00");
+        assertThat(v1.compra().isPagada()).isFalse();
+        assertThat(v1.abonos()).hasSize(1);
+
+        // Abonar de más solo cubre el saldo y la deja pagada (sin vencimiento).
+        var v2 = en(m.negocioId(), () -> compraService.abonar(m.dueno(), id, new BigDecimal("100"), "PAGO_MOVIL", null));
+        assertThat(v2.saldoUsd()).isEqualByComparingTo("0");
+        assertThat(v2.compra().isPagada()).isTrue();
+        assertThat(v2.compra().getVence()).isNull();
+        assertThat(v2.abonos()).hasSize(2);
+
+        // Ya pagada: no acepta más abonos y no es un pago pendiente.
+        assertThatThrownBy(() -> en(m.negocioId(), () -> compraService.abonar(m.dueno(), id, new BigDecimal("1"), null, null)))
+                .isInstanceOf(IllegalStateException.class);
+        assertThat(en(m.negocioId(), () -> compraService.pagosPendientes()))
+                .noneMatch(x -> x.compraId().equals(id));
+    }
+
+    @Test
+    void guardarYBorrarFotoDeLaFactura() {
+        M m = montar("foto1@ejemplo.com");
+        var c = en(m.negocioId(), () -> compraService.registrar(m.dueno(), new CompraService.NuevaCompra(null, null,
+                null, null, null, true, null,
+                List.of(new CompraService.ItemCompra(m.productoId(), new BigDecimal("1"), new BigDecimal("1.00"), null)))));
+        Long id = c.compra().getId();
+        var meta = en(m.negocioId(), () -> compraService.guardarFoto(id, "image/jpeg", "QUJD"));
+        assertThat(meta.id()).isNotNull();
+        assertThat(en(m.negocioId(), () -> compraService.detalle(id)).fotos()).hasSize(1);
+        assertThat(en(m.negocioId(), () -> compraService.foto(id, meta.id())).getDatos()).isEqualTo("QUJD");
+        en(m.negocioId(), () -> { compraService.borrarFoto(id, meta.id()); return null; });
+        assertThat(en(m.negocioId(), () -> compraService.detalle(id)).fotos()).isEmpty();
     }
 
     @Test
@@ -257,7 +307,7 @@ class CompraDevolucionTest extends PostgresRlsTestBase {
         Venta v = vender(m, "G-1", 2, null, usd("4.00")); // 2 × $2, costo $1 c/u → ganancia $2
         var antes = en(m.negocioId(), () -> reporteService.resumenDelDia(null));
         // Una compra sube el costo promedio: la ganancia de esa venta NO cambia.
-        en(m.negocioId(), () -> compraService.registrar(m.dueno(), new CompraService.NuevaCompra(null, null, null, null, true, null,
+        en(m.negocioId(), () -> compraService.registrar(m.dueno(), new CompraService.NuevaCompra(null, null, null, null, null, true, null,
                 List.of(new CompraService.ItemCompra(m.productoId(), new BigDecimal("8"), new BigDecimal("1.90"), null)))));
         var despues = en(m.negocioId(), () -> reporteService.resumenDelDia(null));
         assertThat(despues.gananciaUsd()).isEqualByComparingTo(antes.gananciaUsd());
@@ -286,7 +336,7 @@ class CompraDevolucionTest extends PostgresRlsTestBase {
     @Test
     void anularCompraDevuelveElCostoAnterior() {
         M m = montar("anulcosto@ejemplo.com"); // 10 a $1
-        var c = en(m.negocioId(), () -> compraService.registrar(m.dueno(), new CompraService.NuevaCompra(null, null, null, null, true, null,
+        var c = en(m.negocioId(), () -> compraService.registrar(m.dueno(), new CompraService.NuevaCompra(null, null, null, null, null, true, null,
                 List.of(new CompraService.ItemCompra(m.productoId(), new BigDecimal("10"), new BigDecimal("2.00"), null)))));
         assertThat(producto(m).getCostoUsd()).isEqualByComparingTo("1.50");
         en(m.negocioId(), () -> compraService.anular(m.dueno(), c.compra().getId()));

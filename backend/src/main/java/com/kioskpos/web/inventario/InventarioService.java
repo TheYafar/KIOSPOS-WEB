@@ -111,6 +111,20 @@ public class InventarioService {
     }
 
     /**
+     * Borra TODO el inventario del negocio PARA SIEMPRE (cada producto se desenlaza de sus líneas
+     * de venta, que conservan nombre y monto). Devuelve cuántos productos se borraron.
+     */
+    @Transactional
+    public int eliminarTodo() {
+        List<Producto> todos = productoRepository.findByActivoTrueOrderByNombreAsc();
+        for (Producto p : todos) {
+            detalleVentaRepository.desenlazarProducto(p.getId());
+            productoRepository.delete(p);
+        }
+        return todos.size();
+    }
+
+    /**
      * Importa productos desde CSV (upsert por código de barras). Cabecera esperada:
      * codigo_barras,nombre,precio_usd,costo_usd,categoria,stock,stock_minimo. Devuelve
      * cuántos se crearon y cuántos se actualizaron.

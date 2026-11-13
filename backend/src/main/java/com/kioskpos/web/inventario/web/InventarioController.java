@@ -100,6 +100,12 @@ public class InventarioController {
         return Map.of("eliminado", true);
     }
 
+    /** Borra TODO el inventario del negocio (para empezar de cero). Solo dueño/encargado. */
+    @DeleteMapping("/productos")
+    public Map<String, Object> vaciar() {
+        return Map.of("borrados", inventarioService.eliminarTodo());
+    }
+
     @PostMapping("/productos/{id}/ajuste")
     public ProductoResponse ajustar(@PathVariable Long id,
                                     @AuthenticationPrincipal KioskPrincipal principal,

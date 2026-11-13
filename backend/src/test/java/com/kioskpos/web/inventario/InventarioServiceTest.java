@@ -106,6 +106,22 @@ class InventarioServiceTest extends PostgresRlsTestBase {
     }
 
     @Test
+    void vaciarBorraTodoElInventario() {
+        Long neg = negocio("Cocoa", "inv6@ejemplo.com");
+        try {
+            NegocioContext.set(neg);
+            inventarioService.crear(datos("V-1", "Uno", "1.00", "5"));
+            inventarioService.crear(datos("V-2", "Dos", "2.00", "3"));
+            assertThat(inventarioService.listar()).hasSize(2);
+            assertThat(inventarioService.eliminarTodo()).isEqualTo(2);
+            assertThat(inventarioService.listar()).isEmpty();
+            assertThat(inventarioService.eliminarTodo()).isZero(); // vaciar de nuevo no falla
+        } finally {
+            NegocioContext.clear();
+        }
+    }
+
+    @Test
     void inventarioAisladoPorNegocio() {
         Long cocoa = negocio("Cocoa", "inv4@ejemplo.com");
         Long esquina = negocio("La Esquina", "inv5@ejemplo.com");

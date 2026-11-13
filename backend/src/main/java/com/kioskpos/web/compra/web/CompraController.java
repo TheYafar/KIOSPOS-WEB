@@ -6,6 +6,7 @@ import com.kioskpos.web.compra.CompraService;
 import com.kioskpos.web.compra.Proveedor;
 import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -59,6 +60,46 @@ public class CompraController {
     @PostMapping("/compras/{id}/pagada")
     public Compra pagada(@PathVariable Long id, @RequestParam boolean valor) {
         return service.marcarPagada(id, valor);
+    }
+
+    @PostMapping("/compras/{id}/abonos")
+    public CompraService.CompraVista abonar(@AuthenticationPrincipal KioskPrincipal p, @PathVariable Long id,
+                                            @RequestBody AbonoRequest req) {
+        return service.abonar(p, id, req.monto(), req.metodo(), req.nota());
+    }
+
+    public record AbonoRequest(java.math.BigDecimal monto, String metodo, String nota) {
+    }
+
+    @PostMapping("/compras/{id}/vencimiento")
+    public Compra vencimiento(@PathVariable Long id, @RequestBody VencimientoRequest req) {
+        return service.fijarVencimiento(id, req.vence());
+    }
+
+    public record VencimientoRequest(java.time.LocalDate vence) {
+    }
+
+    @GetMapping("/compras/{id}/fotos/{fotoId}")
+    public FotoDatos foto(@PathVariable Long id, @PathVariable Long fotoId) {
+        var f = service.foto(id, fotoId);
+        return new FotoDatos(f.getId(), f.getMime(), f.getDatos());
+    }
+
+    public record FotoDatos(Long id, String mime, String datos) {
+    }
+
+    @PostMapping("/compras/{id}/fotos")
+    public CompraService.FotoMeta subirFoto(@PathVariable Long id, @RequestBody FotoRequest req) {
+        return service.guardarFoto(id, req.mime(), req.datos());
+    }
+
+    public record FotoRequest(String mime, String datos) {
+    }
+
+    @DeleteMapping("/compras/{id}/fotos/{fotoId}")
+    public java.util.Map<String, Object> borrarFoto(@PathVariable Long id, @PathVariable Long fotoId) {
+        service.borrarFoto(id, fotoId);
+        return java.util.Map.of("borrada", true);
     }
 
     @PostMapping("/compras/{id}/anular")

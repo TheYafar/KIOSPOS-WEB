@@ -21,6 +21,7 @@ import { CierreAviso } from "./negocio";
 import { TemaBtn } from "../TemaBtn";
 import { Atajos } from "../Atajos";
 import { ColaModal, ColaPill, useCola } from "./ColaVentas";
+import { Campana } from "./Campana";
 
 interface Tab { id: string; n: string; icon: string; }
 
@@ -138,6 +139,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
                 </button>
               )}
               <ColaPill cola={cola} onClick={() => setVerCola(true)} />
+              {!esCaja && <Campana onIr={(t, sub) => { setTab(t); if (sub) setTimeout(() => window.dispatchEvent(new CustomEvent("kp-sub-productos", { detail: sub })), 0); }} />}
               <span className="hpill" title={getBcv() && String(getBcv()) !== getTasa() ? "BCV Bs " + getBcv() + " (con ajuste en Config.)" : "Tasa BCV automática"}><span className="t3">{getBcv() && String(getBcv()) !== getTasa() ? "Tasa" : "Tasa BCV"}</span><b className="t">Bs {getTasa()}</b></span>
               <span className={"hpill" + (online ? " ok" : "")}>
                 <span className="dot" style={{ background: online ? "var(--ok)" : "var(--bad)" }} />
@@ -234,6 +236,11 @@ function TurnoBar({ turno, onIr }: { turno: TurnoResumen | null; onIr: () => voi
 /** Productos del dueño: inventario y, al lado, las compras a proveedores. */
 function ProductosYCompras() {
   const [v, setV] = useState<"inv" | "compras">("inv");
+  useEffect(() => {
+    const ir = (e: Event) => { const d = (e as CustomEvent).detail; if (d === "inv" || d === "compras") setV(d); };
+    window.addEventListener("kp-sub-productos", ir);
+    return () => window.removeEventListener("kp-sub-productos", ir);
+  }, []);
   return (
     <div className="caja">
       <div className="toolbar sub-tabs">

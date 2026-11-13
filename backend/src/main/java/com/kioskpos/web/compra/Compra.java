@@ -45,6 +45,14 @@ public class Compra {
     @Column(nullable = false)
     private boolean pagada = true;
 
+    /** Cuánto se lleva pagado de la factura. Saldo = totalUsd - pagadoUsd. */
+    @Column(name = "pagado_usd", nullable = false, precision = 14, scale = 2)
+    private BigDecimal pagadoUsd = BigDecimal.ZERO;
+
+    /** Fecha en que toca pagarle al proveedor (opcional), para los avisos. */
+    @Column
+    private LocalDate vence;
+
     @Column(nullable = false, length = 12)
     private String estado = "REGISTRADA";
 

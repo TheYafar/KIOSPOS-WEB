@@ -1,10 +1,11 @@
 import { hoyVe } from "../dia";
-import { useEffect, useMemo, useState } from "react";
-import { anularCompra, compraPagada, detalleCompra, guardarProveedor, listarCompras, listarProductos, listarProveedores, registrarCompra,
-  type CompraVista, type Producto, type ProveedorV } from "../api";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { abonarCompra, anularCompra, borrarFotoCompra, compraPagada, detalleCompra, fotoCompra, guardarProveedor, listarCompras, listarProductos, listarProveedores, registrarCompra, subirFotoCompra,
+  type CompraVista, type FotoMeta, type Producto, type ProveedorV } from "../api";
 import { getTasa } from "../session";
 import { UIcono } from "../icons";
 import { leerMonto } from "../arqueo";
+import { prepararFoto, type FotoLista } from "../foto";
 
 // Compras a proveedores: registrar la factura suma la mercancía al inventario y
 // recalcula el costo promedio de cada producto. Se puede dejar "por pagar".
@@ -25,7 +26,7 @@ export function Compras() {
   const [editProv, setEditProv] = useState<ProveedorV | null | "nuevo">(null);
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
-  const cargar = () => Promise.all([listarCompras(), listarProveedores()]).then(([c, p]) => { setCompras(c); setProvs(p); setErr(""); }).catch((e) => setErr((e as Error).message));
+  const cargar = () => Promise.all([listarCompras(), listarProveedores()]).then(([c, p]) => { setCompras(c); setProvs(p); setErr(""); window.dispatchEvent(new Event("kp-avisos")); }).catch((e) => setErr((e as Error).message));
   useEffect(() => { cargar(); }, []);
   const porPagar = provs.reduce((s, p) => s + p.porPagarUsd, 0);
   const mes = hoy().slice(0, 7);
@@ -119,6 +120,9 @@ function FormCompra({ provs, onClose, onSaved, onProv }: { provs: ProveedorV[]; 
   const [factura, setFactura] = useState("");
   const [fecha, setFecha] = useState(hoy());
   const [pagada, setPagada] = useState(true);
+  const [vence, setVence] = useState("");
+  const [fotos, setFotos] = useState<FotoLista[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
   const [lineas, setLineas] = useState<Linea[]>([]);
   const [q, setQ] = useState("");
   const [err, setErr] = useState("");
@@ -131,12 +135,25 @@ function FormCompra({ provs, onClose, onSaved, onProv }: { provs: ProveedorV[]; 
   const total = lineas.reduce((s, l) => s + (leerMonto(l.cant) ?? 0) * (leerMonto(l.costo) ?? 0), 0);
   const listo = lineas.length > 0 && lineas.every((l) => (leerMonto(l.cant) ?? 0) > 0 && (leerMonto(l.costo) ?? -1) >= 0) && !enviando;
 
+  const elegirFotos = async (files: FileList | null) => {
+    if (!files) return;
+    setErr("");
+    try {
+      const nuevas: FotoLista[] = [];
+      for (const f of Array.from(files).slice(0, 6)) nuevas.push(await prepararFoto(f));
+      setFotos((prev) => [...prev, ...nuevas].slice(0, 6));
+    } catch (e) { setErr((e as Error).message); }
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
   const guardar = async () => {
     if (!listo) return;
     setEnviando(true); setErr("");
     try {
-      await registrarCompra({ proveedorId: provId === "" ? null : provId, numeroFactura: factura.trim() || undefined, fecha, tasa: Number(getTasa()) || undefined, pagada,
+      const v = await registrarCompra({ proveedorId: provId === "" ? null : provId, numeroFactura: factura.trim() || undefined, fecha,
+        vence: !pagada && vence ? vence : undefined, tasa: Number(getTasa()) || undefined, pagada,
         items: lineas.map((l) => { const pr = leerMonto(l.precio) ?? 0; return { productoId: l.p.id, cantidad: leerMonto(l.cant) ?? 0, costoUsd: leerMonto(l.costo) ?? 0, ...(pr > 0 && Math.abs(pr - l.p.precioUsd) > 0.004 ? { precioVentaUsd: pr } : {}) }; }) });
+      for (const foto of fotos) { try { await subirFotoCompra(v.compra.id, foto.mime, foto.datos); } catch { /* la foto no debe tumbar la compra */ } }
       onSaved("Compra registrada: " + lineas.length + " producto(s) entraron al inventario");
     } catch (e) { setErr((e as Error).message); setEnviando(false); }
   };
@@ -194,6 +211,27 @@ function FormCompra({ provs, onClose, onSaved, onProv }: { provs: ProveedorV[]; 
             <span className="cfg-tx"><b>{pagada ? "Ya está pagada" : "Queda por pagar"}</b><small>{pagada ? "Toca si se la vas a pagar después al proveedor." : "Aparecerá en “Por pagar a proveedores”."}</small></span>
             <span className={"sw" + (pagada ? " on" : "")}><i /></span>
           </button>
+          {!pagada && (
+            <label className="lbl">¿Cuándo hay que pagarla? <span className="opt">(opcional, para avisarte)</span>
+              <input className="inp" type="date" value={vence} min={fecha} onChange={(e) => setVence(e.target.value)} aria-label="Fecha de pago" /></label>
+          )}
+          <div className="cmp-fotos">
+            <div className="cmp-fotos-h"><b>Foto de la factura</b><small className="opt">Tómale una foto al papel para guardarla aquí.</small></div>
+            <div className="fac-fotos">
+              {fotos.map((f, i) => (
+                <div key={i} className="fac-foto">
+                  <img src={"data:" + f.mime + ";base64," + f.datos} alt={"Foto " + (i + 1)} />
+                  <button type="button" className="fac-foto-x" aria-label="Quitar foto" onClick={() => setFotos(fotos.filter((_, j) => j !== i))}>✕</button>
+                </div>
+              ))}
+              {fotos.length < 6 && (
+                <button type="button" className="fac-foto-add press" onClick={() => fileRef.current?.click()} aria-label="Agregar foto de la factura">
+                  <UIcono k="plus" sw={2.2} /><span>Foto</span>
+                </button>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" multiple hidden onChange={(e) => elegirFotos(e.target.files)} />
+          </div>
           {err && <p className="pinmsg err">{err}</p>}
         </div>
         <div className="modal-foot"><button className="btn primary big press" disabled={!listo} onClick={guardar}>{enviando ? "Guardando…" : "Registrar compra · " + usd(Math.round(total * 100) / 100)}</button></div>
@@ -202,14 +240,44 @@ function FormCompra({ provs, onClose, onSaved, onProv }: { provs: ProveedorV[]; 
   );
 }
 
+const fecha11 = (s: string) => new Date(s + "T12:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "short" });
+
 function DetalleCompra({ id, onClose, onCambio }: { id: number; onClose: () => void; onCambio: () => void }) {
   const [c, setC] = useState<CompraVista | null>(null);
   const [err, setErr] = useState("");
+  const [abono, setAbono] = useState("");
+  const [metodo, setMetodo] = useState("EFECTIVO_USD");
+  const [yendo, setYendo] = useState(false);
+  const [imgs, setImgs] = useState<Record<number, string>>({});
+  const [ver, setVer] = useState<number | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
   const cargar = () => detalleCompra(id).then(setC).catch((e) => setErr((e as Error).message));
   useEffect(() => { cargar(); }, [id]);
-  const accion = async (fn: () => Promise<void>) => { try { await fn(); await cargar(); onCambio(); } catch (e) { setErr((e as Error).message); } };
+  useEffect(() => {
+    if (!c) return;
+    c.fotos.forEach((f: FotoMeta) => {
+      if (imgs[f.id]) return;
+      fotoCompra(id, f.id).then((d) => setImgs((m) => ({ ...m, [f.id]: "data:" + d.mime + ";base64," + d.datos }))).catch(() => {});
+    });
+  }, [c]);
+  const accion = async (fn: () => Promise<void>) => { setYendo(true); try { await fn(); await cargar(); onCambio(); } catch (e) { setErr((e as Error).message); } finally { setYendo(false); } };
   if (!c) return <div className="modal"><div className="modal-card"><div className="modal-body"><span className="hint">{err || "Cargando…"}</span></div></div></div>;
   const viva = c.compra.estado === "REGISTRADA";
+  const saldo = c.saldoUsd;
+  const monto = leerMonto(abono) ?? 0;
+  const abonar = async () => {
+    if (monto <= 0) return;
+    setErr("");
+    await accion(async () => { await abonarCompra(id, monto, metodo); setAbono(""); });
+  };
+  const agregarFoto = async (files: FileList | null) => {
+    if (!files || !files[0]) return;
+    setErr("");
+    try { const f = await prepararFoto(files[0]); await subirFotoCompra(id, f.mime, f.datos); await cargar(); }
+    catch (e) { setErr((e as Error).message); }
+    if (fileRef.current) fileRef.current.value = "";
+  };
+
   return (
     <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card">
@@ -218,18 +286,67 @@ function DetalleCompra({ id, onClose, onCambio }: { id: number; onClose: () => v
           <div className="vt-res"><span>{new Date(c.compra.fecha + "T12:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "long", year: "numeric" })}</span>
             <b className="t">{usd(c.compra.totalUsd)}</b>
             {!viva ? <span className="pill late">Anulada</span> : c.compra.pagada ? <span className="pill ok">Pagada</span> : <span className="pill soon">Por pagar</span>}</div>
+
+          {viva && !c.compra.pagada && (
+            <div className="cmp-saldo">
+              <div className="cmp-saldo-r"><span>Abonado</span><b className="t">{usd(c.compra.pagadoUsd)}</b></div>
+              <div className="cmp-saldo-r big"><span>Saldo por pagar</span><b className="t mg-bad">{usd(saldo)}</b></div>
+              {c.compra.vence && <div className="cmp-saldo-r"><span>Pagar antes del</span><b className="t">{new Date(c.compra.vence + "T12:00:00").toLocaleDateString("es-VE", { day: "numeric", month: "long" })}</b></div>}
+              <div className="cmp-abonar">
+                <input className="inp t" inputMode="decimal" placeholder="0,00" value={abono} onChange={(e) => setAbono(e.target.value.replace(/[^\d.,]/g, ""))} aria-label="Monto a abonar en dólares" />
+                <select className="inp" value={metodo} onChange={(e) => setMetodo(e.target.value)} aria-label="Forma de pago del abono">
+                  <option value="EFECTIVO_USD">Efectivo $</option><option value="EFECTIVO_BS">Efectivo Bs</option>
+                  <option value="PAGO_MOVIL">Pago móvil</option><option value="PUNTO">Punto</option>
+                  <option value="TRANSFERENCIA">Transferencia</option><option value="ZELLE">Zelle</option><option value="OTRO">Otra</option>
+                </select>
+                <button className="btn primary press" disabled={monto <= 0 || yendo} onClick={abonar}>Abonar</button>
+              </div>
+              <button className="btn2 press cmp-pagar-todo" disabled={yendo} onClick={() => accion(() => compraPagada(id, true))}>Pagué todo (al contado) · {usd(saldo)}</button>
+            </div>
+          )}
+
           <div className="vt-lineas">{c.detalles.map((d) => (
             <div key={d.id} className="vt-linea"><span className="vt-ln"><b>{d.nombre}</b><small className="t">{money(d.cantidad)} × {usd(d.costoUnitarioUsd)}</small></span><b className="t">{usd(d.subtotalUsd)}</b></div>
           ))}</div>
+
+          {c.abonos.length > 0 && (
+            <div className="cmp-abonos">
+              <b className="cmp-sub">Abonos</b>
+              {c.abonos.map((a) => (
+                <div key={a.id} className="cmp-abono-r"><span>{fecha11(a.fecha)}{a.metodo ? " · " + (METODO_ABONO[a.metodo] || a.metodo) : ""}</span><b className="t">{usd(a.montoUsd)}</b></div>
+              ))}
+            </div>
+          )}
+
+          <div className="cmp-fotos">
+            <div className="cmp-fotos-h"><b>Foto de la factura</b></div>
+            <div className="fac-fotos">
+              {c.fotos.map((f) => (
+                <div key={f.id} className="fac-foto">
+                  {imgs[f.id] ? <img src={imgs[f.id]} alt="Factura" onClick={() => setVer(f.id)} /> : <span className="fac-foto-ld">…</span>}
+                  <button type="button" className="fac-foto-x" aria-label="Quitar foto" onClick={() => accion(() => borrarFotoCompra(id, f.id))}>✕</button>
+                </div>
+              ))}
+              {c.fotos.length < 6 && (
+                <button type="button" className="fac-foto-add press" onClick={() => fileRef.current?.click()} aria-label="Agregar foto de la factura"><UIcono k="plus" sw={2.2} /><span>Foto</span></button>
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" capture="environment" hidden onChange={(e) => agregarFoto(e.target.files)} />
+          </div>
           {err && <p className="pinmsg err">{err}</p>}
         </div>
         {viva && (
           <div className="modal-foot two-btn">
-            <button className="btn2 big press" onClick={() => accion(() => compraPagada(c.compra.id, !c.compra.pagada))}>{c.compra.pagada ? "Marcar por pagar" : "Marcar pagada"}</button>
-            <button className="btn danger big press" onClick={() => { if (window.confirm("¿Anular la compra? Se saca del inventario lo que entró.")) accion(() => anularCompra(c.compra.id)); }}>Anular compra</button>
+            <button className="btn2 big press" disabled={yendo} onClick={() => accion(() => compraPagada(id, !c.compra.pagada))}>{c.compra.pagada ? "Marcar por pagar" : "Marcar pagada"}</button>
+            <button className="btn danger big press" disabled={yendo} onClick={() => { if (window.confirm("¿Anular la compra? Se saca del inventario lo que entró.")) accion(() => anularCompra(id)); }}>Anular compra</button>
           </div>
         )}
       </div>
+      {ver != null && imgs[ver] && (
+        <div className="foto-ver" onClick={() => setVer(null)}><img src={imgs[ver]} alt="Factura" /><button className="foto-ver-x" aria-label="Cerrar">✕</button></div>
+      )}
     </div>
   );
 }
+
+const METODO_ABONO: Record<string, string> = { EFECTIVO_USD: "Efectivo $", EFECTIVO_BS: "Efectivo Bs", PAGO_MOVIL: "Pago móvil", PUNTO: "Punto", TRANSFERENCIA: "Transferencia", ZELLE: "Zelle", OTRO: "Otra" };

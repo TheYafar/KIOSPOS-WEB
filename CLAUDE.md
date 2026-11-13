@@ -667,3 +667,29 @@ el alta/venta/login (try/catch + log).
   `imprimirTicket`/`abrirGaveta` ya la toman por defecto si no reciben una. Botones **Buscar de nuevo** e
   **Imprimir prueba**. Si el Conector no está abierto, explica que es el programa local y ofrece reintentar.
 - No cambió el Conector Java (`/estado` ya listaba impresoras con `Impresora.listar()`). Pruebas: `e2e/impresora.spec.ts`.
+
+## 34. Vaciar inventario, facturas de proveedor (abonos + foto + vencimiento) y campanita de avisos
+
+- **Vaciar inventario** (`InventarioService.eliminarTodo`, `DELETE /api/inventario/productos`, solo dueño/encargado):
+  botón **Vaciar** (rojo) en la barra de Productos; pide confirmar escribiendo **BORRAR**. Borra todo "para siempre"
+  (desenlaza cada producto de sus líneas de venta, que conservan nombre/monto). `api.ts vaciarInventario`.
+- **Facturas de compra mejoradas** (**V28** `compras.pagado_usd` + `vence`; tablas `compra_abonos` y `compra_fotos`
+  con RLS):
+  - **Abonos**: una factura "por pagar" se abona poco a poco. `POST /api/compras/{id}/abonos {monto, metodo, nota}`
+    (`CompraService.abonar`): baja el saldo (saldo = total − pagado), al cubrirlo queda **pagada** y sin vencimiento;
+    no abona más del saldo. Botón **"Pagué todo (al contado)"** = `compraPagada(true)`. La deuda de proveedores
+    (`proveedores().porPagarUsd` y el total "Por pagar") usa el **saldo**, no el total.
+  - **Fecha de pago** (`vence`): al registrar "por pagar" se pide cuándo pagarla; `POST /api/compras/{id}/vencimiento`.
+  - **Foto de la factura** (digitalizar): `frontend/src/foto.ts prepararFoto` toma la foto (o archivo), la reduce a
+    JPEG ≤1600px y la sube en base64. `POST /api/compras/{id}/fotos {mime,datos}`, `GET .../fotos/{fotoId}` (devuelve
+    datos para `<img src=data:…>`), `DELETE .../fotos/{fotoId}`. Hasta 6 por factura; `columnDefinition="text"` (no @Lob).
+    En **Registrar compra** y en el detalle: cámara (`<input type=file accept=image/* capture>`), miniaturas y visor.
+  - El detalle de compra muestra saldo, abonos, vencimiento y fotos. `CompraVista` ahora trae `abonos`, `fotos`
+    (metadatos sin bytes) y `saldoUsd`.
+- **Campanita de avisos** (`GET /api/avisos`, `aviso/AvisoController`, solo dueño/encargado; `screens/Campana.tsx` en
+  el encabezado del dueño): junta **pagos a proveedores pendientes** (con su fecha de pago; ordena por vencer, marca
+  vencidas) y **productos bajo stock / agotados**. Badge con el total (rojo si hay vencidos o agotados), panel
+  filtrable **Todo / Pagos / Stock**; tocar un aviso lleva a Compras o a Inventario (evento `kp-sub-productos`).
+  Se refresca al cambiar inventario/compras (evento `kp-avisos`), al enfocar la ventana y cada 3 min.
+- Pruebas: `CompraDevolucionTest` (abonos, foto), `InventarioServiceTest` (vaciar), `e2e/compras-avisos.spec.ts`
+  (5). Verificado contra Postgres real (V28 aplica, abonos/foto/avisos/vaciar por API).

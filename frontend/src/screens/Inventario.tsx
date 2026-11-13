@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { actualizarProducto, ajustarStock, borrarCategoria, crearCategoria, crearProducto, eliminarProducto, guardarPresentaciones, importarCsv, listarCategorias, listarPresentaciones, listarProductos, renombrarCategoria, type Categoria, type Producto } from "../api";
+import { actualizarProducto, ajustarStock, borrarCategoria, crearCategoria, crearProducto, eliminarProducto, guardarPresentaciones, importarCsv, listarCategorias, listarPresentaciones, listarProductos, renombrarCategoria, vaciarInventario, type Categoria, type Producto } from "../api";
 import { EditorBloques, filasDe, leerBloques, type FilaBloque } from "./Bloques";
 import { cantTxt } from "./Pesable";
 import { Icono, UIcono, catInfo } from "../icons";
@@ -7,7 +7,7 @@ import { Icono, UIcono, catInfo } from "../icons";
 const usd = (n: number) => "$ " + n.toLocaleString("es-VE", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 const num = (s: string) => (s ? parseFloat(s.replace(",", ".")) || 0 : 0);
 
-type Modal = null | { tipo: "nuevo" } | { tipo: "editar"; p: Producto } | { tipo: "ajuste"; p: Producto } | { tipo: "csv" } | { tipo: "categorias" };
+type Modal = null | { tipo: "nuevo" } | { tipo: "editar"; p: Producto } | { tipo: "ajuste"; p: Producto } | { tipo: "csv" } | { tipo: "categorias" } | { tipo: "vaciar" };
 const UNIDAD_N: Record<string, string> = { KG: "kilo", G: "gramo", L: "litro", M: "metro" };
 const UNIDAD_C: Record<string, string> = { KG: "kg", G: "g", L: "L", M: "m" };
 
@@ -38,6 +38,7 @@ export function Inventario() {
   const cargar = () => {
     listarProductos().then(setProductos).catch((e) => setErr((e as Error).message));
     listarCategorias().then(setCats).catch(() => {});
+    window.dispatchEvent(new Event("kp-avisos")); // refresca la campanita (bajo stock)
   };
   useEffect(() => { cargar(); }, []);
 
@@ -63,6 +64,7 @@ export function Inventario() {
         <button className="btn outline press" onClick={() => setModal({ tipo: "categorias" })}>Categorías</button>
         <button className="btn outline press" onClick={() => setModal({ tipo: "csv" })}>Importar CSV</button>
         <button className="btn outline press" disabled={productos.length === 0} onClick={() => exportarCsv(productos)}>Exportar</button>
+        <button className="btn outline danger press" disabled={productos.length === 0} onClick={() => setModal({ tipo: "vaciar" })} title="Borrar todo el inventario"><UIcono k="del" sw={2.1} />Vaciar</button>
       </div>
       {cats.length > 1 && (
         <div className="inv-cats" role="tablist" aria-label="Filtrar por categoría">
@@ -108,6 +110,35 @@ export function Inventario() {
       {modal?.tipo === "ajuste" && <FormAjuste p={modal.p} onEditar={() => setModal({ tipo: "editar", p: modal.p })} onClose={() => setModal(null)} onSaved={() => { setModal(null); setMsg("Stock ajustado"); cargar(); }} onEliminado={() => { setModal(null); setMsg("Producto eliminado"); cargar(); }} onErr={setErr} />}
       {modal?.tipo === "categorias" && <FormCategorias cats={cats} onClose={() => setModal(null)} onCambio={(t) => { setMsg(t); cargar(); }} />}
       {modal?.tipo === "csv" && <FormCsv onClose={() => setModal(null)} onSaved={(r) => { setModal(null); setMsg(`Importados: ${r.creados} nuevos, ${r.actualizados} actualizados`); cargar(); }} onErr={setErr} />}
+      {modal?.tipo === "vaciar" && <VaciarInventario total={productos.length} onClose={() => setModal(null)} onHecho={(n) => { setModal(null); setMsg(`Inventario vaciado: ${n} producto(s) borrado(s)`); cargar(); }} onErr={setErr} />}
+    </div>
+  );
+}
+
+/** Borra TODO el inventario. Pide confirmar escribiendo BORRAR (es para siempre). */
+function VaciarInventario({ total, onClose, onHecho, onErr }: { total: number; onClose: () => void; onHecho: (n: number) => void; onErr: (e: string) => void }) {
+  const [txt, setTxt] = useState("");
+  const [yendo, setYendo] = useState(false);
+  const listo = txt.trim().toUpperCase() === "BORRAR" && !yendo;
+  const vaciar = async () => {
+    if (!listo) return;
+    setYendo(true);
+    try { onHecho(await vaciarInventario()); }
+    catch (e) { onErr((e as Error).message); onClose(); }
+  };
+  return (
+    <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+      <div className="modal-card" onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Escape") onClose(); }}>
+        <div className="modal-head"><h2>Vaciar inventario</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="modal-body">
+          <div className="rep-alert"><span className="ibox" style={{ background: "var(--bad-soft)", color: "var(--bad)" }}><UIcono k="alert" /></span>
+            <div className="grow"><b>Vas a borrar los {total} productos para siempre</b><span className="d">No se puede deshacer. Las ventas ya hechas se conservan (guardan nombre y monto). Lo mejor es <b>Exportar</b> primero por si acaso.</span></div></div>
+          <label className="lbl">Para confirmar, escribe <b>BORRAR</b>
+            <input autoFocus className="inp" value={txt} onChange={(e) => setTxt(e.target.value)} placeholder="BORRAR" aria-label="Escribe BORRAR para confirmar"
+              onKeyDown={(e) => { if (e.key === "Enter" && listo) vaciar(); }} /></label>
+        </div>
+        <div className="modal-foot"><button className="btn danger big press" disabled={!listo} onClick={vaciar}>{yendo ? "Borrando…" : "Borrar todo el inventario"}</button></div>
+      </div>
     </div>
   );
 }

@@ -320,21 +320,48 @@ export async function devolverVenta(id: number, body: { items: { detalleId: numb
 
 // ---------- Compras y proveedores (dueño/encargado) ----------
 export interface ProveedorV { id: number; nombre: string; rif: string | null; telefono: string | null; contacto: string | null; activo: boolean; porPagarUsd: number; compras: number; }
-export interface CompraV { id: number; proveedorId: number | null; numeroFactura: string | null; fecha: string; totalUsd: number; tasa: number | null; pagada: boolean; estado: "REGISTRADA" | "ANULADA"; nota: string | null; }
+export interface CompraV { id: number; proveedorId: number | null; numeroFactura: string | null; fecha: string; totalUsd: number; pagadoUsd: number; vence: string | null; tasa: number | null; pagada: boolean; estado: "REGISTRADA" | "ANULADA"; nota: string | null; }
 export interface CompraLinea { id: number; productoId: number | null; nombre: string; cantidad: number; costoUnitarioUsd: number; subtotalUsd: number; }
-export interface CompraVista { compra: CompraV; proveedor: string | null; detalles: CompraLinea[]; }
+export interface CompraAbonoV { id: number; fecha: string; montoUsd: number; metodo: string | null; nota: string | null; }
+export interface FotoMeta { id: number; mime: string; }
+export interface CompraVista { compra: CompraV; proveedor: string | null; detalles: CompraLinea[]; abonos: CompraAbonoV[]; fotos: FotoMeta[]; saldoUsd: number; }
 export async function listarProveedores(): Promise<ProveedorV[]> { return parse(await fetch("/api/proveedores", { headers: auth() })); }
 export async function guardarProveedor(id: number | null, body: { nombre: string; rif?: string; telefono?: string; contacto?: string; activo?: boolean }): Promise<ProveedorV> {
   return parse(await fetch("/api/proveedores" + (id ? "/" + id : ""), { method: id ? "PUT" : "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
 }
 export async function listarCompras(): Promise<CompraVista[]> { return parse(await fetch("/api/compras", { headers: auth() })); }
 export async function detalleCompra(id: number): Promise<CompraVista> { return parse(await fetch(`/api/compras/${id}`, { headers: auth() })); }
-export async function registrarCompra(body: { proveedorId: number | null; numeroFactura?: string; fecha?: string; tasa?: number; pagada: boolean; nota?: string;
+export async function registrarCompra(body: { proveedorId: number | null; numeroFactura?: string; fecha?: string; vence?: string; tasa?: number; pagada: boolean; nota?: string;
   items: { productoId: number; cantidad: number; costoUsd: number; precioVentaUsd?: number }[] }): Promise<CompraVista> {
   return parse(await fetch("/api/compras", { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify(body) }));
 }
 export async function compraPagada(id: number, valor: boolean): Promise<void> { await parse(await fetch(`/api/compras/${id}/pagada?valor=${valor}`, { method: "POST", headers: auth() })); }
+export async function abonarCompra(id: number, monto: number, metodo?: string, nota?: string): Promise<CompraVista> {
+  return parse(await fetch(`/api/compras/${id}/abonos`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ monto, metodo, nota }) }));
+}
+export async function fijarVencimientoCompra(id: number, vence: string | null): Promise<void> {
+  await parse(await fetch(`/api/compras/${id}/vencimiento`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ vence }) }));
+}
+export async function subirFotoCompra(id: number, mime: string, datos: string): Promise<FotoMeta> {
+  return parse(await fetch(`/api/compras/${id}/fotos`, { method: "POST", headers: { "Content-Type": "application/json", ...auth() }, body: JSON.stringify({ mime, datos }) }));
+}
+export async function fotoCompra(id: number, fotoId: number): Promise<{ id: number; mime: string; datos: string }> {
+  return parse(await fetch(`/api/compras/${id}/fotos/${fotoId}`, { headers: auth() }));
+}
+export async function borrarFotoCompra(id: number, fotoId: number): Promise<void> {
+  await parse(await fetch(`/api/compras/${id}/fotos/${fotoId}`, { method: "DELETE", headers: auth() }));
+}
 export async function anularCompra(id: number): Promise<void> { await parse(await fetch(`/api/compras/${id}/anular`, { method: "POST", headers: auth() })); }
+
+// ---------- Vaciar inventario y campanita de avisos (dueño/encargado) ----------
+export async function vaciarInventario(): Promise<number> {
+  const r = await parse(await fetch("/api/inventario/productos", { method: "DELETE", headers: auth() }));
+  return r.borrados as number;
+}
+export interface PagoPendiente { compraId: number; proveedor: string | null; numeroFactura: string | null; fecha: string; vence: string | null; saldoUsd: number; vencida: boolean; diasPara: number | null; }
+export interface AvisoStock { productoId: number; nombre: string; stock: number; minimo: number; unidad: string; agotado: boolean; }
+export interface Avisos { pagos: PagoPendiente[]; stock: AvisoStock[]; pagosVencidos: number; agotados: number; bajos: number; }
+export async function avisos(): Promise<Avisos> { return parse(await fetch("/api/avisos", { headers: auth() })); }
 
 // ---------- Nómina (dueño/encargado) ----------
 export interface TrabajadorNomina { id: number; nombre: string; telefono: string | null; activo: boolean; sueldoUsd: number; debeFiadoUsd: number;

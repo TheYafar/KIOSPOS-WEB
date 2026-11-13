@@ -27,7 +27,12 @@ export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: a
   prueba?: boolean; planCambio?: any; sesionVencida?: boolean;
   bloques?: any[]; bloquesPut?: { productoId: number; lista: any[] }; puntos?: any[];
   usuarios?: any[]; cajasLista?: any[]; usuarioBorrado?: number; usuarioEditado?: any; usuarioCreado?: any; cajaBorrada?: number; cajaEditada?: any;
-  csvImport?: string; productoBorrado?: number; }
+  csvImport?: string; productoBorrado?: number; inventarioVaciado?: boolean;
+  compraAbonos?: any[]; compraFotos?: any[]; compraVence?: any; compraPagada?: boolean; avisos?: any; }
+
+/** Factura de compra base para los endpoints de detalle/abono. */
+const compraDemo = (st: Estado) => ({ id: 8, proveedorId: 3, numeroFactura: "A-77", fecha: "2026-11-09", totalUsd: 40,
+  pagadoUsd: 0, vence: st.compraVence?.vence ?? "2026-11-20", tasa: 900, pagada: false, estado: "REGISTRADA", nota: null });
 
 export const ventasDemo = [
   { id: 11, numeroFactura: 5, fechaHora: "2026-11-10T14:05:00Z", cajaId: 1, totalUsd: 2.75, totalBs: 2475, estado: "COMPLETADA", clienteId: null, pagos: "EFECTIVO_USD", items: 2, devueltoUsd: 0 },
@@ -133,6 +138,7 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     }
     if (u.includes("/api/inventario/importar")) { st.csvImport = r.request().postData() || ""; return r.fulfill({ json: { creados: 2, actualizados: 1 } }); }
     if (/\/api\/inventario\/productos\/\d+$/.test(u) && m === "DELETE") { st.productoBorrado = Number(u.split("/").pop()); return r.fulfill({ json: { eliminado: true } }); }
+    if (/\/api\/inventario\/productos$/.test(u) && m === "DELETE") { st.inventarioVaciado = true; return r.fulfill({ json: { borrados: productos.length } }); }
     if (u.includes("/api/inventario/productos") && (m === "POST" || m === "PUT")) { st.producto = { metodo: m, ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: productos[0] }); }
     if (u.includes("/api/inventario")) return r.fulfill({ json: productos });
     if (u.includes("/api/tasa")) return r.fulfill({ json: { bs: st.tasa === undefined ? 900 : st.tasa } });
@@ -203,8 +209,29 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     if (u.includes("/api/nomina")) return r.fulfill({ json: { totalSueldosUsd: 15, totalFiadoUsd: 12, pagadoEsteMesUsd: 0,
       trabajadores: [{ id: 3, nombre: "Luis (empleado)", telefono: null, activo: true, sueldoUsd: 15, debeFiadoUsd: 12, netoSugeridoUsd: 3, ultimoPago: null, ultimoPeriodo: null, pagadoEsteMesUsd: 0 }] } });
     if (u.includes("/api/proveedores")) return r.fulfill({ json: [{ id: 3, nombre: "Distribuidora Polar", rif: "J-1", telefono: null, contacto: null, activo: true, porPagarUsd: 40, compras: 2 }] });
-    if (u.includes("/api/compras") && m === "POST") { st.compra = JSON.parse(r.request().postData() || "{}"); return r.fulfill({ json: { compra: { id: 9 }, proveedor: null, detalles: [] } }); }
-    if (u.includes("/api/compras")) return r.fulfill({ json: [{ compra: { id: 8, proveedorId: 3, numeroFactura: "A-77", fecha: "2026-11-09", totalUsd: 40, tasa: 900, pagada: false, estado: "REGISTRADA", nota: null }, proveedor: "Distribuidora Polar", detalles: [] }] });
+    if (/\/api\/compras\/\d+\/abonos/.test(u) && m === "POST") {
+      const b = JSON.parse(r.request().postData() || "{}"); (st.compraAbonos ??= []).push(b);
+      const pagado = (st.compraAbonos as any[]).reduce((s, x) => s + x.monto, 0);
+      const saldo = Math.max(0, 40 - pagado);
+      return r.fulfill({ json: { compra: { ...compraDemo(st), pagadoUsd: pagado, pagada: saldo <= 0, vence: saldo <= 0 ? null : "2026-11-20" },
+        proveedor: "Distribuidora Polar", detalles: [], abonos: (st.compraAbonos as any[]).map((x, i) => ({ id: i + 1, fecha: "2026-11-13", montoUsd: x.monto, metodo: x.metodo, nota: x.nota ?? null })), fotos: st.compraFotos ?? [], saldoUsd: saldo } });
+    }
+    if (/\/api\/compras\/\d+\/vencimiento/.test(u)) { st.compraVence = JSON.parse(r.request().postData() || "{}"); return r.fulfill({ json: compraDemo(st) }); }
+    if (/\/api\/compras\/\d+\/pagada/.test(u)) { st.compraPagada = u.includes("valor=true"); return r.fulfill({ json: compraDemo(st) }); }
+    if (/\/api\/compras\/\d+\/fotos\/\d+$/.test(u) && m === "DELETE") { st.compraFotos = (st.compraFotos ?? []).filter((f: any) => f.id !== Number(u.split("/").pop())); return r.fulfill({ json: { borrada: true } }); }
+    if (/\/api\/compras\/\d+\/fotos\/\d+$/.test(u)) { return r.fulfill({ json: { id: Number(u.split("/").pop()), mime: "image/jpeg", datos: "QUJD" } }); }
+    if (/\/api\/compras\/\d+\/fotos$/.test(u) && m === "POST") { const f = { id: ((st.compraFotos?.length ?? 0) + 1), mime: "image/jpeg" }; (st.compraFotos ??= []).push(f); return r.fulfill({ json: f }); }
+    if (u.includes("/api/compras") && m === "POST") { st.compra = JSON.parse(r.request().postData() || "{}"); return r.fulfill({ json: { compra: { id: 9 }, proveedor: null, detalles: [], abonos: [], fotos: [], saldoUsd: 0 } }); }
+    if (/\/api\/compras\/\d+$/.test(u)) {
+      const pagado = (st.compraAbonos as any[] ?? []).reduce((s, x) => s + x.monto, 0);
+      const saldo = Math.max(0, 40 - pagado);
+      return r.fulfill({ json: { compra: { ...compraDemo(st), pagadoUsd: pagado, pagada: st.compraPagada || saldo <= 0 }, proveedor: "Distribuidora Polar",
+        detalles: [{ id: 1, productoId: 1, nombre: "Harina PAN", cantidad: 10, costoUnitarioUsd: 2, subtotalUsd: 20 }],
+        abonos: (st.compraAbonos as any[] ?? []).map((x, i) => ({ id: i + 1, fecha: "2026-11-13", montoUsd: x.monto, metodo: x.metodo, nota: x.nota ?? null })),
+        fotos: st.compraFotos ?? [], saldoUsd: st.compraPagada ? 0 : saldo } });
+    }
+    if (u.includes("/api/compras")) return r.fulfill({ json: [{ compra: { id: 8, proveedorId: 3, numeroFactura: "A-77", fecha: "2026-11-09", totalUsd: 40, pagadoUsd: 0, vence: "2026-11-20", tasa: 900, pagada: false, estado: "REGISTRADA", nota: null }, proveedor: "Distribuidora Polar", detalles: [], abonos: [], fotos: [], saldoUsd: 40 }] });
+    if (u.includes("/api/avisos")) return r.fulfill({ json: st.avisos ?? { pagos: [{ compraId: 8, proveedor: "Distribuidora Polar", numeroFactura: "A-77", fecha: "2026-11-09", vence: "2026-11-20", saldoUsd: 40, vencida: false, diasPara: 7 }], stock: [{ productoId: 1, nombre: "Harina PAN", stock: 0, minimo: 5, unidad: "UND", agotado: true }], pagosVencidos: 0, agotados: 1, bajos: 0 } });
     if (u.includes("/api/ventas") && m === "POST" && st.ventaFalla) return r.fulfill({ status: 409, json: { error: st.ventaFalla } });
     if (u.includes("/api/ventas") && m === "POST") { st.venta = JSON.parse(r.request().postData() || "{}"); return r.fulfill({ json: { id: 99, numeroFactura: 1 } }); }
     if (u.includes("/api/mi-negocio/caja-config")) {

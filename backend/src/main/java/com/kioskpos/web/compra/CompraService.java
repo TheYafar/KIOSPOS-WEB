@@ -27,14 +27,19 @@ public class CompraService {
     private final ProveedorRepository proveedores;
     private final CompraRepository compras;
     private final CompraDetalleRepository detalles;
+    private final CompraAbonoRepository abonos;
+    private final CompraFotoRepository fotos;
     private final ProductoRepository productos;
     private final InventarioService inventario;
 
     public CompraService(ProveedorRepository proveedores, CompraRepository compras, CompraDetalleRepository detalles,
+                         CompraAbonoRepository abonos, CompraFotoRepository fotos,
                          ProductoRepository productos, InventarioService inventario) {
         this.proveedores = proveedores;
         this.compras = compras;
         this.detalles = detalles;
+        this.abonos = abonos;
+        this.fotos = fotos;
         this.productos = productos;
         this.inventario = inventario;
     }
@@ -57,8 +62,9 @@ public class CompraService {
                 continue;
             }
             cuantas.merge(c.getProveedorId(), 1, Integer::sum);
-            if (!c.isPagada()) {
-                deuda.merge(c.getProveedorId(), c.getTotalUsd(), BigDecimal::add);
+            BigDecimal saldo = saldoDe(c);
+            if (saldo.signum() > 0) {
+                deuda.merge(c.getProveedorId(), saldo, BigDecimal::add);
             }
         }
         return proveedores.findAllByOrderByNombreAsc().stream()
@@ -93,11 +99,19 @@ public class CompraService {
     public record ItemCompra(Long productoId, BigDecimal cantidad, BigDecimal costoUsd, BigDecimal precioVentaUsd) {
     }
 
-    public record NuevaCompra(Long proveedorId, String numeroFactura, LocalDate fecha, BigDecimal tasa, Boolean pagada,
-                              String nota, List<ItemCompra> items) {
+    public record NuevaCompra(Long proveedorId, String numeroFactura, LocalDate fecha, LocalDate vence, BigDecimal tasa,
+                              Boolean pagada, String nota, List<ItemCompra> items) {
     }
 
-    public record CompraVista(Compra compra, String proveedor, List<CompraDetalle> detalles) {
+    /** Metadatos de una foto (sin los bytes), para listar sin cargar megabytes. */
+    public record FotoMeta(Long id, String mime) {
+    }
+
+    public record CompraVista(Compra compra, String proveedor, List<CompraDetalle> detalles,
+                              List<CompraAbono> abonos, List<FotoMeta> fotos, BigDecimal saldoUsd) {
+        public CompraVista(Compra compra, String proveedor, List<CompraDetalle> detalles) {
+            this(compra, proveedor, detalles, List.of(), List.of(), BigDecimal.ZERO);
+        }
     }
 
     @Transactional
@@ -117,7 +131,9 @@ public class CompraService {
         c.setNumeroFactura(recortar(in.numeroFactura(), 40));
         c.setFecha(in.fecha() == null ? com.kioskpos.web.Fechas.hoy() : in.fecha());
         c.setTasa(in.tasa());
-        c.setPagada(in.pagada() == null || in.pagada());
+        boolean pagada = in.pagada() == null || in.pagada();
+        c.setPagada(pagada);
+        c.setVence(pagada ? null : in.vence());
         c.setNota(recortar(in.nota(), 200));
         c.setUsuarioId(principal == null ? null : principal.usuarioId());
         c.setTotalUsd(BigDecimal.ZERO);
@@ -163,8 +179,9 @@ public class CompraService {
             total = total.add(d.getSubtotalUsd());
         }
         c.setTotalUsd(total);
+        c.setPagadoUsd(c.isPagada() ? total : BigDecimal.ZERO);
         compras.save(c);
-        return new CompraVista(c, proveedorNombre, lineas);
+        return new CompraVista(c, proveedorNombre, lineas, List.of(), List.of(), saldoDe(c));
     }
 
     /** Costo promedio ponderado (portado de FacturaCompraService del escritorio). */
@@ -194,7 +211,8 @@ public class CompraService {
         proveedores.findAll().forEach(p -> nombres.put(p.getId(), p.getNombre()));
         List<Compra> l = proveedorId == null ? compras.findTop200ByOrderByFechaDescIdDesc()
                 : compras.findByProveedorIdOrderByFechaDescIdDesc(proveedorId);
-        return l.stream().map(c -> new CompraVista(c, nombres.get(c.getProveedorId()), List.of())).toList();
+        return l.stream().map(c -> new CompraVista(c, nombres.get(c.getProveedorId()), List.of(),
+                List.of(), List.of(), saldoDe(c))).toList();
     }
 
     @Transactional(readOnly = true)
@@ -202,14 +220,154 @@ public class CompraService {
         Compra c = buscar(id);
         String prov = c.getProveedorId() == null ? null
                 : proveedores.findById(c.getProveedorId()).map(Proveedor::getNombre).orElse(null);
-        return new CompraVista(c, prov, detalles.findByCompraIdOrderByIdAsc(id));
+        List<FotoMeta> metas = fotos.findByCompraIdOrderByIdAsc(id).stream()
+                .map(f -> new FotoMeta(f.getId(), f.getMime())).toList();
+        return new CompraVista(c, prov, detalles.findByCompraIdOrderByIdAsc(id),
+                abonos.findByCompraIdOrderByIdDesc(id), metas, saldoDe(c));
     }
 
+    /** Marca una factura como pagada (saldo 0) o por pagar (sin abonos registrados). */
     @Transactional
     public Compra marcarPagada(Long id, boolean pagada) {
         Compra c = buscar(id);
         c.setPagada(pagada);
+        c.setPagadoUsd(pagada ? c.getTotalUsd() : BigDecimal.ZERO);
+        if (pagada) {
+            c.setVence(null);
+        }
         return compras.save(c);
+    }
+
+    /** Registra un abono (pago parcial) a una factura por pagar. Si cubre el saldo, queda pagada. */
+    @Transactional
+    public CompraVista abonar(KioskPrincipal principal, Long id, BigDecimal monto, String metodo, String nota) {
+        Compra c = buscar(id);
+        if (!"REGISTRADA".equals(c.getEstado())) {
+            throw new IllegalStateException("La compra está anulada");
+        }
+        if (monto == null || monto.signum() <= 0) {
+            throw new IllegalArgumentException("El abono debe ser mayor a 0");
+        }
+        monto = monto.setScale(2, RoundingMode.HALF_UP);
+        BigDecimal saldo = saldoDe(c);
+        if (saldo.signum() <= 0) {
+            throw new IllegalStateException("Esta factura ya está pagada");
+        }
+        if (monto.compareTo(saldo) > 0) {
+            monto = saldo; // no se abona más de lo que se debe
+        }
+        CompraAbono a = new CompraAbono();
+        a.setNegocioId(NegocioContext.require());
+        a.setCompraId(c.getId());
+        a.setFecha(com.kioskpos.web.Fechas.hoy());
+        a.setMontoUsd(monto);
+        a.setMetodo(recortar(metodo, 16));
+        a.setNota(recortar(nota, 200));
+        a.setUsuarioId(principal == null ? null : principal.usuarioId());
+        abonos.save(a);
+
+        c.setPagadoUsd(c.getPagadoUsd().add(monto));
+        if (c.getPagadoUsd().compareTo(c.getTotalUsd()) >= 0) {
+            c.setPagada(true);
+            c.setVence(null);
+        }
+        compras.save(c);
+        return detalle(id);
+    }
+
+    /** Cambia la fecha de pago (vencimiento) de una factura por pagar. */
+    @Transactional
+    public Compra fijarVencimiento(Long id, LocalDate vence) {
+        Compra c = buscar(id);
+        c.setVence(c.isPagada() ? null : vence);
+        return compras.save(c);
+    }
+
+    // ---------- Fotos de la factura ----------
+
+    @Transactional
+    public FotoMeta guardarFoto(Long id, String mime, String datos) {
+        Compra c = buscar(id);
+        if (datos == null || datos.isBlank()) {
+            throw new IllegalArgumentException("La foto está vacía");
+        }
+        if (datos.length() > 9_000_000) {
+            throw new IllegalArgumentException("La foto es muy pesada; tómala con menos resolución");
+        }
+        if (fotos.countByCompraId(id) >= 6) {
+            throw new IllegalStateException("Ya hay 6 fotos en esta factura");
+        }
+        CompraFoto f = new CompraFoto();
+        f.setNegocioId(NegocioContext.require());
+        f.setCompraId(c.getId());
+        f.setMime(mime == null || mime.isBlank() ? "image/jpeg" : recortar(mime, 40));
+        f.setDatos(datos);
+        f = fotos.save(f);
+        return new FotoMeta(f.getId(), f.getMime());
+    }
+
+    @Transactional(readOnly = true)
+    public CompraFoto foto(Long compraId, Long fotoId) {
+        CompraFoto f = fotos.findById(fotoId)
+                .orElseThrow(() -> new IllegalArgumentException("Foto no encontrada"));
+        if (!f.getCompraId().equals(compraId)) {
+            throw new IllegalArgumentException("Foto no encontrada");
+        }
+        return f;
+    }
+
+    @Transactional
+    public void borrarFoto(Long compraId, Long fotoId) {
+        fotos.delete(foto(compraId, fotoId));
+    }
+
+    /** Saldo pendiente de una factura (0 si está anulada o pagada). */
+    static BigDecimal saldoDe(Compra c) {
+        if (!"REGISTRADA".equals(c.getEstado())) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal pagado = c.getPagadoUsd() == null ? BigDecimal.ZERO : c.getPagadoUsd();
+        BigDecimal saldo = c.getTotalUsd().subtract(pagado);
+        return saldo.signum() > 0 ? saldo : BigDecimal.ZERO;
+    }
+
+    // ---------- Avisos (campanita): pagos a proveedores pendientes ----------
+
+    public record PagoPendiente(Long compraId, String proveedor, String numeroFactura, LocalDate fecha,
+                                LocalDate vence, BigDecimal saldoUsd, boolean vencida, Integer diasPara) {
+    }
+
+    @Transactional(readOnly = true)
+    public List<PagoPendiente> pagosPendientes() {
+        Map<Long, String> nombres = new HashMap<>();
+        proveedores.findAll().forEach(p -> nombres.put(p.getId(), p.getNombre()));
+        LocalDate hoy = com.kioskpos.web.Fechas.hoy();
+        List<PagoPendiente> out = new ArrayList<>();
+        for (Compra c : compras.findTop200ByOrderByFechaDescIdDesc()) {
+            BigDecimal saldo = saldoDe(c);
+            if (saldo.signum() <= 0) {
+                continue;
+            }
+            LocalDate v = c.getVence();
+            boolean vencida = v != null && v.isBefore(hoy);
+            Integer dias = v == null ? null : (int) java.time.temporal.ChronoUnit.DAYS.between(hoy, v);
+            out.add(new PagoPendiente(c.getId(), nombres.get(c.getProveedorId()), c.getNumeroFactura(),
+                    c.getFecha(), v, saldo, vencida, dias));
+        }
+        // Primero las que tienen fecha de pago y están más cerca de vencer (o ya vencidas).
+        out.sort((a, b) -> {
+            if (a.vence() == null && b.vence() == null) {
+                return 0;
+            }
+            if (a.vence() == null) {
+                return 1;
+            }
+            if (b.vence() == null) {
+                return -1;
+            }
+            return a.vence().compareTo(b.vence());
+        });
+        return out;
     }
 
     /** Anula una compra mal cargada: saca del stock lo que entró (si todavía está). */
