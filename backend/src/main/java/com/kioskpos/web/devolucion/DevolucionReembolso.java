@@ -39,4 +39,8 @@ public class DevolucionReembolso {
 
     @Column(length = 100)
     private String referencia;
+
+    /** Solo FUERA_DE_CAJA: cómo se le dio el dinero (EFECTIVO_USD, PAGO_MOVIL, ZELLE…). */
+    @Column(length = 20)
+    private String forma;
 }

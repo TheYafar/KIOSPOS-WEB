@@ -20,6 +20,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.stereotype.Service;
@@ -72,11 +73,21 @@ public class DevolucionService {
     }
 
     /** metodoReembolso: COMO_PAGO (igual que pagó, repartido), un método, A_CUENTA o FUERA_DE_CAJA. */
-    public record NuevaDevolucion(List<ItemDevolucion> items, String metodoReembolso, String motivo, String referencia) {
+    public record NuevaDevolucion(List<ItemDevolucion> items, String metodoReembolso, String motivo, String referencia,
+                                  String formaFuera) {
+        public NuevaDevolucion(List<ItemDevolucion> items, String metodoReembolso, String motivo, String referencia) {
+            this(items, metodoReembolso, motivo, referencia, null);
+        }
+
         public NuevaDevolucion(List<ItemDevolucion> items, String metodoReembolso, String motivo) {
-            this(items, metodoReembolso, motivo, null);
+            this(items, metodoReembolso, motivo, null, null);
         }
     }
+
+    /** Cómo se le pudo dar el dinero en una devolución fuera de caja, y en qué moneda va. */
+    static final Map<String, String> FORMAS_FUERA = Map.of(
+            "EFECTIVO_USD", "USD", "EFECTIVO_BS", "VES", "PAGO_MOVIL", "VES", "TRANSFERENCIA", "VES",
+            "PUNTO", "VES", "BIOPAGO", "VES", "ZELLE", "USD", "BINANCE", "USD");
 
     public record DevolucionHecha(Devolucion devolucion, List<DevolucionReembolso> reembolsos) {
     }
@@ -246,7 +257,14 @@ public class DevolucionService {
                 if (principal == null || !(principal.rol() == RolUsuario.DUENO || principal.rol() == RolUsuario.ENCARGADO)) {
                     throw new IllegalArgumentException("Solo el dueño o el encargado registra devoluciones fuera de caja");
                 }
-                partes = List.of(new RepartoReembolso.Parte("FUERA_DE_CAJA", "USD", total));
+                String forma = in.formaFuera() == null || in.formaFuera().isBlank() ? null : in.formaFuera().trim().toUpperCase(Locale.ROOT);
+                if (forma != null && !FORMAS_FUERA.containsKey(forma)) {
+                    throw new IllegalArgumentException("Forma de devolución no válida");
+                }
+                // En la moneda en que se le dio: Bs a la tasa de la venta (recibe lo que pagó).
+                partes = List.of(forma != null && "VES".equals(FORMAS_FUERA.get(forma))
+                        ? new RepartoReembolso.Parte("FUERA_DE_CAJA", "VES", total.multiply(tasaVenta).setScale(2, RoundingMode.HALF_UP))
+                        : new RepartoReembolso.Parte("FUERA_DE_CAJA", "USD", total));
             }
         }
         if (partes.isEmpty()) {
@@ -304,7 +322,11 @@ public class DevolucionService {
             rr.setMetodo(p.metodo());
             rr.setMoneda(p.moneda());
             rr.setMonto(p.monto());
-            rr.setReferencia("PAGO_MOVIL".equals(p.metodo()) && ref != null ? (ref.length() > 100 ? ref.substring(0, 100) : ref) : null);
+            String forma = "FUERA_DE_CAJA".equals(p.metodo()) && in.formaFuera() != null && !in.formaFuera().isBlank()
+                    ? in.formaFuera().trim().toUpperCase(Locale.ROOT) : null;
+            rr.setForma(forma);
+            boolean llevaRef = "PAGO_MOVIL".equals(p.metodo()) || forma != null && !forma.startsWith("EFECTIVO");
+            rr.setReferencia(llevaRef && ref != null ? (ref.length() > 100 ? ref.substring(0, 100) : ref) : null);
             reembolsos.save(rr);
         }
 

@@ -119,7 +119,7 @@ class SuscripcionPermisoTest extends PostgresRlsTestBase {
         ponerPagoHasta(neg, com.kioskpos.web.Fechas.hoy().minusDays(40)); // bien vencido, solo consulta
         assertThat(suscripcionService.puedeCobrar(neg)).isFalse();
 
-        var pago = suscripcionService.reportarPago(neg, new BigDecimal("25.00"), "USD", "Pago móvil", "REF-1", 1);
+        var pago = suscripcionService.reportarPago(neg, new BigDecimal("15.00"), "USD", "Pago móvil", "REF-1", 1);
         assertThat(pago.getEstado()).isEqualTo("PENDIENTE");
 
         suscripcionService.aprobarPago(pago.getId(), 1L);
@@ -144,7 +144,7 @@ class SuscripcionPermisoTest extends PostgresRlsTestBase {
         assertThat(vencida.estadoEfectivo()).isEqualTo("SUSPENDIDA");
         assertThat(vencida.puedeCobrar()).isFalse();
         assertThat(vencida.mensaje()).contains("prueba gratis terminó");
-        assertThat(vencida.deuda()).isEqualByComparingTo("25.00");
+        assertThat(vencida.deuda()).isEqualByComparingTo("15.00");
 
         // Paga el primer mes: deja de estar en prueba y vuelve a cobrar.
         var pago = suscripcionService.reportarPago(neg, new BigDecimal("25.00"), "USD", "Pago móvil", "R-9", 1);
@@ -157,14 +157,14 @@ class SuscripcionPermisoTest extends PostgresRlsTestBase {
     @Test
     void planYCajasDefinenLaMensualidadYLosLimites() {
         Long neg = nuevoNegocio("Planes", "planes@ejemplo.com");
-        assertThat(suscripcionService.situacion(neg).mensualidad()).isEqualByComparingTo("25.00");
+        assertThat(suscripcionService.situacion(neg).mensualidad()).isEqualByComparingTo("15.00");
         suscripcionService.cambiarPlan(neg, "basico", 2, 1);
-        assertThat(suscripcionService.situacion(neg).mensualidad()).isEqualByComparingTo("35.00"); // 25 + 1 caja extra de 10
+        assertThat(suscripcionService.situacion(neg).mensualidad()).isEqualByComparingTo("19.00"); // 15 + 1 caja extra de 4
         suscripcionService.cambiarPlan(neg, "PRO", 3, 1);
         var pro = suscripcionService.situacion(neg);
         assertThat(pro.plan()).isEqualTo("PRO");
         assertThat(pro.cajasContratadas()).isEqualTo(3);
-        assertThat(pro.mensualidad()).isEqualByComparingTo("48.00"); // 40 + 1 extra de 8
+        assertThat(pro.mensualidad()).isEqualByComparingTo("29.00"); // 25 + 1 extra de 4
 
         assertThatThrownBy(() -> suscripcionService.cambiarPlan(neg, "BASICO", 4, 1)).hasMessageContaining("hasta 3 cajas");
         assertThatThrownBy(() -> suscripcionService.cambiarPlan(neg, "PRO", 1, 2)).hasMessageContaining("Desactiva alguna");

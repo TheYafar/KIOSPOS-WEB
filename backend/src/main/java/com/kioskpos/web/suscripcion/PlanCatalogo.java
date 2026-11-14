@@ -20,10 +20,10 @@ public final class PlanCatalogo {
     }
 
     public static final List<Plan> PLANES = List.of(
-            new Plan("BASICO", "Bodega", new BigDecimal("25.00"), 1, new BigDecimal("10.00"), 3,
-                    "Para la bodega de una o dos cajas. Ventas, inventario, crédito, recargas, cierres y reportes."),
-            new Plan("PRO", "Bodega Pro", new BigDecimal("40.00"), 2, new BigDecimal("8.00"), 10,
-                    "Para negocios con varias cajas: 2 incluidas y cajas extra más baratas."));
+            new Plan("BASICO", "Bodega", new BigDecimal("15.00"), 1, new BigDecimal("4.00"), 3,
+                    "Para la bodega de una a tres cajas. Ventas, inventario, crédito, recargas, cierres y reportes."),
+            new Plan("PRO", "Bodega Pro", new BigDecimal("25.00"), 2, new BigDecimal("4.00"), 10,
+                    "Para negocios con varias cajas: 2 incluidas y hasta 10 cajas."));
 
     private PlanCatalogo() {
     }

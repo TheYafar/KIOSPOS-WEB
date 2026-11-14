@@ -86,3 +86,24 @@ test("registrar una compra: busca el producto, calcula el costo promedio y la ma
   await expect(page.locator(".pill.ok")).toContainText("Compra registrada");
   expect(st.compra).toMatchObject({ proveedorId: 3, numeroFactura: "B-12", pagada: false, items: [{ productoId: 1, cantidad: 20, costoUsd: 0.8 }] });
 });
+
+test("devolución fuera de caja: el dueño anota cómo se la dio (pago móvil en Bs con referencia)", async ({ page }) => {
+  const st: Estado = { turnoAbierto: true };
+  await preparar(page, st, { "kioskpos.sesion": sesionDueno, "kioskpos.cajaToken": '""' });
+  await ir(page);
+  await page.evaluate(() => { location.hash = "#/ventas"; });
+  await page.locator(".vt-row", { hasText: "#4" }).click();
+  await page.getByRole("button", { name: "Devolver productos" }).click();
+  await page.getByRole("button", { name: "Más Arroz Mary" }).click();
+  await page.getByRole("button", { name: "Fuera de caja" }).click();
+  await expect(page.getByRole("button", { name: "Elige cómo se lo diste" })).toBeDisabled();
+  const formas = page.getByRole("group", { name: "Cómo se le dio el dinero" });
+  await formas.getByRole("button", { name: "Pago móvil" }).click();
+  await expect(page.locator(".cli-saldo")).toContainText("Pago móvil (fuera de caja)");
+  await expect(page.locator(".cli-saldo")).toContainText("Bs 1.800,00");
+  await expect(page.locator(".cli-saldo")).toContainText("no toca el cierre de caja");
+  await page.getByLabel("Referencia del reembolso").fill("7788");
+  await page.getByRole("button", { name: "Devolver $ 2,00" }).click();
+  await expect(page.locator(".pinmsg.ok")).toHaveText("Devolución registrada ✓");
+  expect(st.devuelta).toEqual({ id: 12, items: [{ detalleId: 201, cantidad: 1 }], metodoReembolso: "FUERA_DE_CAJA", referencia: "7788", formaFuera: "PAGO_MOVIL" });
+});

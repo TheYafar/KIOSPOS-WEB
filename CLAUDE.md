@@ -511,8 +511,8 @@ el alta/venta/login (try/catch + log).
 - **Cuentas "a mano" en el servidor** (V23 `contabilidad_docs`, RLS, JSON + `version`):
   `GET|PUT /api/contabilidad/{libro|hojas}` (409 con lo del servidor si otro equipo guardó antes).
   `contabilidad-sync.ts` (`useDocServidor`): copia local + subida a los 1,5 s, pendiente sin internet.
-- **Planes (Sección 6)** (`suscripcion/PlanCatalogo`): Bodega $25 (1 caja, +$10, máx. 3) y Bodega Pro $40 (2 cajas,
-  +$8, máx. 10); mensualidad = plan + cajas extra. V24 `negocios.en_prueba`: la prueba de 7 días **vence sola sin
+- **Planes (Sección 6)** (`suscripcion/PlanCatalogo`): Bodega **$15** (1 caja, +$4, máx. 3) y Bodega Pro **$25** (2 cajas,
+  +$4, máx. 10) — precios de nov-2026 (antes $25/+$10 y $40/+$8); mensualidad = plan + cajas extra. V24 `negocios.en_prueba`: la prueba de 7 días **vence sola sin
   gracia**; el primer pago aprobado la apaga. `GET /api/planes`, `PUT /api/mi-negocio/plan` (dueño),
   `PUT /api/admin/negocios/{id}/plan`; plan al crear negocio. PWA: `ElegirPlan.tsx` en Mi plan y en el panel admin,
   barra "Prueba gratis: te quedan N días".
@@ -804,3 +804,15 @@ el alta/venta/login (try/catch + log).
 - La pantalla final de la caja dice "N° control interno" (el número interno sigue siendo `numero_factura`).
 - **Pendiente (P3):** factura fiscal real = integrarse con una imprenta digital autorizada o con máquina fiscal.
 - Pruebas: `TicketFormatoTest`, `ticket.test.ts`, `e2e/nofiscal.spec.ts`; verificado contra Postgres real.
+
+## 41. Devolución fuera de caja con su forma + nuevos precios
+
+- **Devolución "Fuera de caja"** (solo dueño/encargado): ahora se elige **cómo se le dio el dinero** (Efectivo $,
+  Efectivo Bs, Pago móvil, Transferencia, Punto, Biopago, Zelle, Binance) → `POST /api/ventas/{id}/devolver
+  {metodoReembolso: FUERA_DE_CAJA, formaFuera, referencia?}`. V31 `devolucion_reembolsos.forma`; las formas en Bs
+  guardan el monto en VES a la tasa de la venta. Sigue sin tocar el cuadre (`metodo` = FUERA_DE_CAJA). En la PWA el
+  botón queda en "Elige cómo se lo diste" hasta elegirla; la historia muestra "Fuera de caja · Pago móvil Bs X (ref.)".
+- **Precios:** Bodega $15 (+$4 por caja extra), Bodega Pro $25 (+$4). La mensualidad se calcula en vivo, así que los
+  negocios existentes pasan al precio nuevo sin migración.
+- Pruebas: `e2e/ventas.spec.ts` (fuera de caja), `e2e/planes.spec.ts`, `SuscripcionPermisoTest`; verificado contra
+  Postgres real (reembolso VES con forma y referencia, cuadre sin cambios, `/api/planes`).

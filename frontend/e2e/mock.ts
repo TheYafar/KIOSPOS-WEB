@@ -66,11 +66,11 @@ export function rangoDemo(u: string) {
 }
 
 export const planesDemo = [
-  { codigo: "BASICO", nombre: "Bodega", precioBase: 25, cajasIncluidas: 1, precioCajaExtra: 10, maxCajas: 3, descripcion: "Para la bodega de una o dos cajas." },
-  { codigo: "PRO", nombre: "Bodega Pro", precioBase: 40, cajasIncluidas: 2, precioCajaExtra: 8, maxCajas: 10, descripcion: "Para negocios con varias cajas." },
+  { codigo: "BASICO", nombre: "Bodega", precioBase: 15, cajasIncluidas: 1, precioCajaExtra: 4, maxCajas: 3, descripcion: "Para la bodega de una o dos cajas." },
+  { codigo: "PRO", nombre: "Bodega Pro", precioBase: 25, cajasIncluidas: 2, precioCajaExtra: 4, maxCajas: 10, descripcion: "Para negocios con varias cajas." },
 ];
 export const situacionDemo = (st: Estado) => ({ negocioId: 1, nombre: "Bodega", plan: "BASICO", planNombre: "Bodega", estadoEfectivo: "ACTIVA", puedeCobrar: true, pagoHasta: "2026-12-10",
-  diasVencido: 0, mesesPendientes: 0, deuda: 0, mensaje: st.prueba ? "Prueba gratis: te quedan 5 días" : "", enPrueba: !!st.prueba, cajasContratadas: 1, mensualidad: 25 });
+  diasVencido: 0, mesesPendientes: 0, deuda: 0, mensaje: st.prueba ? "Prueba gratis: te quedan 5 días" : "", enPrueba: !!st.prueba, cajasContratadas: 1, mensualidad: 15 });
 
 export const clientesDemo = () => [
   { id: 1, nombre: "María Pérez", cedula: "V12345678", telefono: "04121234567", limiteUsd: 10, activo: true, saldoUsd: 8, ultimoMovimiento: "2026-11-09T12:00:00Z" },

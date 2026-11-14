@@ -19,7 +19,14 @@ const hoy = () => hoyVe();
 const ayer = () => hace(1);
 const NOMBRE: Record<string, string> = { EFECTIVO_USD: "Efectivo $", EFECTIVO_BS: "Efectivo Bs", PAGO_MOVIL: "Pago móvil", PUNTO: "Punto", BIOPAGO: "Biopago", OTRO: "Otra", FIADO: "Crédito",
   A_CUENTA: "A su crédito", FUERA_DE_CAJA: "Fuera de caja", COMO_PAGO: "Como pagó" };
-const fmtParte = (p: { metodo: string; moneda: string; monto: number }) => (NOMBRE[p.metodo] || p.metodo) + " " + (p.moneda === "USD" ? usd(p.monto) : bs(p.monto));
+// Devolución fuera de caja: cómo se le dio el dinero (y en qué moneda va).
+const FORMAS_FUERA: [string, string, "USD" | "VES"][] = [["EFECTIVO_USD", "Efectivo $", "USD"], ["EFECTIVO_BS", "Efectivo Bs", "VES"],
+  ["PAGO_MOVIL", "Pago móvil", "VES"], ["TRANSFERENCIA", "Transferencia", "VES"], ["PUNTO", "Punto", "VES"], ["BIOPAGO", "Biopago", "VES"],
+  ["ZELLE", "Zelle", "USD"], ["BINANCE", "Binance", "USD"]];
+const nombreForma = (f?: string | null) => FORMAS_FUERA.find((x) => x[0] === f)?.[1] || f || "";
+const fmtParte = (p: { metodo: string; moneda: string; monto: number; forma?: string | null; referencia?: string | null }) =>
+  (NOMBRE[p.metodo] || p.metodo) + (p.forma ? " · " + nombreForma(p.forma) : "") + " " + (p.moneda === "USD" ? usd(p.monto) : bs(p.monto))
+  + (p.referencia ? " (ref. " + p.referencia + ")" : "");
 const esJefe = () => { const r = getSesion()?.rol; return r === "DUENO" || r === "ENCARGADO"; };
 
 export function Ventas() {
@@ -98,6 +105,7 @@ function DetalleVentaModal({ id, onClose, onCambio }: { id: number; onClose: () 
   const [cant, setCant] = useState<Record<number, string>>({});
   const [metodo, setMetodo] = useState("COMO_PAGO");
   const [refe, setRefe] = useState("");
+  const [forma, setForma] = useState<string | null>(null);
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [enviando, setEnviando] = useState(false);
@@ -119,14 +127,18 @@ function DetalleVentaModal({ id, onClose, onCambio }: { id: number; onClose: () 
   const enBs = (n: number) => Math.round(n * v.tasa * 100) / 100;
   const partes: Parte[] = totalDev <= 0 ? []
     : metodo === "COMO_PAGO" ? repartir(v.pagos, v.vueltoUsd, v.vueltoBs, v.tasa, v.totalUsd, totalDev)
-    : metodo === "EFECTIVO_USD" || metodo === "A_CUENTA" || metodo === "FUERA_DE_CAJA" ? [{ metodo, moneda: "USD", monto: totalDev }]
+    : metodo === "FUERA_DE_CAJA" ? [FORMAS_FUERA.find((x) => x[0] === forma)?.[2] === "VES"
+        ? { metodo, moneda: "VES", monto: enBs(totalDev) } : { metodo, moneda: "USD", monto: totalDev }]
+    : metodo === "EFECTIVO_USD" || metodo === "A_CUENTA" ? [{ metodo, moneda: "USD", monto: totalDev }]
     : [{ metodo, moneda: "VES", monto: enBs(totalDev) }];
-  const pideRef = partes.some((p) => p.metodo === "PAGO_MOVIL");
+  const fuera = metodo === "FUERA_DE_CAJA";
+  const faltaForma = fuera && !forma;
+  const pideRef = partes.some((p) => p.metodo === "PAGO_MOVIL") || (fuera && !!forma && !forma.startsWith("EFECTIVO"));
   const devolverTodo = () => setCant(Object.fromEntries(v.lineas.filter((l) => !l.servicio && queda(l) > 0).map((l) => [l.detalleId, String(queda(l))])));
 
   const correr = async (fn: () => Promise<unknown>, msg: string) => {
     setEnviando(true); setErr("");
-    try { await fn(); setOk(msg); setModo("ver"); setCant({}); setMotivo(""); setRefe(""); await cargar(); onCambio(); window.dispatchEvent(new Event("kp-turno")); }
+    try { await fn(); setOk(msg); setModo("ver"); setCant({}); setMotivo(""); setRefe(""); setForma(null); await cargar(); onCambio(); window.dispatchEvent(new Event("kp-turno")); }
     catch (e) { setErr((e as Error).message); }
     finally { setEnviando(false); }
   };
@@ -186,15 +198,24 @@ function DetalleVentaModal({ id, onClose, onCambio }: { id: number; onClose: () 
                 <div className="seg cli-met">{metodos.map(([m, n]) => <button key={m} className={metodo === m ? "on" : ""} onClick={() => setMetodo(m)}>{n}</button>)}</div>
               </div>
               {metodos.length === 0 && <span className="hint">Para devolver dinero hazlo desde una caja abierta.</span>}
+              {fuera && (
+                <div className="lbl">¿Cómo se lo diste?
+                  <div className="seg cli-met vt-forma" role="group" aria-label="Cómo se le dio el dinero">
+                    {FORMAS_FUERA.map(([f, n]) => <button key={f} className={forma === f ? "on" : ""} onClick={() => setForma(f)}>{n}</button>)}
+                  </div>
+                </div>
+              )}
               {metodo === "COMO_PAGO" && <span className="hint">Se le devuelve por las mismas formas con que pagó, en la misma proporción (sin contar el vuelto).</span>}
               {totalDev > 0 && (
                 <div className="cli-saldo debe vt-reemb">
                   <span>{metodo === "A_CUENTA" ? "Se baja de su crédito" : "Le devuelves"} {usd(totalDev)}</span>
-                  {partes.map((p) => <div key={p.metodo + p.moneda} className="vt-parte"><span>{NOMBRE[p.metodo] || p.metodo}</span><b className="t">{p.moneda === "USD" ? usd(p.monto) : bs(p.monto)}</b></div>)}
-                  <small>La mercancía vuelve al inventario y el dinero se descuenta del cierre de caja.</small>
+                  {partes.map((p) => <div key={p.metodo + p.moneda} className="vt-parte"><span>{fuera && forma ? nombreForma(forma) + " (fuera de caja)" : NOMBRE[p.metodo] || p.metodo}</span><b className="t">{p.moneda === "USD" ? usd(p.monto) : bs(p.monto)}</b></div>)}
+                  <small>{fuera ? "La mercancía vuelve al inventario. El dinero no sale de la gaveta: no toca el cierre de caja."
+                    : metodo === "A_CUENTA" ? "La mercancía vuelve al inventario y se le baja la deuda."
+                    : "La mercancía vuelve al inventario y el dinero se descuenta del cierre de caja."}</small>
                 </div>
               )}
-              {pideRef && <input className="inp" inputMode="numeric" value={refe} onChange={(e) => setRefe(e.target.value.replace(/\D/g, "").slice(0, 12))} placeholder="Referencia del pago móvil que le hiciste (opcional)" aria-label="Referencia del reembolso" />}
+              {pideRef && <input className="inp" inputMode="numeric" value={refe} onChange={(e) => setRefe(e.target.value.replace(/\D/g, "").slice(0, 12))} placeholder={fuera ? "Referencia de lo que le enviaste (opcional)" : "Referencia del pago móvil que le hiciste (opcional)"} aria-label="Referencia del reembolso" />}
               <input className="inp" value={motivo} maxLength={200} onChange={(e) => setMotivo(e.target.value)} placeholder="Motivo (opcional): vencido, dañado…" aria-label="Motivo de la devolución" />
             </>
           )}
@@ -215,10 +236,11 @@ function DetalleVentaModal({ id, onClose, onCambio }: { id: number; onClose: () 
           </>}
           {modo === "devolver" && <>
             <button className="btn2 big press" onClick={() => setModo("ver")}>Volver</button>
-            <button className="btn primary big press" disabled={totalDev <= 0 || enviando || metodos.length === 0} onClick={() => correr(() => devolverVenta(v.id, {
+            <button className="btn primary big press" disabled={totalDev <= 0 || enviando || metodos.length === 0 || faltaForma} onClick={() => correr(() => devolverVenta(v.id, {
               items: v.lineas.map((l) => ({ detalleId: l.detalleId, cantidad: Math.min(queda(l), leerMonto(cant[l.detalleId]) ?? 0) })).filter((x) => x.cantidad > 0),
               metodoReembolso: metodo, ...(motivo.trim() ? { motivo: motivo.trim() } : {}), ...(pideRef && refe ? { referencia: refe } : {}),
-            }), "Devolución registrada ✓")}>{enviando ? "Guardando…" : totalDev > 0 ? "Devolver " + usd(totalDev) : "Elige qué devuelve"}</button>
+              ...(fuera && forma ? { formaFuera: forma } : {}),
+            }), "Devolución registrada ✓")}>{enviando ? "Guardando…" : totalDev > 0 && faltaForma ? "Elige cómo se lo diste" : totalDev > 0 ? "Devolver " + usd(totalDev) : "Elige qué devuelve"}</button>
           </>}
         </div>
       </div>
