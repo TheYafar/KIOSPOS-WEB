@@ -233,10 +233,11 @@ export interface ServicioCobro {
   tipo: "RECARGA" | "AVANCE"; operadora?: string; numero?: string; montoBs?: number;
   entregaMoneda?: "USD" | "VES"; entregaMonto?: number; cobradoBs: number;
 }
-export async function cobrar(items: LineaCobro[], pagos: PagoCobro[], clienteId?: number | null, resumen?: { totalUsd: number; productos: string }, servicios?: ServicioCobro[]): Promise<string> {
+/** vueltoUsd: dólares del vuelto que se entregan en $ (el resto sale en Bs). */
+export async function cobrar(items: LineaCobro[], pagos: PagoCobro[], clienteId?: number | null, resumen?: { totalUsd: number; productos: string }, servicios?: ServicioCobro[], vueltoUsd?: number): Promise<string> {
   const codigoUnico = nuevoCodigo();
   await encolar(codigoUnico, { codigoUnico, tasaBcv: Number(getTasa()) || 1, items, pagos, ...(clienteId ? { clienteId } : {}),
-    ...(servicios && servicios.length ? { servicios } : {}) }, resumen);
+    ...(servicios && servicios.length ? { servicios } : {}), ...(vueltoUsd != null ? { vueltoUsd } : {}) }, resumen);
   await sincronizar();
   return codigoUnico;
 }

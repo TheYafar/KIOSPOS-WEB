@@ -49,6 +49,9 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
 }) {
   const [txt, setTxt] = useState<Record<string, string>>({});
   const [ref, setRef] = useState("");
+  // Vuelto: "auto" decide solo (Bs si pagó en Bs o es menos de $1; si no, dólares enteros + resto en Bs).
+  const [vModo, setVModo] = useState<"auto" | "USD" | "VES" | "MIXTO">("auto");
+  const [vUsdTxt, setVUsdTxt] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [foco, setFoco] = useState<string>("EFECTIVO_USD"); // casilla activa (para F8)
   const primero = useRef<HTMLInputElement>(null);
@@ -75,10 +78,32 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
   const aCalc = (f: Forma, u: number) => (f.extra?.tipo === "OTRA" ? Math.round(u * (f.extra.tasaUsd || 0) * 100) / 100 : u);
   const deCalc = (f: Forma, v: number) => (f.extra?.tipo === "OTRA" ? (f.extra.tasaUsd > 0 ? Math.ceil((v / f.extra.tasaUsd) * 100 - 1e-6) / 100 : 0) : v);
   const montos: Montos = Object.fromEntries(formas.map((f) => [f.id, aCalc(f, unidades(f))])) as Montos;
-  const e = calcularCobro(total, tasa, montos, monedaDe, totalBs);
-  const pmUsado = (montos.PAGO_MOVIL || 0) > 0;
-  const refMala = pmUsado && !/^\d{4,6}$/.test(ref);
+  // El crédito no es dinero: se descuenta del total y lo demás se cobra normal (igual que el servidor).
   const fiadoUsd = montos.FIADO || 0;
+  const sinFiado: Montos = { ...montos, FIADO: 0 };
+  const neto = Math.max(0, Math.round((total - fiadoUsd) * 100) / 100);
+  const bsFijo = fiadoUsd > 0 ? undefined : totalBs;
+  const totalBsVista = totalBs ?? Math.round(total * tasa * 100) / 100;
+  const e0 = calcularCobro(neto, tasa, sinFiado, monedaDe, bsFijo);
+  const modo = vModo !== "auto" ? vModo
+    : e0.soloBs || e0.sobraUsd < 1 ? "VES" : Number.isInteger(Math.round(e0.sobraUsd * 100) / 100) ? "USD" : "MIXTO";
+  const dolaresVuelto = modo === "USD" ? e0.sobraUsd : modo === "VES" ? 0
+    : Math.min(e0.sobraUsd, vModo === "MIXTO" ? numOf(vUsdTxt) : Math.floor(e0.sobraUsd));
+  const e = calcularCobro(neto, tasa, sinFiado, monedaDe, bsFijo, dolaresVuelto);
+  const hayVuelto = e.cubre && e.sobraBs > 0;
+  const entregaTxt = e.vueltoUsd > 0 && e.vueltoBs > 0 ? usd(e.vueltoUsd) + " + " + bs(e.vueltoBs)
+    : e.vueltoUsd > 0 ? usd(e.vueltoUsd) : bs(e.vueltoBs);
+  const elegirVuelto = (m: "USD" | "VES" | "MIXTO") => {
+    setVModo(m);
+    if (m === "MIXTO") setVUsdTxt(String(Math.floor(e0.sobraUsd) || 0));
+  };
+  const pasoDolar = (d: number) => {
+    const n = Math.min(Math.floor(e0.sobraUsd), Math.max(0, Math.floor(numOf(vModo === "MIXTO" ? vUsdTxt : String(dolaresVuelto))) + d));
+    setVModo("MIXTO"); setVUsdTxt(String(n));
+  };
+  const pmUsado = (montos.PAGO_MOVIL || 0) > 0;
+  // La referencia del pago móvil es OPCIONAL; si se escribe, que sea completa (4 a 6 dígitos).
+  const refMala = pmUsado && ref.length > 0 && !/^\d{4,6}$/.test(ref);
   const fiadoMal = fiadoUsd <= 0 ? ""
     : !cliente ? "Elige a quién le das crédito"
     : fiadoUsd > total + 0.005 ? "El crédito no puede pasar del total"
@@ -86,16 +111,16 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
     : "";
 
   // El motivo REAL por el que no se puede cobrar (antes decía "Faltan $0,00" aunque faltara la referencia).
-  const bloqueo = !e.hayPago ? "Escribe cuánto pagó el cliente"
+  const bloqueo = !(e.hayPago || fiadoUsd > 0) ? "Escribe cuánto pagó el cliente"
     : !e.cubre ? "Faltan " + usd(e.faltaUsd) + " · " + bs(e.faltaBs)
-    : refMala ? "Falta la referencia del pago móvil (4 a 6 dígitos)"
+    : refMala ? "La referencia lleva 4 a 6 dígitos (o déjala vacía)"
     : fiadoMal ? fiadoMal
     : "";
   const valido = !bloqueo && !enviando;
 
   const set = (id: string, v: string) => setTxt((t) => ({ ...t, [id]: v }));
   const billete = (id: string, b: number) => set(id, aTexto((montos[id] || 0) + b)); // suma, como el escritorio
-  const limpiar = () => { setTxt({}); setRef(""); };
+  const limpiar = () => { setTxt({}); setRef(""); setVModo("auto"); setVUsdTxt(""); };
 
   // "Resto aquí": SIEMPRE hace algo visible.
   //  - Si falta dinero con las demás formas: pone en esta lo que falta (y lo dice en el botón).
@@ -126,9 +151,9 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
       ? { metodo: "OTRO", moneda: f.moneda, montoOriginal: Math.round((montos[f.id] || 0) * 100) / 100,
           referencia: (f.n + (f.sim ? " " + f.sim + " " + money(unidades(f)) : "")).slice(0, 100) }
       : { metodo: f.id as PagoCobro["metodo"], moneda: f.moneda, montoOriginal: Math.round((montos[f.id] || 0) * 100) / 100,
-          ...(f.id === "PAGO_MOVIL" ? { referencia: ref } : {}) });
-    const payLine = usados.map((f) => f.n + " " + fmtF(f, unidades(f)) + (f.id === "PAGO_MOVIL" ? " ref. " + ref : f.id === "FIADO" && cliente ? " (" + cliente.nombre + ")" : "")).join(" + ");
-    const change = e.vueltoUsd > 0 ? usd(e.vueltoUsd) + " (" + bs(Math.round(e.vueltoUsd * tasa * 100) / 100) + ")" : e.vueltoBs > 0 ? bs(e.vueltoBs) : "";
+          ...(f.id === "PAGO_MOVIL" && ref ? { referencia: ref } : {}) });
+    const payLine = usados.map((f) => f.n + " " + fmtF(f, unidades(f)) + (f.id === "PAGO_MOVIL" && ref ? " ref. " + ref : f.id === "FIADO" && cliente ? " (" + cliente.nombre + ")" : "")).join(" + ");
+    const change = hayVuelto ? entregaTxt : "";
     onConfirm(pagos, {
       payLine, change, changeNote: change ? "El vuelto sale del efectivo" : "", vueltoUsd: e.vueltoUsd, vueltoBs: e.vueltoBs,
       ...(fiadoUsd > 0 && cliente ? { credito: { nombre: cliente.nombre, trabajador: cliente.tipo === "TRABAJADOR", montoUsd: fiadoUsd } } : {}),
@@ -169,17 +194,17 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
       <div className="co-head">
         <button className="back press" onClick={onBack}><UIcono k="back" sw={2} />Ticket <kbd className="kb">Esc</kbd></button>
         <div className="steps"><b style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>Cobrar</b></div>
-        <div className="co-tot"><b className="t">{usd(total)}</b><small className="t">{bs(e.totalBs)}</small></div>
+        <div className="co-tot"><b className="t">{usd(total)}</b><small className="t">{bs(totalBsVista)}</small></div>
       </div>
 
       <div className="cb3-body">
         <div className="cb3-main">
           {/* Resumen: Total / Cubierto / Falta / Vuelto */}
           <div className="cb3-sum">
-            <div className="cb3-cell tot"><span className="k">Total a cobrar</span><b className="t">{usd(total)}</b><span className="s t">{bs(e.totalBs)}</span></div>
-            <div className="cb3-cell ok"><span className="k">Cubierto</span><b className="t">{usd(Math.min(e.cubierto, total))}</b><span className="s">{(() => { const n = formas.filter((f) => (montos[f.id] || 0) > 0).length; return n === 0 ? "Sin pagos" : n === 1 ? "1 forma de pago" : n + " formas de pago"; })()}</span></div>
+            <div className="cb3-cell tot"><span className="k">Total a cobrar</span><b className="t">{usd(total)}</b><span className="s t">{bs(totalBsVista)}</span></div>
+            <div className="cb3-cell ok"><span className="k">Cubierto</span><b className="t">{usd(Math.min(e.cubre ? total : e.cubierto + fiadoUsd, total))}</b><span className="s">{(() => { const n = formas.filter((f) => (montos[f.id] || 0) > 0).length; return n === 0 ? "Sin pagos" : n === 1 ? "1 forma de pago" : n + " formas de pago"; })()}</span></div>
             <div className={"cb3-cell" + (e.cubre ? "" : " warn")}><span className="k">Falta</span><b className="t">{usd(e.faltaUsd)}</b><span className="s t">{bs(e.faltaBs)}</span></div>
-            <div className={"cb3-cell" + (e.vueltoUsd > 0 || e.vueltoBs > 0 ? " info" : "")}><span className="k">Vuelto</span><b className="t">{e.vueltoBs > 0 ? bs(e.vueltoBs) : usd(e.vueltoUsd)}</b><span className="s t">{e.vueltoUsd > 0 ? bs(Math.round(e.vueltoUsd * tasa * 100) / 100) : "Sale del efectivo"}</span></div>
+            <div className={"cb3-cell" + (hayVuelto ? " info" : "")}><span className="k">Vuelto</span><b className="t">{usd(e.sobraUsd)}</b><span className="s t">{hayVuelto ? bs(e.sobraBs) : "Sale del efectivo"}</span></div>
             <div className="progress cb3-bar">
               {formas.map((f) => { const w = pct(f.id); return w > 0 ? <i key={f.id} style={{ width: w + "%", background: f.color }} /> : null; })}
             </div>
@@ -207,8 +232,8 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
                   {m > 0 && <span className="cb3-eq t">{f.sim ? "= " + usd(m) + " · " + bs(Math.round(m * tasa * 100) / 100) : f.moneda === "USD" ? "= " + bs(Math.round(m * tasa * 100) / 100) : "= " + usd(Math.round((m / (tasa || 1)) * 100) / 100)}</span>}
                   {f.ref && (
                     <label className={"cb3-ref" + (refMala ? " bad" : "")}>
-                      <span>Referencia</span>
-                      <input className="t" inputMode="numeric" placeholder="4 a 6 dígitos" value={ref} onChange={(ev) => setRef(ev.target.value.replace(/\D/g, "").slice(0, 6))} aria-label="Referencia del pago móvil" />
+                      <span>Referencia <small className="opt">(opcional)</small></span>
+                      <input className="t" inputMode="numeric" placeholder="Opcional · 4 a 6 dígitos" value={ref} onChange={(ev) => setRef(ev.target.value.replace(/\D/g, "").slice(0, 6))} aria-label="Referencia del pago móvil" />
                       {!refMala && ref.length >= 4 && <span className="okc"><UIcono k="check" sw={2.4} /></span>}
                     </label>
                   )}
@@ -237,8 +262,29 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
 
         {/* Acciones (a la derecha en PC, fijas abajo en tablet/móvil) */}
         <aside className="cb3-act">
-          {(e.vueltoUsd > 0 || e.vueltoBs > 0) && e.cubre && (
-            <div className="cb3-vuelto"><span>Entregar de vuelto</span><b className="t">{e.vueltoBs > 0 ? bs(e.vueltoBs) : usd(e.vueltoUsd) + " · " + bs(Math.round(e.vueltoUsd * tasa * 100) / 100)}</b></div>
+          {hayVuelto && (
+            <div className="vz" aria-label="Vuelto">
+              <div className="vz-h"><span>Vuelto</span><b className="t">{usd(e.sobraUsd)}</b><small className="t">{bs(e.sobraBs)}</small></div>
+              <span className="vz-q">¿Cómo lo das?</span>
+              <div className="vz-seg" role="radiogroup" aria-label="Cómo dar el vuelto">
+                <button role="radio" aria-checked={modo === "USD"} className={modo === "USD" ? "on" : ""} onClick={() => elegirVuelto("USD")}>Todo en $</button>
+                <button role="radio" aria-checked={modo === "VES"} className={modo === "VES" ? "on" : ""} onClick={() => elegirVuelto("VES")}>Todo en Bs</button>
+                <button role="radio" aria-checked={modo === "MIXTO"} className={modo === "MIXTO" ? "on" : ""} disabled={e0.sobraUsd < 1} onClick={() => elegirVuelto("MIXTO")}>$ y Bs</button>
+              </div>
+              {modo === "MIXTO" && (
+                <div className="vz-mix">
+                  <span>Dólares en billetes</span>
+                  <div className="vz-step">
+                    <button className="press" aria-label="Un dólar menos" onClick={() => pasoDolar(-1)}>−</button>
+                    <label className="vz-in"><i>$</i><input className="t" inputMode="decimal" aria-label="Dólares del vuelto"
+                      value={vModo === "MIXTO" ? vUsdTxt : String(dolaresVuelto)} onChange={(ev) => { setVModo("MIXTO"); setVUsdTxt(ev.target.value.replace(/[^\d.,]/g, "")); }} /></label>
+                    <button className="press" aria-label="Un dólar más" onClick={() => pasoDolar(1)}>+</button>
+                  </div>
+                </div>
+              )}
+              <div className="vz-ent"><span>Entrega</span><b className="t">{entregaTxt}</b></div>
+              <small className="vz-nota">Sale del efectivo de la gaveta{e.vueltoUsd > 0 && e.vueltoBs > 0 ? ": dólares en billetes y el resto en bolívares." : "."}</small>
+            </div>
           )}
           {err && <p className="pinmsg err">{err}</p>}
           <button className="btn primary big press cb3-go" disabled={!valido} onClick={confirmar}>

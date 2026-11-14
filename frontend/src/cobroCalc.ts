@@ -4,7 +4,10 @@
 //
 //  - Solo $   -> se compara en dólares exactos.
 //  - Solo Bs  -> se compara en bolívares exactos (sin pasar por $, no se pierden centavos).
-//  - Mixto    -> se convierte todo a $ y se acepta una tolerancia de $0,05 por conversión.
+//  - Mixto    -> se compara en BOLÍVARES (lo pagado en $ a la tasa) con tolerancia de Bs 1.
+//                (Antes era $0,05 = ~Bs 45 a tasa 900: dejaba cobrar con Bs 20 de menos.)
+//
+// Vuelto: el cajero elige cuántos DÓLARES entrega en billetes; el resto sale en bolívares.
 //
 // Todo se hace en CENTAVOS enteros para evitar los errores de coma flotante
 // (0,78 + 1,00 + 0,22 no siempre da 2,00 en la computadora).
@@ -18,7 +21,7 @@ export type Montos = Partial<Record<string, number>>;
 export type MonedaDe = (metodo: string) => "USD" | "VES";
 const monedaFija: MonedaDe = (m) => (MONEDA as Record<string, "USD" | "VES">)[m] ?? "USD";
 
-const TOLERANCIA_CENT = 5; // $0,05 (TOLERANCIA_USD del servidor)
+const TOLERANCIA_BS_CENT = 100; // Bs 1,00 (TOLERANCIA_BS del servidor)
 const cent = (n: number) => Math.round((n || 0) * 100);
 const r4 = (n: number) => Math.round(n * 10000) / 10000;
 
@@ -29,8 +32,11 @@ export interface EstadoCobro {
   cubre: boolean;      // ¿el servidor lo aceptaría?
   faltaUsd: number;
   faltaBs: number;
-  vueltoUsd: number;
-  vueltoBs: number;
+  vueltoUsd: number;   // lo que se entrega en dólares
+  vueltoBs: number;    // lo que se entrega en bolívares
+  sobraUsd: number;    // vuelto total expresado en $
+  sobraBs: number;     // vuelto total expresado en Bs
+  soloBs: boolean;     // se pagó solo en bolívares
 }
 
 function sumas(montos: Montos, excepto: string | undefined, mon: MonedaDe) {
@@ -44,33 +50,47 @@ function sumas(montos: Montos, excepto: string | undefined, mon: MonedaDe) {
   return { usdC, bsC };
 }
 
-/** totalBsFijo: total exacto en Bs cuando la venta lleva recargas/avances (el servidor también lo usa). */
-export function calcularCobro(total: number, tasa: number, montos: Montos, mon: MonedaDe = monedaFija, totalBsFijo?: number): EstadoCobro {
+/**
+ * totalBsFijo: total exacto en Bs cuando la venta lleva recargas/avances (el servidor también lo usa).
+ * vueltoUsdPedido: cuántos dólares del vuelto se dan en $ (el resto en Bs); undefined = automático
+ * (solo Bs → todo en Bs; si no → todo en $), igual que el servidor.
+ */
+export function calcularCobro(total: number, tasa: number, montos: Montos, mon: MonedaDe = monedaFija, totalBsFijo?: number, vueltoUsdPedido?: number): EstadoCobro {
   const totalC = cent(total);
   const totalBsC = totalBsFijo != null ? Math.round(totalBsFijo * 100) : Math.round(total * tasa * 100);
   const { usdC, bsC } = sumas(montos, undefined, mon);
   const t = tasa > 0 ? tasa : 1;
   // Igual que el servidor: pagadoUsd + (pagadoBs / tasa con 4 decimales), a 2 decimales.
   const tpuC = cent(usdC / 100 + r4(bsC / 100 / t));
-  const base = { totalBs: totalBsC / 100, cubierto: tpuC / 100, hayPago: usdC + bsC > 0 };
+  const base = { totalBs: totalBsC / 100, cubierto: tpuC / 100, hayPago: usdC + bsC > 0, soloBs: usdC === 0 && bsC > 0 };
+  const nada = { vueltoUsd: 0, vueltoBs: 0, sobraUsd: 0, sobraBs: 0 };
 
   if (usdC === 0 && bsC === 0) {
-    return { ...base, cubre: false, faltaUsd: totalC / 100, faltaBs: totalBsC / 100, vueltoUsd: 0, vueltoBs: 0 };
+    return { ...base, ...nada, cubre: totalC === 0, faltaUsd: totalC / 100, faltaBs: totalBsC / 100 };
   }
+  let cubre: boolean, faltaUsdC: number, faltaBsC: number, sobraUsdC: number, sobraBsC: number;
   if (bsC === 0) { // solo $
-    const cubre = usdC >= totalC;
-    const f = Math.max(0, totalC - usdC);
-    return { ...base, cubre, faltaUsd: f / 100, faltaBs: Math.round((f / 100) * t * 100) / 100, vueltoUsd: Math.max(0, usdC - totalC) / 100, vueltoBs: 0 };
+    cubre = usdC >= totalC;
+    faltaUsdC = Math.max(0, totalC - usdC); faltaBsC = Math.round(faltaUsdC * t);
+    sobraUsdC = Math.max(0, usdC - totalC); sobraBsC = Math.round(sobraUsdC * t);
+  } else if (usdC === 0) { // solo Bs
+    cubre = bsC >= totalBsC;
+    faltaBsC = Math.max(0, totalBsC - bsC); faltaUsdC = Math.ceil(faltaBsC / t);
+    sobraBsC = Math.max(0, bsC - totalBsC); sobraUsdC = Math.round(sobraBsC / t);
+  } else { // mixto: en Bs exactos (lo pagado en $ a la tasa)
+    const pagadoBsC = bsC + Math.round(usdC * t);
+    cubre = pagadoBsC + TOLERANCIA_BS_CENT >= totalBsC;
+    faltaBsC = cubre ? 0 : totalBsC - pagadoBsC; faltaUsdC = Math.ceil(faltaBsC / t);
+    sobraBsC = Math.max(0, pagadoBsC - totalBsC); sobraUsdC = Math.round(sobraBsC / t);
   }
-  if (usdC === 0) { // solo Bs
-    const cubre = bsC >= totalBsC;
-    const fBs = Math.max(0, totalBsC - bsC);
-    return { ...base, cubre, faltaUsd: Math.ceil(fBs / t) / 100, faltaBs: fBs / 100, vueltoUsd: 0, vueltoBs: Math.max(0, bsC - totalBsC) / 100 };
+  let vUsdC = 0, vBsC = 0;
+  if (cubre && sobraBsC > 0) {
+    const pedC = vueltoUsdPedido == null ? (usdC === 0 ? 0 : sobraUsdC) : Math.max(0, cent(vueltoUsdPedido));
+    if (pedC >= sobraUsdC) vUsdC = sobraUsdC;
+    else { vUsdC = pedC; vBsC = Math.max(0, Math.round(sobraBsC - pedC * t)); }
   }
-  // mixto
-  const cubre = tpuC + TOLERANCIA_CENT >= totalC;
-  const f = cubre ? 0 : totalC - tpuC;
-  return { ...base, cubre, faltaUsd: f / 100, faltaBs: Math.round((f / 100) * t * 100) / 100, vueltoUsd: cubre ? Math.max(0, tpuC - totalC) / 100 : 0, vueltoBs: 0 };
+  return { ...base, cubre, faltaUsd: cubre ? 0 : faltaUsdC / 100, faltaBs: cubre ? 0 : faltaBsC / 100,
+    vueltoUsd: vUsdC / 100, vueltoBs: vBsC / 100, sobraUsd: cubre ? sobraUsdC / 100 : 0, sobraBs: cubre ? sobraBsC / 100 : 0 };
 }
 
 /** Cuánto hay que poner en `metodo` (en SU moneda) para completar el total con lo demás. */

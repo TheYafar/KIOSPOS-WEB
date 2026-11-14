@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { calcularCobro as C, restoPara as R } from "../cobroCalc";
 
-// Mismo criterio que el servidor (CobroCalculadora): $ exacto, Bs exacto, mixto con tolerancia $0,05.
+// Mismo criterio que el servidor (CobroCalculadora): $ exacto, Bs exacto, mixto en Bs con tolerancia Bs 1.
 describe("calcularCobro", () => {
   it("cuadra el caso mixto real (PM 702 + $1 + Bs 198 a 900)", () => {
     const e = C(2, 900, { PAGO_MOVIL: 702, EFECTIVO_USD: 1, EFECTIVO_BS: 198 });
@@ -18,9 +18,23 @@ describe("calcularCobro", () => {
     expect(C(2, 900, { EFECTIVO_USD: 1.99 })).toMatchObject({ cubre: false, faltaUsd: 0.01 });
     expect(C(2, 900, { EFECTIVO_USD: 5 })).toMatchObject({ cubre: true, vueltoUsd: 3 });
   });
-  it("mixto acepta la tolerancia de $0,05 y rechaza más", () => {
-    expect(C(10, 900, { EFECTIVO_USD: 5, PAGO_MOVIL: 4473 })).toMatchObject({ cubre: true, faltaUsd: 0 });
-    expect(C(10, 900, { EFECTIVO_USD: 5, PAGO_MOVIL: 4400 })).toMatchObject({ cubre: false, faltaUsd: 0.11 });
+  it("mixto se compara en Bs: el caso real con Bs 20,80 de menos NO cubre", () => {
+    // $2,90 a 912 = Bs 2.644,80; paga $2 (Bs 1.824) + Bs 800 → faltan Bs 20,80.
+    expect(C(2.9, 912, { EFECTIVO_USD: 2, EFECTIVO_BS: 800 })).toMatchObject({ cubre: false, faltaBs: 20.8, faltaUsd: 0.03 });
+    expect(C(2.9, 912, { EFECTIVO_USD: 2, EFECTIVO_BS: 820.8 })).toMatchObject({ cubre: true, faltaBs: 0, vueltoUsd: 0, vueltoBs: 0 });
+  });
+  it("mixto solo tolera céntimos (Bs 1)", () => {
+    expect(C(2.9, 912, { EFECTIVO_USD: 2, EFECTIVO_BS: 820.3 }).cubre).toBe(true);
+    expect(C(2.9, 912, { EFECTIVO_USD: 2, EFECTIVO_BS: 819.5 }).cubre).toBe(false);
+    expect(C(10, 900, { EFECTIVO_USD: 5, PAGO_MOVIL: 4473 })).toMatchObject({ cubre: false, faltaBs: 27 });
+  });
+  it("vuelto partido: dólares en billetes y el resto en Bs (como el servidor)", () => {
+    expect(C(2.9, 912, { EFECTIVO_USD: 5 })).toMatchObject({ vueltoUsd: 2.1, vueltoBs: 0, sobraBs: 1915.2 });
+    expect(C(2.9, 912, { EFECTIVO_USD: 5 }, undefined, undefined, 2)).toMatchObject({ vueltoUsd: 2, vueltoBs: 91.2 });
+    expect(C(2.9, 912, { EFECTIVO_USD: 5 }, undefined, undefined, 0)).toMatchObject({ vueltoUsd: 0, vueltoBs: 1915.2 });
+  });
+  it("venta toda a crédito (nada que cobrar) cubre", () => {
+    expect(C(0, 912, {})).toMatchObject({ cubre: true });
   });
   it("sin pagos no cubre", () => {
     expect(C(2, 900, {})).toMatchObject({ cubre: false, hayPago: false, faltaUsd: 2, faltaBs: 1800 });

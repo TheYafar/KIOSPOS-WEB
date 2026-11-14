@@ -736,3 +736,19 @@ el alta/venta/login (try/catch + log).
 - **Pendiente:** limpieza periódica de las demos vencidas (hoy quedan en la base, ocultas e inaccesibles).
 - Pruebas: `RecuperacionTest`, `DemoTest`, `RegistroPublicoTest` (CI); `e2e/lanzamiento.spec.ts` (6) + registro y
   seguridad actualizadas. Verificado contra Postgres real.
+
+## 37. Cobro: mixto exacto en Bs, referencia opcional y vuelto en $ / Bs
+
+- **Bug corregido (pago mixto):** `CobroCalculadora` (servidor) y `cobroCalc.ts` (caja) aceptaban un pago mixto $+Bs
+  con una tolerancia de **$0,05** (heredada del escritorio) = ~Bs 45 a tasa 900: con $2 + Bs 800 de un total que pedía
+  Bs 820,80 decía "Falta 0" y cobraba. Ahora el mixto se compara en **bolívares exactos** (lo pagado en $ × tasa) con
+  tolerancia **Bs 1** (`TOLERANCIA_BS`). La caja descuenta el crédito del total igual que el servidor (antes lo contaba
+  como pago en $), así pantalla y servidor coinciden al céntimo.
+- **Referencia del pago móvil opcional:** sin referencia también cobra; si se escribe, 4 a 6 dígitos.
+- **Vuelto, cómo se entrega** (`screens/Cobro.tsx`, panel `.vz`): **Todo en $ / Todo en Bs / $ y Bs** (dólares en
+  billetes con −/+ y el resto en bolívares). Automático: si pagó solo en Bs o sobra menos de $1 → Bs; si sobran dólares
+  enteros → $; si no → los dólares enteros en $ y el resto en Bs. Se manda `vueltoUsd` (dólares que se entregan) en
+  `POST /api/ventas` (`VentaInput.vueltoUsd`); el servidor calcula el resto en Bs (`vueltoBs`), el cuadre descuenta cada
+  parte de su gaveta y el ticket imprime ambas líneas. Sin el campo (cola vieja) sigue el comportamiento anterior.
+- Pruebas: `CobroCalculadoraTest` (Java, sin BD), `cobroCalc.test.ts`, `e2e/cobro.spec.ts` (3 nuevas). Verificado contra
+  Postgres real (mixto corto → 400, pago móvil sin referencia, vuelto $2 + Bs en venta, cuadre y ticket).

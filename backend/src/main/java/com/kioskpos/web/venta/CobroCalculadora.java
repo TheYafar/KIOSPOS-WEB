@@ -5,13 +5,22 @@ import java.math.RoundingMode;
 import java.util.List;
 
 /**
- * Lógica de cobro multimoneda (USD / Bs tasa BCV), portada y simplificada del
- * CobroCalculadoraService del escritorio para P1: valida que los pagos cubran el
- * total y calcula el vuelto. El servidor es la autoridad del cobro.
+ * Lógica de cobro multimoneda (USD / Bs tasa BCV), portada del CobroCalculadoraService del
+ * escritorio: valida que los pagos cubran el total y calcula el vuelto. El servidor es la
+ * autoridad del cobro.
+ *
+ *  - Solo $  : se compara en dólares exactos.
+ *  - Solo Bs : se compara en bolívares exactos.
+ *  - Mixto   : se compara en BOLÍVARES (lo pagado en $ se pasa a Bs a la tasa), con una
+ *              tolerancia de Bs 1 por céntimos de conversión. Antes era $0,05, que a tasa ~900
+ *              son ~Bs 45: dejaba cobrar con Bs 20 de menos.
+ *
+ * Vuelto: el cajero elige cuántos DÓLARES entrega ({@code vueltoUsdPedido}); el resto sale en
+ * bolívares. Sin elección: solo-Bs → todo en Bs; si no → todo en $ (como antes).
  */
 public final class CobroCalculadora {
 
-    private static final BigDecimal TOLERANCIA_USD = new BigDecimal("0.05");
+    static final BigDecimal TOLERANCIA_BS = new BigDecimal("1.00");
 
     private CobroCalculadora() {
     }
@@ -27,20 +36,21 @@ public final class CobroCalculadora {
             BigDecimal vueltoBs) {
     }
 
-    /**
-     * @param totalUsd total de la venta en USD (autoridad del servidor)
-     * @param tasa     tasa BCV del día
-     * @param pagos    pagos recibidos
-     */
     public static Resultado calcular(BigDecimal totalUsd, BigDecimal tasa, List<Pago> pagos) {
-        return calcular(totalUsd, null, tasa, pagos);
+        return calcular(totalUsd, null, tasa, pagos, null);
+    }
+
+    public static Resultado calcular(BigDecimal totalUsd, BigDecimal totalBsExacto, BigDecimal tasa, List<Pago> pagos) {
+        return calcular(totalUsd, totalBsExacto, tasa, pagos, null);
     }
 
     /**
-     * Igual, pero con el total en Bs exacto cuando la venta lleva servicios cobrados en Bs
-     * (recargas, avances): así "Bs 600" se cobra con Bs 600 y no con su redondeo en $.
+     * @param totalBsExacto total exacto en Bs cuando la venta lleva servicios cobrados en Bs (recargas,
+     *                      avances): así "Bs 600" se cobra con Bs 600 y no con su redondeo en $.
+     * @param vueltoUsdPedido cuántos dólares del vuelto se entregan en $ (el resto, en Bs); null = automático.
      */
-    public static Resultado calcular(BigDecimal totalUsd, BigDecimal totalBsExacto, BigDecimal tasa, List<Pago> pagos) {
+    public static Resultado calcular(BigDecimal totalUsd, BigDecimal totalBsExacto, BigDecimal tasa, List<Pago> pagos,
+                                     BigDecimal vueltoUsdPedido) {
         if (tasa == null || tasa.signum() <= 0) {
             throw new IllegalArgumentException("La tasa del día debe ser mayor a 0");
         }
@@ -48,46 +58,54 @@ public final class CobroCalculadora {
         BigDecimal totalBs = totalBsExacto != null ? totalBsExacto.setScale(2, RoundingMode.HALF_UP)
                 : total.multiply(tasa).setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal pagadoUsdDirecto = BigDecimal.ZERO;
-        BigDecimal pagadoBsDirecto = BigDecimal.ZERO;
+        BigDecimal usd = BigDecimal.ZERO;
+        BigDecimal bs = BigDecimal.ZERO;
         for (Pago p : pagos) {
             BigDecimal m = sane(p.montoOriginal()).setScale(2, RoundingMode.HALF_UP);
             if (p.moneda() == Moneda.USD) {
-                pagadoUsdDirecto = pagadoUsdDirecto.add(m);
+                usd = usd.add(m);
             } else {
-                pagadoBsDirecto = pagadoBsDirecto.add(m);
+                bs = bs.add(m);
             }
         }
+        BigDecimal totalPagadoBs = bs.add(usd.multiply(tasa)).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal totalPagadoUsd = usd.add(bs.divide(tasa, 4, RoundingMode.HALF_UP)).setScale(2, RoundingMode.HALF_UP);
 
-        BigDecimal totalPagadoBs = pagadoBsDirecto.add(pagadoUsdDirecto.multiply(tasa)).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal totalPagadoUsd = pagadoUsdDirecto.add(pagadoBsDirecto.divide(tasa, 4, RoundingMode.HALF_UP)).setScale(2, RoundingMode.HALF_UP);
-
+        boolean soloUsd = bs.signum() == 0 && usd.signum() > 0;
+        boolean soloBs = usd.signum() == 0 && bs.signum() > 0;
         boolean cubre;
+        BigDecimal sobraUsd;
+        BigDecimal sobraBs;
+        if (soloUsd) {
+            cubre = usd.compareTo(total) >= 0;
+            sobraUsd = usd.subtract(total).max(BigDecimal.ZERO);
+            sobraBs = sobraUsd.multiply(tasa).setScale(2, RoundingMode.HALF_UP);
+        } else if (soloBs) {
+            cubre = bs.compareTo(totalBs) >= 0;
+            sobraBs = bs.subtract(totalBs).max(BigDecimal.ZERO);
+            sobraUsd = sobraBs.divide(tasa, 2, RoundingMode.HALF_UP);
+        } else {
+            // Mixto (o nada pagado: venta toda a crédito, donde lo que queda por cobrar es 0).
+            cubre = usd.signum() == 0 && bs.signum() == 0 ? total.signum() == 0
+                    : totalPagadoBs.add(TOLERANCIA_BS).compareTo(totalBs) >= 0;
+            sobraBs = totalPagadoBs.subtract(totalBs).max(BigDecimal.ZERO);
+            sobraUsd = sobraBs.divide(tasa, 2, RoundingMode.HALF_UP);
+        }
+
         BigDecimal vueltoUsd = BigDecimal.ZERO;
         BigDecimal vueltoBs = BigDecimal.ZERO;
-
-        if (pagadoBsDirecto.signum() == 0 && pagadoUsdDirecto.signum() > 0) {
-            // Solo USD: se compara en USD.
-            cubre = pagadoUsdDirecto.compareTo(total) >= 0;
-            if (cubre) {
-                vueltoUsd = pagadoUsdDirecto.subtract(total).setScale(2, RoundingMode.HALF_UP);
-            }
-        } else if (pagadoUsdDirecto.signum() == 0 && pagadoBsDirecto.signum() > 0) {
-            // Solo Bs: se compara en Bs (moneda de menor magnitud, criterio más estricto).
-            cubre = pagadoBsDirecto.compareTo(totalBs) >= 0;
-            if (cubre) {
-                vueltoBs = pagadoBsDirecto.subtract(totalBs).setScale(2, RoundingMode.HALF_UP);
-            }
-        } else {
-            // Mixto: se compara el equivalente combinado en USD con una tolerancia de conversión.
-            cubre = totalPagadoUsd.add(TOLERANCIA_USD).compareTo(total) >= 0;
-            if (cubre) {
-                BigDecimal sobra = totalPagadoUsd.subtract(total).max(BigDecimal.ZERO);
-                vueltoUsd = sobra.setScale(2, RoundingMode.HALF_UP);
+        if (cubre && sobraBs.signum() > 0) {
+            BigDecimal pedido = vueltoUsdPedido == null ? (soloBs ? BigDecimal.ZERO : sobraUsd)
+                    : vueltoUsdPedido.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+            if (pedido.compareTo(sobraUsd) >= 0) {
+                vueltoUsd = sobraUsd;                     // todo en dólares
+            } else {
+                vueltoUsd = pedido;                       // parte en $ y el resto en Bs
+                vueltoBs = sobraBs.subtract(pedido.multiply(tasa)).max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
             }
         }
-
-        return new Resultado(totalPagadoUsd, totalPagadoBs, cubre, vueltoUsd, vueltoBs);
+        return new Resultado(totalPagadoUsd, totalPagadoBs, cubre, vueltoUsd.setScale(2, RoundingMode.HALF_UP),
+                vueltoBs.setScale(2, RoundingMode.HALF_UP));
     }
 
     private static BigDecimal sane(BigDecimal v) {

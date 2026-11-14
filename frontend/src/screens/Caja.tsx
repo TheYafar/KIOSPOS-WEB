@@ -215,7 +215,7 @@ export function Caja() {
       const its = [...carrito.values()].filter((i) => !i.servicio).map((i) => i.bloque && i.base
         ? { productoId: i.base.id, presentacionId: i.bloque.id, cantidad: i.qty, precioUsd: i.producto.precioUsd }
         : { productoId: i.producto.id, cantidad: i.qty, precioUsd: i.producto.precioUsd });
-      const codigo = await cobrar(its, pagos, clienteId, { totalUsd: total, productos: [...carrito.values()].map((i) => i.producto.nombre).join(", ").slice(0, 120) }, servicios);
+      const codigo = await cobrar(its, pagos, clienteId, { totalUsd: total, productos: [...carrito.values()].map((i) => i.producto.nombre).join(", ").slice(0, 120) }, servicios, resumen.vueltoUsd);
       window.dispatchEvent(new Event("kp-turno"));
       setDone({ total, totalBs, payLine: resumen.payLine, change: resumen.change, changeNote: resumen.changeNote, receipt: recibo(pagos, resumen, facturaDe(codigo)), factura: facturaDe(codigo), credito: resumen.credito });
       setView("done");

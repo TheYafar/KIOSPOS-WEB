@@ -33,14 +33,48 @@ test("'Resto aquí' siempre hace algo y lo dice en el botón", async ({ page }) 
   await expect(page.locator(".cb3-go")).toBeEnabled();
 });
 
-test("el botón explica por qué no deja cobrar (referencia del pago móvil)", async ({ page }) => {
-  await preparar(page, { turnoAbierto: true }, { "kioskpos.sesion": sesionCajero });
+test("la referencia del pago móvil es opcional, pero si se escribe va completa", async ({ page }) => {
+  const st: Estado = { turnoAbierto: true };
+  await preparar(page, st, { "kioskpos.sesion": sesionCajero });
   await ir(page); await abrirCobro(page);
   await boton(page, "Pago móvil").click();
+  await expect(page.locator(".cb3-go")).toBeEnabled(); // sin referencia también cobra
   await page.getByLabel("Referencia del pago móvil").fill("85");
-  await expect(page.locator(".cb3-go")).toHaveText(/Falta la referencia del pago móvil/);
-  await page.getByLabel("Referencia del pago móvil").fill("8521");
+  await expect(page.locator(".cb3-go")).toHaveText(/La referencia lleva 4 a 6 dígitos/);
+  await page.getByLabel("Referencia del pago móvil").fill("");
+  await page.locator(".cb3-go").click();
+  await expect.poll(() => st.venta?.pagos?.[0]).toEqual({ metodo: "PAGO_MOVIL", moneda: "VES", montoOriginal: 2475 });
+});
+
+test("pago mixto: con bolívares de menos NO deja cobrar (el caso de Bs 800 por Bs 820,80)", async ({ page }) => {
+  await preparar(page, { turnoAbierto: true }, { "kioskpos.sesion": sesionCajero });
+  await ir(page); await abrirCobro(page); // $2,75 = Bs 2.475 a 900
+  await page.getByLabel("Monto en Efectivo $").fill("2");      // Bs 1.800
+  await page.getByLabel("Monto en Efectivo Bs").fill("650");   // faltan Bs 25
+  await expect(page.locator(".cb3-go")).toBeDisabled();
+  await expect(page.locator(".cb3-go")).toHaveText(/Faltan .*Bs 25,00/);
+  await page.getByLabel("Monto en Efectivo Bs").fill("675");
   await expect(page.locator(".cb3-go")).toBeEnabled();
+});
+
+test("vuelto: se elige darlo en $, en Bs o parte y parte, y va al servidor", async ({ page }) => {
+  const st: Estado = { turnoAbierto: true };
+  await preparar(page, st, { "kioskpos.sesion": sesionCajero });
+  await ir(page); await abrirCobro(page); // $2,75
+  await page.getByLabel("Monto en Efectivo $").fill("5");   // sobran $2,25 = Bs 2.025
+  const vz = page.locator(".vz");
+  await expect(vz).toContainText("$ 2,25");
+  // Por defecto: los dólares enteros en billetes y el resto en bolívares.
+  await expect(vz.locator(".vz-ent")).toContainText("$ 2,00 + Bs 225,00");
+  await vz.getByRole("radio", { name: "Todo en Bs" }).click();
+  await expect(vz.locator(".vz-ent")).toContainText("Bs 2.025,00");
+  await vz.getByRole("radio", { name: "Todo en $" }).click();
+  await expect(vz.locator(".vz-ent")).toContainText("$ 2,25");
+  await vz.getByRole("radio", { name: "$ y Bs" }).click();
+  await vz.getByRole("button", { name: "Un dólar menos" }).click();
+  await expect(vz.locator(".vz-ent")).toContainText("$ 1,00 + Bs 1.125,00");
+  await page.locator(".cb3-go").click();
+  await expect.poll(() => st.venta?.vueltoUsd).toBe(1);
 });
 
 test("formas de pago apagadas no salen y las monedas extra se cobran como OTRO", async ({ page }) => {
