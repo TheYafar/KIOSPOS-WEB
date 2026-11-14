@@ -50,14 +50,14 @@ test("ver la demo: entra a una bodega de muestra, cambia a cajera y sale", async
   await page.getByRole("button", { name: "Ver la demo" }).click();
   await expect.poll(() => st.demoCreada).toBe(true);
   const barra = page.locator(".demo-bar");
-  await expect(barra).toContainText("Estás probando la DEMO");
-  await expect(barra).toContainText("como su dueño");
+  await expect(barra).toContainText("Bodega de muestra");
+  await expect(barra).toContainText("La ves como dueño");
 
   await barra.getByRole("button", { name: "Vender como cajera" }).click();
   await expect(page.locator(".demo-bar")).toContainText("cajera Ana");
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem("kioskpos.sesion") || "{}").token)).toBe("demo-c");
 
-  await page.locator(".demo-bar").getByRole("button", { name: "Salir de la demo" }).click();
+  await page.locator(".demo-bar").getByRole("button", { name: "Salir", exact: true }).click();
   await expect(page.locator(".demo-bar")).toHaveCount(0);
   expect(await page.evaluate(() => localStorage.getItem("kp_demo"))).toBeNull();
 });
@@ -78,3 +78,21 @@ test("en Más el dueño crea su código de recuperación", async ({ page }) => {
   await expect.poll(() => st.codigoGenerado).toBe(true);
   await expect(page.locator(".seg-card .rec-code")).toHaveText("MASS-CODE-2345");
 });
+
+for (const [nombre, ancho] of [["teléfono", 390], ["PC", 1440]] as const) {
+  test(`la barra de la demo se ve completa en ${nombre}`, async ({ page }) => {
+    await page.setViewportSize({ width: ancho, height: 844 });
+    await preparar(page, { turnoAbierto: true }, SIN_CAJA);
+    await ir(page);
+    await page.getByRole("button", { name: "Ver la demo" }).click();
+    const barra = page.locator(".demo-bar");
+    await expect(barra).toBeVisible();
+    // No se aplasta: lo que tiene adentro cabe en su altura, y no se sale a lo ancho.
+    const m = await barra.evaluate((e) => ({ sh: e.scrollHeight, ch: e.clientHeight, sw: e.scrollWidth, cw: e.clientWidth }));
+    expect(m.sh).toBeLessThanOrEqual(m.ch + 1);
+    expect(m.sw).toBeLessThanOrEqual(m.cw + 1);
+    for (const n of ["Vender como cajera", "Preguntar por WhatsApp", "Salir"]) await expect(barra.getByRole(n === "Preguntar por WhatsApp" ? "link" : "button", { name: n, exact: true })).toBeVisible();
+    await expect(barra.getByRole("button", { name: /Crear (mi )?cuenta/ })).toBeVisible();
+    await page.screenshot({ path: process.env.SHOT_DIR ? `${process.env.SHOT_DIR}/demo-${ancho}.png` : `test-results/demo-${ancho}.png` });
+  });
+}

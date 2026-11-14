@@ -1479,7 +1479,7 @@ details.cb-cierre[open] .cb-chev { transform:rotate(180deg); }
 @media (max-width:560px) { .plan-susp { margin:0 12px 10px; padding:14px; } .plan-susp-tx b { font-size:20px; } .plan-susp-btn, .plan-susp-cta { width:100%; text-align:center; justify-content:center; } }
 /* Cada pantalla se desplaza DENTRO de la app (no la página entera): así el menú lateral
    y la barra del turno quedan siempre completos. */
-.appmain > div:not(.hdr):not(.turno-bar):not(.plan-susp):not(.plan-aviso) { flex:1 1 auto; min-height:0; overflow-y:auto; }
+.appmain > div:not(.hdr):not(.turno-bar):not(.plan-susp):not(.plan-aviso):not(.demo-bar) { flex:1 1 auto; min-height:0; overflow-y:auto; }
 
 /* ---- Tamaño grande (botón A+): agranda letras y botones de toda la app ---- */
 html[data-tam="grande"] body { zoom:1.15; }
@@ -1913,13 +1913,31 @@ html[data-tam="muy-grande"] body { zoom:1.3; }
 .bienv-foot { flex-direction:column; align-items:stretch; gap:8px; }
 
 /* ===== Barra de la demo ===== */
-.demo-bar { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; margin:0 16px 10px; padding:10px 14px; border-radius:14px; background:var(--accent-soft); border:1px solid var(--line); }
-.demo-tx { display:flex; flex-direction:column; min-width:0; flex:1 1 240px; }
-.demo-tx b { font-size:14px; color:var(--warn); }
-.demo-tx span { font-size:12.5px; color:var(--text-2); }
-.demo-acc { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
-.demo-acc .btn, .demo-acc .btn2 { height:36px; padding:0 12px; font-size:13px; text-decoration:none; display:inline-flex; align-items:center; }
-.demo-salir { font-size:12.5px; }
+.demo-bar { flex:none; display:flex; align-items:center; justify-content:space-between; gap:10px 16px; flex-wrap:wrap; margin:0 16px 12px; padding:10px 10px 10px 14px; border-radius:14px; background:var(--accent-soft); border:1px solid color-mix(in srgb, var(--accent) 35%, transparent); }
+.demo-tx { display:flex; align-items:center; gap:10px; min-width:0; flex:1 1 260px; }
+.demo-tag { flex:none; font-size:11px; font-weight:800; letter-spacing:1.2px; color:#3b2600; background:var(--accent); padding:4px 8px; border-radius:7px; }
+.demo-msg { display:flex; flex-direction:column; min-width:0; line-height:1.25; }
+.demo-msg b { font-size:14px; color:var(--text); }
+.demo-msg span { font-size:12.5px; color:var(--text-2); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.demo-acc { display:flex; align-items:center; gap:6px; flex:none; }
+.demo-b { height:36px; padding:0 14px; border-radius:10px; font:inherit; font-size:13px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:6px; cursor:pointer; white-space:nowrap; text-decoration:none; border:1px solid transparent; }
+.demo-b.sec { background:var(--surface); color:var(--text); border-color:var(--line); }
+.demo-b.sec:hover { background:var(--surface-2); }
+.demo-b.pri { background:var(--primary); color:#fff; }
+.demo-b.pri:hover { filter:brightness(1.06); }
+.demo-b.ws { width:36px; padding:0; background:#25d366; color:#06371c; }
+.demo-b.ws svg { width:19px; height:19px; }
+.demo-b.ghost { background:transparent; color:var(--text-2); padding:0 8px; }
+.demo-b.ghost:hover { color:var(--text); }
+.demo-b:focus-visible { outline:2px solid var(--primary); outline-offset:2px; }
+.demo-b .l-corta { display:none; }
+@media (max-width:640px) {
+  .demo-bar { margin:0 12px 10px; padding:10px; }
+  .demo-tx { flex-basis:100%; }
+  .demo-acc { display:grid; grid-template-columns:1fr 1fr 36px auto; width:100%; }
+  .demo-b { padding:0 10px; }
+  .demo-b .l-larga { display:none; } .demo-b .l-corta { display:inline; }
+}
 
 /* ===== Seguridad de la cuenta (Más) ===== */
 .seg-card { display:flex; flex-direction:column; gap:10px; }
