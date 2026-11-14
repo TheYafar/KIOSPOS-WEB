@@ -711,3 +711,28 @@ el alta/venta/login (try/catch + log).
   "Mejor uso este equipo"); la lista marca **Este equipo**. La tarjeta "Tus cajeros" del inicio muestra **Tus cajas**
   y el botón "Usar este equipo como caja" si hay cupo.
 - Pruebas: `RegistroPublicoTest` (CI) y `e2e/registro.spec.ts` (3). Verificado contra Postgres real.
+
+## 36. Lanzamiento público: soporte por WhatsApp, código de recuperación y demo
+
+- **Soporte por WhatsApp** (`frontend/src/soporte.ts`: `WHATSAPP_SOPORTE = 584124682180`, `linkWhatsApp(msg)`;
+  `screens/Ayuda.tsx` `AyudaWhatsApp`): en todas las vistas de la entrada, la bienvenida, Más (tarjeta de seguridad),
+  el aviso de servicio suspendido y la barra de la demo, con mensaje ya escrito según el caso.
+- **Código de recuperación (olvidé mi clave SIN correo)** (V29 `cuentas_login.recuperacion_hash`,
+  `seguridad/RecuperacionService`): 12 caracteres sin ambiguos (XXXX-XXXX-XXXX), solo se guarda el hash BCrypt.
+  Se entrega al registrarse (`/api/auth/registro` ahora responde `{sesion, codigoRecuperacion}`; la bienvenida lo
+  muestra y no deja seguir sin marcar "Ya lo guardé") y se puede regenerar en Más (`GET|POST /api/mi-cuenta/recuperacion`,
+  solo dueño/encargado). `POST /api/auth/recuperar-con-codigo {email, codigo, password}`: intentos limitados como el
+  login (clave `rec:`+correo), un solo uso (devuelve un código nuevo) y desbloquea el login. La pantalla "¿Olvidaste tu
+  contraseña?" usa el código; sin código → WhatsApp con el correo escrito; el enlace por correo solo aparece si
+  `GET /api/auth/opciones` dice `correo:true` (`EmailService.activo()`).
+- **Demo por visitante** (`demo/DemoService`, `POST /api/auth/demo`, V29 `negocios.es_demo`): cada "Ver la demo" crea
+  SU bodega de muestra (aislada por RLS): 16 productos con categorías, bloques (cigarros), 3 bajo stock, caja con turno
+  abierto, cajeras Ana (PIN 1234) y Luis, 7 ventas del día (todas las formas de pago, una a crédito), clientes con deuda,
+  proveedor con factura por pagar abonada y vencimiento. Devuelve sesiones de **dueño y cajera de 24 h**
+  (`JwtService.emitir(p, ttl)`; sin clave conocida, al vencer muere). Límites: `kioskpos.demo.max-por-hora` (10/IP),
+  `max-por-dia` (300), apagable con `KIOSKPOS_DEMO_ABIERTA=false`. `DemoGuard`: en demo no se crean cuentas con
+  correo ni se reportan pagos ni códigos; el panel admin no lista demos. PWA: `src/demo.ts` (`kp_demo`) y
+  `screens/DemoBanner.tsx` (Ver como dueño / Vender como cajera / Crear mi cuenta gratis / Preguntar / Salir).
+- **Pendiente:** limpieza periódica de las demos vencidas (hoy quedan en la base, ocultas e inaccesibles).
+- Pruebas: `RecuperacionTest`, `DemoTest`, `RegistroPublicoTest` (CI); `e2e/lanzamiento.spec.ts` (6) + registro y
+  seguridad actualizadas. Verificado contra Postgres real.

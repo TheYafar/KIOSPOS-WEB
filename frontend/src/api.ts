@@ -59,12 +59,38 @@ export async function loginCajero(usuarioId: number, pin: string): Promise<Sesio
   return s;
 }
 
+const aSesion = (r: any): Sesion => ({ token: r.token, rol: r.rol as Rol, usuarioId: r.usuarioId, negocioId: r.negocioId, cajaId: r.cajaId, nombre: r.nombreCompleto });
+
 /** Registro por cuenta propia: crea el negocio + la cuenta del dueño y deja la sesión iniciada. */
-export async function registrarNegocio(d: { negocio: string; nombre: string; telefono?: string; email: string; password: string }): Promise<Sesion> {
+export async function registrarNegocio(d: { negocio: string; nombre: string; telefono?: string; email: string; password: string }): Promise<{ sesion: Sesion; codigo: string | null }> {
   const r = await parse(await fetch("/api/auth/registro", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(d) }));
-  const s: Sesion = { token: r.token, rol: r.rol as Rol, usuarioId: r.usuarioId, negocioId: r.negocioId, cajaId: r.cajaId, nombre: r.nombreCompleto };
+  const s = aSesion(r.sesion);
   setSesion(s);
-  return s;
+  return { sesion: s, codigo: r.codigoRecuperacion ?? null };
+}
+
+/** Qué ofrece la entrada: registro abierto, demo y si hay correo para recuperar la clave. */
+export interface OpcionesEntrada { registro: boolean; demo: boolean; correo: boolean; }
+export async function opcionesEntrada(): Promise<OpcionesEntrada> {
+  return parse(await fetch("/api/auth/opciones"));
+}
+
+/** "Probar la demo": bodega de muestra propia (24 h). Trae la sesión de dueño y la de la cajera. */
+export interface DemoCreada { dueno: Sesion; cajero: Sesion; pinCajero: string; expira: string; }
+export async function crearDemo(): Promise<DemoCreada> {
+  const r = await parse(await fetch("/api/auth/demo", { method: "POST" }));
+  return { dueno: aSesion(r.dueno), cajero: aSesion(r.cajero), pinCajero: r.pinCajero, expira: r.expira };
+}
+
+/** Olvidé mi contraseña sin correo: correo + código → clave nueva. Devuelve un código NUEVO. */
+export async function recuperarConCodigo(email: string, codigo: string, password: string): Promise<{ email: string; codigoNuevo: string }> {
+  return parse(await fetch("/api/auth/recuperar-con-codigo", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email, codigo, password }) }));
+}
+
+export async function estadoRecuperacion(): Promise<{ tiene: boolean }> { return parse(await fetch("/api/mi-cuenta/recuperacion", { headers: auth() })); }
+export async function generarCodigoRecuperacion(): Promise<string> {
+  const r = await parse(await fetch("/api/mi-cuenta/recuperacion", { method: "POST", headers: auth() }));
+  return r.codigo as string;
 }
 
 export async function loginDueno(email: string, password: string): Promise<Sesion> {

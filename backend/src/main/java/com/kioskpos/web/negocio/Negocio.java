@@ -93,6 +93,10 @@ public class Negocio {
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
 
+    /** Bodega de muestra de "Probar la demo" (oculta del panel admin; sin cuentas con correo ni pagos). */
+    @Column(name = "es_demo", nullable = false)
+    private boolean esDemo = false;
+
     /** Comisión por defecto de las recargas (%). */
     @Column(name = "comision_recarga_pct", nullable = false, precision = 5, scale = 2)
     private java.math.BigDecimal comisionRecargaPct = new java.math.BigDecimal("20");

@@ -117,6 +117,9 @@ public class SuscripcionService {
     @Transactional
     public Pago reportarPago(Long negocioId, BigDecimal monto, String moneda,
                              String metodo, String referencia, int meses) {
+        if (negocioRepository.findById(negocioId).map(Negocio::isEsDemo).orElse(false)) {
+            throw new IllegalStateException("En la demo no se reportan pagos. Crea tu cuenta gratis para activar tu bodega.");
+        }
         if (monto == null || monto.signum() <= 0) {
             throw new IllegalArgumentException("El monto debe ser mayor que cero");
         }

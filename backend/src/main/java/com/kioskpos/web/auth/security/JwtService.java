@@ -58,13 +58,18 @@ public class JwtService {
     // ---------- Token de sesión ----------
 
     public String emitir(KioskPrincipal p) {
+        return emitir(p, sesionTtl);
+    }
+
+    /** Sesión con duración propia (la demo dura 24 h, no 90 días). */
+    public String emitir(KioskPrincipal p, Duration ttl) {
         Instant now = Instant.now();
         var builder = Jwts.builder()
                 .subject(String.valueOf(p.usuarioId()))
                 .claim("tipo", TIPO_SESION)
                 .claim("rol", p.rol().name())
                 .issuedAt(Date.from(now))
-                .expiration(Date.from(now.plus(sesionTtl)));
+                .expiration(Date.from(now.plus(ttl)));
         if (p.negocioId() != null) {
             builder.claim("neg", p.negocioId());
         }

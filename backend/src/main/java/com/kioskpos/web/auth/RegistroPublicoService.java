@@ -2,12 +2,9 @@ package com.kioskpos.web.auth;
 
 import com.kioskpos.web.correo.EmailService;
 import com.kioskpos.web.negocio.NegocioRepository;
+import com.kioskpos.web.seguridad.LimitePorIp;
+import com.kioskpos.web.seguridad.RecuperacionService;
 import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayDeque;
-import java.util.Deque;
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.regex.Pattern;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -25,22 +22,22 @@ import org.springframework.stereotype.Service;
 public class RegistroPublicoService {
 
     private static final Pattern CORREO = Pattern.compile("^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$");
-    private static final Duration VENTANA = Duration.ofHours(1);
 
     private final NegocioRegistroService negocioRegistroService;
     private final NegocioRepository negocioRepository;
     private final CuentaLoginRepository cuentaLoginRepository;
     private final EmailService emailService;
     private final AuthService authService;
+    private final RecuperacionService recuperacion;
     private final boolean abierto;
-    private final int maxPorHora;
-    private final Map<String, Deque<Instant>> porIp = new ConcurrentHashMap<>();
+    private final LimitePorIp limite;
 
     public RegistroPublicoService(NegocioRegistroService negocioRegistroService,
                                   NegocioRepository negocioRepository,
                                   CuentaLoginRepository cuentaLoginRepository,
                                   EmailService emailService,
                                   AuthService authService,
+                                  RecuperacionService recuperacion,
                                   @Value("${kioskpos.registro.abierto:true}") boolean abierto,
                                   @Value("${kioskpos.registro.max-por-hora:5}") int maxPorHora) {
         this.negocioRegistroService = negocioRegistroService;
@@ -48,15 +45,25 @@ public class RegistroPublicoService {
         this.cuentaLoginRepository = cuentaLoginRepository;
         this.emailService = emailService;
         this.authService = authService;
+        this.recuperacion = recuperacion;
         this.abierto = abierto;
-        this.maxPorHora = maxPorHora;
+        this.limite = new LimitePorIp(maxPorHora, Duration.ofHours(1),
+                "Se crearon muchas cuentas desde esta conexión. Intenta más tarde.");
+    }
+
+    public boolean abierto() {
+        return abierto;
+    }
+
+    /** Sesión iniciada + código de recuperación (se muestra UNA vez en la bienvenida). */
+    public record Registrado(AuthService.ResultadoLogin login, String codigoRecuperacion) {
     }
 
     public record DatosRegistro(String negocio, String nombre, String telefono, String email, String password) {
     }
 
     /** Crea negocio + dueño y devuelve la sesión ya iniciada (entra directo al sistema). */
-    public AuthService.ResultadoLogin registrar(DatosRegistro d, String ip) {
+    public Registrado registrar(DatosRegistro d, String ip) {
         if (!abierto) {
             throw new IllegalStateException("El registro está cerrado por ahora. Escríbenos por WhatsApp y te creamos la cuenta.");
         }
@@ -82,7 +89,7 @@ public class RegistroPublicoService {
         if (cuentaLoginRepository.existsByEmail(correo)) {
             throw new IllegalArgumentException("Ya hay una cuenta con ese correo. Entra con tu contraseña o usa \"¿Olvidaste tu contraseña?\".");
         }
-        controlarIp(ip);
+        limite.contar(ip);
 
         NegocioRegistroService.NegocioCreado creado =
                 negocioRegistroService.registrarNegocioConDueno(negocio, nombre, correo, clave);
@@ -94,23 +101,8 @@ public class RegistroPublicoService {
             negocioRepository.save(n);
         });
         emailService.bienvenida(correo, nombre, negocio); // async, no rompe el alta si falla
-        return authService.loginDueno(correo, clave);
-    }
-
-    /** Máximo N negocios nuevos por IP por hora (frena altas en masa). */
-    private void controlarIp(String ip) {
-        String clave = ip == null || ip.isBlank() ? "?" : ip;
-        Instant ahora = Instant.now();
-        Deque<Instant> q = porIp.computeIfAbsent(clave, k -> new ArrayDeque<>());
-        synchronized (q) {
-            while (!q.isEmpty() && q.peekFirst().isBefore(ahora.minus(VENTANA))) {
-                q.pollFirst();
-            }
-            if (q.size() >= maxPorHora) {
-                throw new IllegalStateException("Se crearon muchas cuentas desde esta conexión. Intenta más tarde.");
-            }
-            q.addLast(ahora);
-        }
+        String codigo = cuentaLoginRepository.findByEmail(correo).map(recuperacion::generar).orElse(null);
+        return new Registrado(authService.loginDueno(correo, clave), codigo);
     }
 
     private static String limpio(String s, String error, int max) {

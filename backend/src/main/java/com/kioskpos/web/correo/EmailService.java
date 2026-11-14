@@ -39,6 +39,11 @@ public class EmailService {
         this.appUrl = appUrl;
     }
 
+    /** Si de verdad se pueden mandar correos (habilitado y con servidor SMTP configurado). */
+    public boolean activo() {
+        return enabled && senderProvider.getIfAvailable() != null;
+    }
+
     /** Bienvenida al dueño cuando se da de alta su negocio, con su acceso. */
     @Async
     public void bienvenida(String correo, String nombreDueno, String nombreNegocio) {

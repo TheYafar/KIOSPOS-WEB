@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { adminLogin, listarCajeros, loginCajero, loginDueno, olvideClave, registrarNegocio, Requiere2fa, restablecerClave, tasaBcvServidor, type Cajero } from "../api";
+import { adminLogin, crearDemo, listarCajeros, loginCajero, loginDueno, olvideClave, opcionesEntrada, recuperarConCodigo, registrarNegocio, Requiere2fa, restablecerClave, tasaBcvServidor, type Cajero, type OpcionesEntrada } from "../api";
 import { marcarBienvenida } from "../esteEquipo";
-import { getCajaToken, getSesion, getTasa, setCajaToken, setTasa, type Sesion } from "../session";
+import { guardarDemo } from "../demo";
+import { AyudaWhatsApp, CodigoRecuperacion } from "./Ayuda";
+import { getCajaToken, getSesion, getTasa, setCajaToken, setSesion, setTasa, type Sesion } from "../session";
 import { UIcono } from "../icons";
 import { TemaBtn } from "../TemaBtn";
 import { TamBtn } from "../TamBtn";
@@ -21,7 +23,16 @@ function saludoHora(): string {
 
 /** Pantalla de entrada (rediseño 04): panel oscuro con reloj + "¿Quién va a cobrar?" con PIN. */
 export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
-  const [vista, setVista] = useState<Vista>(getCajaToken() ? "pin" : "dueno");
+  const [vista, setVista] = useState<Vista>(() => {
+    // Desde la demo, "Crear mi cuenta" llega directo al registro.
+    try { if (sessionStorage.getItem("kp_ir_registro")) { sessionStorage.removeItem("kp_ir_registro"); return "registro"; } } catch { /* ignore */ }
+    return getCajaToken() ? "pin" : "dueno";
+  });
+  const [opc, setOpc] = useState<OpcionesEntrada>({ registro: true, demo: true, correo: false });
+  const [codigoRec, setCodigoRec] = useState("");
+  const [codigoNuevo, setCodigoNuevo] = useState("");
+  const [porCorreo, setPorCorreo] = useState(false);
+  const [abriendoDemo, setAbriendoDemo] = useState(false);
   const [cajeros, setCajeros] = useState<Cajero[]>([]);
   const [sel, setSel] = useState<Cajero | null>(null);
   const [pin, setPin] = useState("");
@@ -48,6 +59,8 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
   const [negocio, setNegocio] = useState("");
   const [nombre, setNombre] = useState("");
   const [telefono, setTelefono] = useState("");
+
+  useEffect(() => { opcionesEntrada().then(setOpc).catch(() => { /* deja lo de por defecto */ }); }, []);
 
   useEffect(() => {
     const t = setInterval(() => setReloj(new Date()), 1000);
@@ -179,10 +192,32 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
     if (!registroListo) return;
     setEnviando(true); setErr("");
     try {
-      const s = await registrarNegocio({ negocio: negocio.trim(), nombre: nombre.trim(), telefono: telefono.trim() || undefined, email: email.trim(), password: pass });
+      const r = await registrarNegocio({ negocio: negocio.trim(), nombre: nombre.trim(), telefono: telefono.trim() || undefined, email: email.trim(), password: pass });
       marcarBienvenida();
-      onLogin(s);
+      try { if (r.codigo) sessionStorage.setItem("kp_codigo_rec", r.codigo); } catch { /* ignore */ }
+      onLogin(r.sesion);
     } catch (e) { setErr((e as Error).message); setEnviando(false); }
+  };
+
+  const probarDemo = async () => {
+    setAbriendoDemo(true); setErr("");
+    try {
+      const d = await crearDemo();
+      guardarDemo(d);
+      setSesion(d.dueno);
+      onLogin(d.dueno);
+    } catch (e) { setErr((e as Error).message); setAbriendoDemo(false); }
+  };
+
+  const recuperar = async () => {
+    if (pass.length < 8) { setErr("La contraseña nueva debe tener al menos 8 caracteres"); return; }
+    if (pass !== pass2) { setErr("Las dos contraseñas no coinciden"); return; }
+    setEnviando(true); setErr("");
+    try {
+      const r = await recuperarConCodigo(email.trim(), codigoRec.trim(), pass);
+      setCodigoNuevo(r.codigoNuevo);
+    } catch (e) { setErr((e as Error).message); }
+    finally { setEnviando(false); }
   };
 
   const entrarAdmin = async () => {
@@ -259,6 +294,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
             {aviso && !err && <p className="pinmsg err" role="alert">{aviso}</p>}
             {err && <p className="pinmsg err">{err}</p>}
             <button className="btn primary" onClick={guardarConfig} disabled={!cajaTok.trim() || guardando}>{guardando ? "Verificando…" : "Guardar y continuar"}</button>
+            <AyudaWhatsApp />
           </div>
         </main>
       </div></div>
@@ -288,10 +324,16 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
             <button className="link" onClick={() => { setErr(""); setOk(""); setVista("olvide"); }}>¿Olvidaste tu contraseña?</button>
             {getCajaToken() && <button className="link" onClick={() => { setErr(""); setVista("pin"); }}>Volver a los cajeros</button>}
             <button className="link" onClick={() => { setErr(""); setEmail(""); setPass(""); setVista("admin"); }}>Soy el administrador</button>
-            <div className="reg-cta">
-              <div><b>¿Tu bodega aún no tiene cuenta?</b><span>Créala tú mismo en un minuto. 7 días gratis, sin tarjeta.</span></div>
-              <button className="btn outline press" onClick={() => { setErr(""); setOk(""); setPass(""); setPass2(""); setVista("registro"); }}>Crear mi cuenta</button>
-            </div>
+            {(opc.registro || opc.demo) && (
+              <div className="reg-cta">
+                <div><b>¿Tu bodega aún no tiene cuenta?</b><span>{opc.registro ? "Créala tú mismo en un minuto. 7 días gratis, sin tarjeta." : "Mira cómo funciona con una bodega de muestra."}</span></div>
+                <div className="reg-cta-acc">
+                  {opc.demo && <button className="btn outline press" disabled={abriendoDemo} onClick={probarDemo}>{abriendoDemo ? "Preparando…" : "Ver la demo"}</button>}
+                  {opc.registro && <button className="btn primary press" onClick={() => { setErr(""); setOk(""); setPass(""); setPass2(""); setVista("registro"); }}>Crear mi cuenta</button>}
+                </div>
+              </div>
+            )}
+            <AyudaWhatsApp />
           </div>
         </main>
       </div></div>
@@ -333,6 +375,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
             <button type="submit" className="btn primary" disabled={!registroListo}>{enviando ? "Creando tu cuenta…" : "Crear mi cuenta gratis"}</button>
             <p className="hint reg-legal">Después podrás crear tus cajas y cajeros desde tu cuenta, sin tokens ni enredos.</p>
             <button type="button" className="link" onClick={() => { setErr(""); setPass(""); setPass2(""); setVista("dueno"); }}>Ya tengo cuenta, quiero entrar</button>
+            <AyudaWhatsApp mensaje="Hola, quiero crear la cuenta de mi bodega en KioskPOS y tengo una pregunta." />
           </form>
         </main>
       </div></div>
@@ -340,22 +383,71 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
   }
 
   if (vista === "olvide") {
+    const volver = () => { setErr(""); setOk(""); setPass(""); setPass2(""); setCodigoRec(""); setCodigoNuevo(""); setPorCorreo(false); setVista("dueno"); };
+    if (codigoNuevo) {
+      return (
+        <div className="app"><div className="entrar">{side}
+          <main className="entrar-main">
+            <div className="entrar-head"><h1>¡Listo, clave nueva!</h1><p>El código que usaste ya no sirve. Este es tu código nuevo: guárdalo.</p></div>
+            <div className="owner">
+              <CodigoRecuperacion codigo={codigoNuevo} />
+              {err && <p className="pinmsg err">{err}</p>}
+              <button className="btn primary" onClick={async () => { try { onLogin(await loginDueno(email.trim(), pass)); } catch (e) { setErr((e as Error).message); } }}>Entrar a mi negocio</button>
+            </div>
+          </main>
+        </div></div>
+      );
+    }
+    if (porCorreo) {
+      return (
+        <div className="app"><div className="entrar">{side}
+          <main className="entrar-main">
+            <div className="entrar-head"><h1>Enlace por correo</h1><p>Te mandamos un enlace a tu correo para poner una clave nueva</p></div>
+            <div className="owner">
+              <label>Correo con el que entras
+                <input className="inp" type="email" value={email} autoFocus onChange={(e) => setEmail(e.target.value)} autoComplete="username"
+                  onKeyDown={(e) => { if (e.key === "Enter" && email.includes("@")) pedirEnlace(); }} />
+              </label>
+              {ok && <p className="pinmsg ok">{ok} Revisa también la carpeta de spam. El enlace vence en 30 minutos.</p>}
+              {err && <p className="pinmsg err">{err}</p>}
+              <button className="btn primary" onClick={pedirEnlace} disabled={!email.includes("@") || enviando}>{enviando ? "Enviando…" : ok ? "Enviar otra vez" : "Enviarme el enlace"}</button>
+              <button className="link" onClick={() => { setErr(""); setOk(""); setPorCorreo(false); }}>Mejor uso mi código</button>
+            </div>
+          </main>
+        </div></div>
+      );
+    }
+    const listo = email.includes("@") && codigoRec.replace(/[^A-Za-z0-9]/g, "").length >= 12 && pass.length >= 8 && pass === pass2 && !enviando;
     return (
       <div className="app"><div className="entrar">{side}
         <main className="entrar-main">
-          <div className="entrar-head"><h1>¿Olvidaste tu contraseña?</h1><p>Te mandamos un enlace a tu correo para poner una nueva</p></div>
-          <div className="owner">
+          <div className="entrar-head"><h1>¿Olvidaste tu contraseña?</h1><p>Pon una nueva con tu <b>código de recuperación</b> (el que te dimos al crear la cuenta)</p></div>
+          <form className="owner" onSubmit={(e) => { e.preventDefault(); if (listo) recuperar(); }}>
             <label>Correo con el que entras
-              <input className="inp" type="email" value={email} autoFocus onChange={(e) => setEmail(e.target.value)} autoComplete="username"
-                onKeyDown={(e) => { if (e.key === "Enter" && email.includes("@")) pedirEnlace(); }} />
+              <input id="rec-email" className="inp" type="email" value={email} autoFocus onChange={(e) => setEmail(e.target.value)} autoComplete="username" />
             </label>
-            {ok ? <p className="pinmsg ok">{ok} Revisa también la carpeta de spam. El enlace vence en 30 minutos.</p>
-              : <p className="hint">¿No te llega? Pídele al soporte de KioskPOS un enlace por WhatsApp.</p>}
-            {aviso && !err && <p className="pinmsg err" role="alert">{aviso}</p>}
-            {err && <p className="pinmsg err">{err}</p>}
-            <button className="btn primary" onClick={pedirEnlace} disabled={!email.includes("@") || enviando}>{enviando ? "Enviando…" : ok ? "Enviar otra vez" : "Enviarme el enlace"}</button>
-            <button className="link" onClick={() => { setErr(""); setOk(""); setVista("dueno"); }}>Volver</button>
-          </div>
+            <label>Código de recuperación
+              <input id="rec-codigo" className="inp t rec-input" value={codigoRec} onChange={(e) => setCodigoRec(e.target.value.toUpperCase())} placeholder="XXXX-XXXX-XXXX" autoComplete="off" spellCheck={false} />
+            </label>
+            <div className="reg-two">
+              <label>Contraseña nueva
+                <input id="rec-pass" className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="new-password" />
+              </label>
+              <label>Repítela
+                <input id="rec-pass2" className="inp" type="password" value={pass2} onChange={(e) => setPass2(e.target.value)} autoComplete="new-password" />
+              </label>
+            </div>
+            {pass.length > 0 && pass.length < 8 && <p className="hint">Mínimo 8 caracteres (faltan {8 - pass.length})</p>}
+            {pass2.length > 0 && pass !== pass2 && <p className="hint" style={{ color: "var(--bad)" }}>Las dos contraseñas no coinciden</p>}
+            {err && <p className="pinmsg err" role="alert">{err}</p>}
+            <button type="submit" className="btn primary" disabled={!listo}>{enviando ? "Guardando…" : "Poner contraseña nueva"}</button>
+            <div className="rec-sin">
+              <b>¿No tienes el código?</b>
+              <AyudaWhatsApp boton texto="Pídenos ayuda por WhatsApp" mensaje={"Hola, olvidé mi contraseña de KioskPOS." + (email.includes("@") ? " Mi correo es " + email.trim() + "." : "")} />
+              {opc.correo && <button type="button" className="link" onClick={() => { setErr(""); setOk(""); setPorCorreo(true); }}>Enviarme un enlace al correo</button>}
+            </div>
+            <button type="button" className="link" onClick={volver}>Volver</button>
+          </form>
         </main>
       </div></div>
     );
@@ -456,6 +548,7 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
         <button className="owner-pill" onClick={() => { setErr(""); setVista("dueno"); }}>
           <UIcono k="user" />¿Eres el dueño? Entra con tu correo
         </button>
+        <AyudaWhatsApp />
       </main>
     </div></div>
   );

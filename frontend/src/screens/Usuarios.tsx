@@ -5,6 +5,9 @@ import { UIcono } from "../icons";
 import { MiPlan } from "./MiPlan";
 import { AjustesNegocio } from "./negocio";
 import { adoptarCaja, cajaLocalId, esteEquipoEsCaja } from "../esteEquipo";
+import { SeguridadCuenta } from "./SeguridadCuenta";
+import { esSesionDemo } from "../demo";
+import { AyudaWhatsApp } from "./Ayuda";
 
 const ROL_N: Record<string, string> = { DUENO: "Dueño", ENCARGADO: "Encargado", CAJERO: "Cajero", SOPORTE: "Soporte Técnico", SUPER_ADMIN: "Super admin" };
 
@@ -44,6 +47,7 @@ export function Usuarios({ onSalir }: { onSalir: () => void }) {
         <div className="mas-col">
         <MiPlan />
         <AjustesNegocio />
+        {esSesionDemo(getSesion()) ? <section className="card seg-card"><AyudaWhatsApp /></section> : <SeguridadCuenta />}
         </div>
         <div className="mas-col">
         {err && <p className="noresult">{err}</p>}

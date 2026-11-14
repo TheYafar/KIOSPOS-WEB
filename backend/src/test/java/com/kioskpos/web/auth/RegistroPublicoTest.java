@@ -23,7 +23,9 @@ class RegistroPublicoTest extends PostgresRlsTestBase {
 
     @Test
     void registraNegocioEnPruebaYDevuelveSesionDeDueno() {
-        var r = registro.registrar(datos("Nueva@Ejemplo.com", "clave-segura"), "10.0.0.1");
+        var reg = registro.registrar(datos("Nueva@Ejemplo.com", "clave-segura"), "10.0.0.1");
+        var r = reg.login();
+        assertThat(reg.codigoRecuperacion()).matches("[A-Z2-9]{4}-[A-Z2-9]{4}-[A-Z2-9]{4}");
         assertThat(r.token()).isNotBlank();
         assertThat(r.rol()).isEqualTo(RolUsuario.DUENO);
         assertThat(r.nombreCompleto()).isEqualTo("María Pérez");

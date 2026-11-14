@@ -2,6 +2,7 @@ import { useState } from "react";
 import { getSesion } from "../session";
 import { UIcono } from "../icons";
 import { cerrarBienvenida, esteEquipoEsCaja, usarEsteEquipoComoCaja } from "../esteEquipo";
+import { AyudaWhatsApp, CodigoRecuperacion } from "./Ayuda";
 
 /**
  * Bienvenida al sistema justo después de registrarse: saluda, recuerda la prueba gratis
@@ -12,9 +13,19 @@ export function Bienvenida({ onIr, onCerrar }: { onIr: (tab: string) => void; on
   const [caja, setCaja] = useState(esteEquipoEsCaja());
   const [yendo, setYendo] = useState(false);
   const [err, setErr] = useState("");
+  const [codigo] = useState(() => { try { return sessionStorage.getItem("kp_codigo_rec") || ""; } catch { return ""; } });
+  const [guardado, setGuardado] = useState(false);
+  const [falta, setFalta] = useState(false);
 
-  const cerrar = () => { cerrarBienvenida(); onCerrar(); };
-  const ir = (tab: string) => { cerrar(); onIr(tab); };
+  const cerrar = () => {
+    if (codigo && !guardado) return;
+    try { sessionStorage.removeItem("kp_codigo_rec"); } catch { /* ignore */ }
+    cerrarBienvenida(); onCerrar();
+  };
+  const ir = (tab: string) => {
+    if (codigo && !guardado) { setFalta(true); return; } // primero que guarde su código
+    cerrar(); onIr(tab);
+  };
   const usarEquipo = async () => {
     setYendo(true); setErr("");
     try { await usarEsteEquipoComoCaja("Caja 1"); setCaja(true); }
@@ -31,6 +42,7 @@ export function Bienvenida({ onIr, onCerrar }: { onIr: (tab: string) => void; on
           <p>Tu bodega ya tiene cuenta. Tienes <b>7 días gratis</b> para probarlo todo. Deja todo listo en 3 pasos:</p>
         </div>
         <div className="modal-body bienv-pasos">
+          {codigo && <CodigoRecuperacion codigo={codigo} onGuardado={setGuardado} />}
           <div className={"bienv-paso" + (caja ? " hecho" : "")}>
             <span className="bienv-n">{caja ? <UIcono k="check" sw={2.6} /> : "1"}</span>
             <div className="bienv-tx">
@@ -51,7 +63,11 @@ export function Bienvenida({ onIr, onCerrar }: { onIr: (tab: string) => void; on
             <button className="btn outline press" onClick={() => ir("inventario")}>Cargar</button>
           </div>
         </div>
-        <div className="modal-foot"><button className="btn primary big press" onClick={cerrar}>Empezar a usar KioskPOS</button></div>
+        <div className="modal-foot bienv-foot">
+          {codigo && !guardado && <span className={"hint" + (falta ? " mg-bad" : "")}>Primero guarda tu código y marca "Ya lo guardé"</span>}
+          <button className="btn primary big press" disabled={!!codigo && !guardado} onClick={cerrar}>Empezar a usar KioskPOS</button>
+          <AyudaWhatsApp mensaje="Hola, acabo de crear mi cuenta en KioskPOS y tengo una pregunta." />
+        </div>
       </div>
     </div>
   );

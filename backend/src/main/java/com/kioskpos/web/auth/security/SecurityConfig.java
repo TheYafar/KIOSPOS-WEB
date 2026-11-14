@@ -61,6 +61,8 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.GET, "/api/cierres-punto").hasAnyRole("DUENO", "ENCARGADO")
                         // Compras y proveedores: solo dueño o encargado.
                         .requestMatchers("/api/compras/**", "/api/proveedores/**").hasAnyRole("DUENO", "ENCARGADO")
+                        // Código de recuperación de la cuenta: solo quien entra con correo.
+                        .requestMatchers("/api/mi-cuenta/**").hasAnyRole("DUENO", "ENCARGADO")
                         // Campanita de avisos (pagos a proveedores + bajo stock): solo dueño o encargado.
                         .requestMatchers("/api/avisos", "/api/avisos/**").hasAnyRole("DUENO", "ENCARGADO")
                         // Inventario: leer lo puede todo usuario; crear/editar/borrar/importar solo dueño/encargado.

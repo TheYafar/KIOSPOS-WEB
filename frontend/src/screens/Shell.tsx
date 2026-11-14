@@ -24,6 +24,9 @@ import { ColaModal, ColaPill, useCola } from "./ColaVentas";
 import { Campana } from "./Campana";
 import { Bienvenida } from "./Bienvenida";
 import { pideBienvenida } from "../esteEquipo";
+import { DemoBanner } from "./DemoBanner";
+import { AyudaWhatsApp } from "./Ayuda";
+import { esSesionDemo } from "../demo";
 
 interface Tab { id: string; n: string; icon: string; }
 
@@ -61,6 +64,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
   const [online, setOnline] = useState(navigator.onLine);
   const [ayuda, setAyuda] = useState(false);
   const [bienv, setBienv] = useState(() => !esCaja && pideBienvenida());
+  const enDemo = esSesionDemo(sesion);
   // Ventas cobradas que aún no llegan al servidor (sin internet o rechazadas).
   const cola = useCola();
   const [verCola, setVerCola] = useState(false);
@@ -155,8 +159,9 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
             </div>
           </header>
 
-          {bienv && <Bienvenida onIr={setTab} onCerrar={() => setBienv(false)} />}
-          {plan && <AvisoPlan plan={plan} esCaja={esCaja} onPagar={irAPagar} />}
+          {bienv && !enDemo && <Bienvenida onIr={setTab} onCerrar={() => setBienv(false)} />}
+          {enDemo && <DemoBanner sesion={sesion} onSalir={onSalir} />}
+          {plan && !enDemo && <AvisoPlan plan={plan} esCaja={esCaja} onPagar={irAPagar} />}
           {tab === "caja" && esCaja && <Caja />}
           {tab === "cuadre" && esCaja && <Cuadre />}
           {tab === "reportes" && <Reportes onIr={setTab} />}
@@ -306,6 +311,7 @@ function SuspendidoModal({ plan, esCaja, onPagar, onClose }: { plan: Situacion; 
           {plan.deuda > 0 && <div className="susp-deuda"><span>Debes</span><b className="t">{usd2(plan.deuda)}</b>{plan.mesesPendientes > 0 && <small>{plan.mesesPendientes} mes(es) de mensualidad</small>}</div>}
           <p className="susp-tx">Mientras no pagues, la caja <b>no puede cobrar ni dar crédito</b>. Tus datos están guardados y puedes consultarlos.
             {esCaja ? " Avísale al dueño del negocio para que pague." : " Paga por pago móvil, transferencia o Zelle y repórtalo: apenas se apruebe, todo vuelve a funcionar."}</p>
+          {!esCaja && <AyudaWhatsApp texto="¿Dudas para pagar? Escríbenos por WhatsApp" mensaje="Hola, quiero pagar / reactivar mi KioskPOS." />}
         </div>
         <div className="modal-foot two-btn">
           <button className="btn2 big press" onClick={onClose}>Entendido</button>

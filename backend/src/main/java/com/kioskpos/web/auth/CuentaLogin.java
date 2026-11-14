@@ -42,6 +42,10 @@ public class CuentaLogin {
     @Column(nullable = false)
     private boolean activo = true;
 
+    /** Hash (BCrypt) del código de recuperación de la cuenta; null si nunca se generó. */
+    @Column(name = "recuperacion_hash", length = 100)
+    private String recuperacionHash;
+
     @Column(name = "created_at", insertable = false, updatable = false)
     private Instant createdAt;
 }

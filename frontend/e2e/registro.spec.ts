@@ -38,7 +38,12 @@ test("el dueño se registra solo, recibe la bienvenida y usa este equipo como ca
   const token = await page.evaluate(() => localStorage.getItem("kioskpos.cajaToken"));
   expect(token).toContain("tok-nuevo");
 
-  await bienv.getByRole("button", { name: "Empezar a usar KioskPOS" }).click();
+  // El código de recuperación sale una vez y hay que confirmar que se guardó.
+  await expect(bienv.locator(".rec-code")).toHaveText("ABCD-EFGH-JK23");
+  const empezar = bienv.getByRole("button", { name: "Empezar a usar KioskPOS" });
+  await expect(empezar).toBeDisabled();
+  await bienv.getByLabel("Ya lo guardé").check();
+  await empezar.click();
   await expect(bienv).toHaveCount(0);
   // La bienvenida no vuelve a salir.
   await page.reload();

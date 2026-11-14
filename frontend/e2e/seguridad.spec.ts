@@ -12,12 +12,13 @@ test("el PIN equivocado muestra cuántos intentos quedan (lo dice el servidor)",
   await expect(page.locator(".pinmsg.err")).toHaveText("PIN incorrecto. Te quedan 3 intentos.");
 });
 
-test("olvidé mi contraseña pide el enlace por correo", async ({ page }) => {
+test("si hay correo configurado, olvidé mi contraseña también puede pedir el enlace por correo", async ({ page }) => {
   let pedido: any = null;
-  await preparar(page, { turnoAbierto: false }, { "kioskpos.cajaToken": "" });
+  await preparar(page, { turnoAbierto: false, opciones: { registro: true, demo: true, correo: true } }, { "kioskpos.cajaToken": "" });
   await page.route("**/api/auth/olvide-clave", (r) => { pedido = JSON.parse(r.request().postData() || "{}"); return r.fulfill({ json: { mensaje: "Si ese correo está registrado, te llegará un enlace." } }); });
   await ir(page);
   await page.getByRole("button", { name: "¿Olvidaste tu contraseña?" }).click();
+  await page.getByRole("button", { name: "Enviarme un enlace al correo" }).click();
   await page.getByLabel("Correo con el que entras").fill("dueno@bodega.com");
   await page.keyboard.press("Enter");
   await expect(page.locator(".pinmsg.ok")).toContainText("te llegará un enlace");

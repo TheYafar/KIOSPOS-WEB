@@ -29,7 +29,8 @@ export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: a
   usuarios?: any[]; cajasLista?: any[]; usuarioBorrado?: number; usuarioEditado?: any; usuarioCreado?: any; cajaBorrada?: number; cajaEditada?: any;
   csvImport?: string; productoBorrado?: number; inventarioVaciado?: boolean;
   compraAbonos?: any[]; compraFotos?: any[]; compraVence?: any; compraPagada?: boolean; avisos?: any;
-  registro?: any; registroFalla?: string; cajaCreada?: any; }
+  registro?: any; registroFalla?: string; cajaCreada?: any;
+  opciones?: any; demoCreada?: boolean; recuperacion?: any; recuperacionFalla?: string; codigoGenerado?: boolean; }
 
 /** Factura de compra base para los endpoints de detalle/abono. */
 const compraDemo = (st: Estado) => ({ id: 8, proveedorId: 3, numeroFactura: "A-77", fecha: "2026-11-09", totalUsd: 40,
@@ -111,7 +112,23 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     if (u.includes("/api/auth/registro")) {
       st.registro = JSON.parse(r.request().postData() || "{}");
       if (st.registroFalla) return r.fulfill({ status: 400, json: { error: st.registroFalla } });
-      return r.fulfill({ json: { token: "x", rol: "DUENO", usuarioId: 1, negocioId: 7, cajaId: null, nombreCompleto: st.registro.nombre } });
+      return r.fulfill({ json: { sesion: { token: "x", rol: "DUENO", usuarioId: 1, negocioId: 7, cajaId: null, nombreCompleto: st.registro.nombre }, codigoRecuperacion: "ABCD-EFGH-JK23" } });
+    }
+    if (u.includes("/api/auth/opciones")) return r.fulfill({ json: st.opciones ?? { registro: true, demo: true, correo: false } });
+    if (u.includes("/api/auth/demo")) {
+      st.demoCreada = true;
+      const exp = new Date(Date.now() + 86400000).toISOString();
+      return r.fulfill({ json: { dueno: { token: "demo-d", rol: "DUENO", usuarioId: 1, negocioId: 99, cajaId: null, nombreCompleto: "Visitante" },
+        cajero: { token: "demo-c", rol: "CAJERO", usuarioId: 3, negocioId: 99, cajaId: 1, nombreCompleto: "Ana" }, pinCajero: "1234", expira: exp } });
+    }
+    if (u.includes("/api/auth/recuperar-con-codigo")) {
+      st.recuperacion = JSON.parse(r.request().postData() || "{}");
+      if (st.recuperacionFalla) return r.fulfill({ status: 401, json: { error: st.recuperacionFalla } });
+      return r.fulfill({ json: { email: st.recuperacion.email, codigoNuevo: "NUEV-OCOD-IGO2" } });
+    }
+    if (u.includes("/api/mi-cuenta/recuperacion")) {
+      if (m === "POST") { st.codigoGenerado = true; return r.fulfill({ json: { codigo: "MASS-CODE-2345" } }); }
+      return r.fulfill({ json: { tiene: !!st.codigoGenerado } });
     }
     if (u.includes("/api/auth/login-cajero")) return r.fulfill({ json: { token: "x", rol: "CAJERO", usuarioId: 3, negocioId: 1, cajaId: 1, nombreCompleto: "test2" } });
     if (u.includes("/api/inventario/categorias")) {

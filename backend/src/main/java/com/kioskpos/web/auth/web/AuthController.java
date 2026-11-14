@@ -2,6 +2,9 @@ package com.kioskpos.web.auth.web;
 
 import com.kioskpos.web.auth.AuthService;
 import com.kioskpos.web.auth.RegistroPublicoService;
+import com.kioskpos.web.correo.EmailService;
+import com.kioskpos.web.demo.DemoService;
+import com.kioskpos.web.seguridad.RecuperacionService;
 import jakarta.servlet.http.HttpServletRequest;
 import com.kioskpos.web.auth.RolUsuario;
 import com.kioskpos.web.seguridad.RecuperarClaveService;
@@ -23,18 +26,51 @@ public class AuthController {
     private final AuthService authService;
     private final RecuperarClaveService recuperarClaveService;
     private final RegistroPublicoService registroPublicoService;
+    private final RecuperacionService recuperacionService;
+    private final DemoService demoService;
+    private final EmailService emailService;
 
     public AuthController(AuthService authService, RecuperarClaveService recuperarClaveService,
-                          RegistroPublicoService registroPublicoService) {
+                          RegistroPublicoService registroPublicoService, RecuperacionService recuperacionService,
+                          DemoService demoService, EmailService emailService) {
         this.authService = authService;
         this.recuperarClaveService = recuperarClaveService;
         this.registroPublicoService = registroPublicoService;
+        this.recuperacionService = recuperacionService;
+        this.demoService = demoService;
+        this.emailService = emailService;
+    }
+
+    /** Qué ofrece la pantalla de entrada: registro, demo y si hay correo para recuperar la clave. */
+    @GetMapping("/auth/opciones")
+    public Map<String, Boolean> opciones() {
+        return Map.of("registro", registroPublicoService.abierto(), "demo", demoService.abierta(),
+                "correo", emailService.activo());
     }
 
     /** Registro por cuenta propia: crea el negocio y el dueño, y deja la sesión iniciada. */
     @PostMapping("/auth/registro")
-    public TokenResponse registro(@RequestBody RegistroPublicoService.DatosRegistro req, HttpServletRequest http) {
-        return TokenResponse.de(registroPublicoService.registrar(req, ipDe(http)));
+    public RegistroResponse registro(@RequestBody RegistroPublicoService.DatosRegistro req, HttpServletRequest http) {
+        var r = registroPublicoService.registrar(req, ipDe(http));
+        return new RegistroResponse(TokenResponse.de(r.login()), r.codigoRecuperacion());
+    }
+
+    public record RegistroResponse(TokenResponse sesion, String codigoRecuperacion) {
+    }
+
+    /** "Probar la demo": una bodega de muestra solo para este visitante (24 h). */
+    @PostMapping("/auth/demo")
+    public DemoService.DemoCreada demo(HttpServletRequest http) {
+        return demoService.crear(ipDe(http));
+    }
+
+    /** Olvidé mi contraseña SIN correo: correo + código de recuperación → clave nueva (y código nuevo). */
+    @PostMapping("/auth/recuperar-con-codigo")
+    public RecuperacionService.Recuperada recuperarConCodigo(@RequestBody RecuperarCodigoRequest req) {
+        return recuperacionService.recuperar(req.email(), req.codigo(), req.password());
+    }
+
+    public record RecuperarCodigoRequest(String email, String codigo, String password) {
     }
 
     /** IP real del cliente detrás de nginx (X-Real-IP), o la de la conexión. */

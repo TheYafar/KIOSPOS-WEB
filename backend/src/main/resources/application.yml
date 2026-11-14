@@ -66,6 +66,11 @@ kioskpos:
   registro:
     abierto: ${KIOSKPOS_REGISTRO_ABIERTO:true}
     max-por-hora: ${KIOSKPOS_REGISTRO_MAX_POR_HORA:5}
+  # "Probar la demo": una bodega de muestra por visitante, que dura 24 h.
+  demo:
+    abierta: ${KIOSKPOS_DEMO_ABIERTA:true}
+    max-por-hora: ${KIOSKPOS_DEMO_MAX_POR_HORA:10}
+    max-por-dia: ${KIOSKPOS_DEMO_MAX_POR_DIA:300}
   # Bloqueo por intentos fallidos (PIN, clave del dueño, super admin).
   login:
     max-intentos: ${KIOSKPOS_LOGIN_MAX_INTENTOS:5}

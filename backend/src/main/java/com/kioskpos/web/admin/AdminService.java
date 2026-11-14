@@ -49,7 +49,8 @@ public class AdminService {
     }
 
     public List<NegocioVista> listarNegocios() {
-        return negocioRepository.findAll().stream().map(this::vista).toList();
+        // Las bodegas de "Probar la demo" no son clientes: no se listan en el panel.
+        return negocioRepository.findAll().stream().filter(n -> !n.isEsDemo()).map(this::vista).toList();
     }
 
     public NegocioVista verNegocio(Long negocioId) {

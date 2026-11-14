@@ -19,13 +19,16 @@ public class UsuarioService {
     private final UsuarioRepository usuarioRepository;
     private final CuentaLoginRepository cuentaLoginRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.kioskpos.web.demo.DemoGuard demoGuard;
 
     public UsuarioService(UsuarioRepository usuarioRepository,
                           CuentaLoginRepository cuentaLoginRepository,
-                          PasswordEncoder passwordEncoder) {
+                          PasswordEncoder passwordEncoder,
+                          com.kioskpos.web.demo.DemoGuard demoGuard) {
         this.usuarioRepository = usuarioRepository;
         this.cuentaLoginRepository = cuentaLoginRepository;
         this.passwordEncoder = passwordEncoder;
+        this.demoGuard = demoGuard;
     }
 
     /** Crea un usuario que entra con correo+contraseña (DUENO o ENCARGADO). */
@@ -34,6 +37,8 @@ public class UsuarioService {
         if (rol != RolUsuario.DUENO && rol != RolUsuario.ENCARGADO && rol != RolUsuario.SOPORTE) {
             throw new IllegalArgumentException("Este rol no usa correo+contraseña");
         }
+        // En la demo no se crean cuentas con correo: reservaría correos reales de otras personas.
+        demoGuard.exigirNoDemo(NegocioContext.require(), "crear usuarios con correo");
         exigirTexto(nombreCompleto, "El nombre completo es obligatorio");
         exigirTexto(email, "El correo es obligatorio");
         exigirTexto(password, "La contraseña es obligatoria");
