@@ -1,6 +1,8 @@
 package com.kioskpos.web.auth.web;
 
 import com.kioskpos.web.auth.AuthService;
+import com.kioskpos.web.auth.RegistroPublicoService;
+import jakarta.servlet.http.HttpServletRequest;
 import com.kioskpos.web.auth.RolUsuario;
 import com.kioskpos.web.seguridad.RecuperarClaveService;
 import java.util.Map;
@@ -20,10 +22,32 @@ public class AuthController {
 
     private final AuthService authService;
     private final RecuperarClaveService recuperarClaveService;
+    private final RegistroPublicoService registroPublicoService;
 
-    public AuthController(AuthService authService, RecuperarClaveService recuperarClaveService) {
+    public AuthController(AuthService authService, RecuperarClaveService recuperarClaveService,
+                          RegistroPublicoService registroPublicoService) {
         this.authService = authService;
         this.recuperarClaveService = recuperarClaveService;
+        this.registroPublicoService = registroPublicoService;
+    }
+
+    /** Registro por cuenta propia: crea el negocio y el dueño, y deja la sesión iniciada. */
+    @PostMapping("/auth/registro")
+    public TokenResponse registro(@RequestBody RegistroPublicoService.DatosRegistro req, HttpServletRequest http) {
+        return TokenResponse.de(registroPublicoService.registrar(req, ipDe(http)));
+    }
+
+    /** IP real del cliente detrás de nginx (X-Real-IP), o la de la conexión. */
+    private static String ipDe(HttpServletRequest http) {
+        String real = http.getHeader("X-Real-IP");
+        if (real != null && !real.isBlank()) {
+            return real.trim();
+        }
+        String xff = http.getHeader("X-Forwarded-For");
+        if (xff != null && !xff.isBlank()) {
+            return xff.split(",")[0].trim();
+        }
+        return http.getRemoteAddr();
     }
 
     /** "Olvidé mi contraseña": siempre responde igual (no revela si el correo existe). */

@@ -28,7 +28,8 @@ export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: a
   bloques?: any[]; bloquesPut?: { productoId: number; lista: any[] }; puntos?: any[];
   usuarios?: any[]; cajasLista?: any[]; usuarioBorrado?: number; usuarioEditado?: any; usuarioCreado?: any; cajaBorrada?: number; cajaEditada?: any;
   csvImport?: string; productoBorrado?: number; inventarioVaciado?: boolean;
-  compraAbonos?: any[]; compraFotos?: any[]; compraVence?: any; compraPagada?: boolean; avisos?: any; }
+  compraAbonos?: any[]; compraFotos?: any[]; compraVence?: any; compraPagada?: boolean; avisos?: any;
+  registro?: any; registroFalla?: string; cajaCreada?: any; }
 
 /** Factura de compra base para los endpoints de detalle/abono. */
 const compraDemo = (st: Estado) => ({ id: 8, proveedorId: 3, numeroFactura: "A-77", fecha: "2026-11-09", totalUsd: 40,
@@ -107,6 +108,11 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
     const u = r.request().url(), m = r.request().method();
     if (st.sesionVencida && !u.includes("/api/auth/") && !u.includes("/api/caja/cajeros") && !u.includes("/api/tasa")) return r.fulfill({ status: 401, json: { error: "Sesión vencida" } });
     if (u.includes("/api/caja/cajeros")) return r.fulfill({ json: [{ id: 2, nombre: "test1" }, { id: 3, nombre: "test2" }] });
+    if (u.includes("/api/auth/registro")) {
+      st.registro = JSON.parse(r.request().postData() || "{}");
+      if (st.registroFalla) return r.fulfill({ status: 400, json: { error: st.registroFalla } });
+      return r.fulfill({ json: { token: "x", rol: "DUENO", usuarioId: 1, negocioId: 7, cajaId: null, nombreCompleto: st.registro.nombre } });
+    }
     if (u.includes("/api/auth/login-cajero")) return r.fulfill({ json: { token: "x", rol: "CAJERO", usuarioId: 3, negocioId: 1, cajaId: 1, nombreCompleto: "test2" } });
     if (u.includes("/api/inventario/categorias")) {
       if (m !== "GET") { st.categoria = { metodo: m, ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { nombre: "x", productos: 0 } }); }
@@ -260,6 +266,7 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
       st.cajasLista ??= [{ id: 1, nombre: "Caja 1", localId: 1, autorizada: true, activa: true }];
       const id = Number(u.split("/").pop());
       if (m === "DELETE") { st.cajaBorrada = id; st.cajasLista = st.cajasLista.filter((x) => x.id !== id); return r.fulfill({ json: { borrada: true } }); }
+      if (m === "POST") { const b = JSON.parse(r.request().postData() || "{}"); const c = { id: (st.cajasLista.length ? Math.max(...st.cajasLista.map((x: any) => x.id)) : 0) + 1, nombre: b.nombre, localId: 1, autorizada: true, activa: true }; st.cajasLista.push(c); st.cajaCreada = c; return r.fulfill({ json: { ...c, cajaToken: "tok-nuevo-" + c.id } }); }
       if (m === "PUT") { const b = JSON.parse(r.request().postData() || "{}"); st.cajaEditada = { id, ...b }; const x = st.cajasLista.find((y) => y.id === id); if (x) x.nombre = b.nombre; return r.fulfill({ json: x ?? {} }); }
       return r.fulfill({ json: st.cajasLista });
     }

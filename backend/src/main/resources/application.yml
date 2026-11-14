@@ -61,6 +61,11 @@ spring:
             enable: true
 
 kioskpos:
+  # Registro por cuenta propia desde la pantalla de entrada (prueba gratis). Apágalo con
+  # KIOSKPOS_REGISTRO_ABIERTO=false si solo quieres crear negocios desde el panel admin.
+  registro:
+    abierto: ${KIOSKPOS_REGISTRO_ABIERTO:true}
+    max-por-hora: ${KIOSKPOS_REGISTRO_MAX_POR_HORA:5}
   # Bloqueo por intentos fallidos (PIN, clave del dueño, super admin).
   login:
     max-intentos: ${KIOSKPOS_LOGIN_MAX_INTENTOS:5}

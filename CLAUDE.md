@@ -693,3 +693,21 @@ el alta/venta/login (try/catch + log).
   Se refresca al cambiar inventario/compras (evento `kp-avisos`), al enfocar la ventana y cada 3 min.
 - Pruebas: `CompraDevolucionTest` (abonos, foto), `InventarioServiceTest` (vaciar), `e2e/compras-avisos.spec.ts`
   (5). Verificado contra Postgres real (V28 aplica, abonos/foto/avisos/vaciar por API).
+
+## 35. Registro por cuenta propia, cajas desde la cuenta del dueño y bienvenida
+
+- **Registro propio** (`auth/RegistroPublicoService`, `POST /api/auth/registro {negocio, nombre, telefono?, email,
+  password}`, público): crea negocio + local + dueño (+ Soporte visible) con la **prueba de 7 días**, plan BASICO y
+  1 caja, manda el correo de bienvenida y devuelve la sesión ya iniciada. Valida TODO antes de crear (correo válido,
+  clave ≥ 8, correo no usado → así no quedan negocios huérfanos) y limita altas por IP (`X-Real-IP`):
+  `kioskpos.registro.max-por-hora` (5). Se apaga con `KIOSKPOS_REGISTRO_ABIERTO=false`.
+- **PWA:** en la entrada, tarjeta "¿Tu bodega aún no tiene cuenta? **Crear mi cuenta**" → formulario (bodega, tu
+  nombre, WhatsApp opcional, correo, clave ×2). Al registrarse marca `kp_bienvenida` y entra.
+- **Bienvenida** (`screens/Bienvenida.tsx`, en `Shell` solo para el dueño, una sola vez): saludo + 7 días gratis +
+  3 pasos: **Usar este equipo** como caja (lo hace ahí mismo), agregar cajeros, cargar productos.
+- **Cajas sin token** (`src/esteEquipo.ts`: `usarEsteEquipoComoCaja`, `adoptarCaja`, `cajaLocalId` en `kp_caja_local`):
+  el dueño crea la caja desde su cuenta y el token se guarda en ESE equipo (al salir, abre en "¿Quién va a cobrar?").
+  En Equipo y cajas, "+ Caja" pregunta **En este equipo / En otro equipo** (este último da el enlace, y ahí también
+  "Mejor uso este equipo"); la lista marca **Este equipo**. La tarjeta "Tus cajeros" del inicio muestra **Tus cajas**
+  y el botón "Usar este equipo como caja" si hay cupo.
+- Pruebas: `RegistroPublicoTest` (CI) y `e2e/registro.spec.ts` (3). Verificado contra Postgres real.

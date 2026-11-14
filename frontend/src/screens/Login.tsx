@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useState } from "react";
-import { adminLogin, listarCajeros, loginCajero, loginDueno, olvideClave, Requiere2fa, restablecerClave, tasaBcvServidor, type Cajero } from "../api";
+import { adminLogin, listarCajeros, loginCajero, loginDueno, olvideClave, registrarNegocio, Requiere2fa, restablecerClave, tasaBcvServidor, type Cajero } from "../api";
+import { marcarBienvenida } from "../esteEquipo";
 import { getCajaToken, getSesion, getTasa, setCajaToken, setTasa, type Sesion } from "../session";
 import { UIcono } from "../icons";
 import { TemaBtn } from "../TemaBtn";
 import { TamBtn } from "../TamBtn";
 import { setBcv, tasaEfectiva } from "../config";
 
-type Vista = "config" | "pin" | "dueno" | "admin" | "olvide" | "reset";
+type Vista = "config" | "pin" | "dueno" | "admin" | "olvide" | "reset" | "registro";
 
 const AV_COLORES = [
   "var(--c-bebidas)", "var(--c-limpieza)", "var(--c-chucherias)",
@@ -44,6 +45,9 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
   const [ok, setOk] = useState("");
   const [enviando, setEnviando] = useState(false);
   const [resetTok, setResetTok] = useState("");
+  const [negocio, setNegocio] = useState("");
+  const [nombre, setNombre] = useState("");
+  const [telefono, setTelefono] = useState("");
 
   useEffect(() => {
     const t = setInterval(() => setReloj(new Date()), 1000);
@@ -169,6 +173,18 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
     }
   };
 
+  const correoOk = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim());
+  const registroListo = negocio.trim() && nombre.trim() && correoOk && pass.length >= 8 && pass === pass2 && !enviando;
+  const registrar = async () => {
+    if (!registroListo) return;
+    setEnviando(true); setErr("");
+    try {
+      const s = await registrarNegocio({ negocio: negocio.trim(), nombre: nombre.trim(), telefono: telefono.trim() || undefined, email: email.trim(), password: pass });
+      marcarBienvenida();
+      onLogin(s);
+    } catch (e) { setErr((e as Error).message); setEnviando(false); }
+  };
+
   const entrarAdmin = async () => {
     try {
       await adminLogin(email.trim(), pass, codigo.trim());
@@ -272,7 +288,52 @@ export function Login({ onLogin }: { onLogin: (s: Sesion) => void }) {
             <button className="link" onClick={() => { setErr(""); setOk(""); setVista("olvide"); }}>¿Olvidaste tu contraseña?</button>
             {getCajaToken() && <button className="link" onClick={() => { setErr(""); setVista("pin"); }}>Volver a los cajeros</button>}
             <button className="link" onClick={() => { setErr(""); setEmail(""); setPass(""); setVista("admin"); }}>Soy el administrador</button>
+            <div className="reg-cta">
+              <div><b>¿Tu bodega aún no tiene cuenta?</b><span>Créala tú mismo en un minuto. 7 días gratis, sin tarjeta.</span></div>
+              <button className="btn outline press" onClick={() => { setErr(""); setOk(""); setPass(""); setPass2(""); setVista("registro"); }}>Crear mi cuenta</button>
+            </div>
           </div>
+        </main>
+      </div></div>
+    );
+  }
+
+  if (vista === "registro") {
+    return (
+      <div className="app"><div className="entrar">{side}
+        <main className="entrar-main">
+          <div className="entrar-head"><h1>Crea la cuenta de tu bodega</h1><p>En un minuto estás vendiendo. <b>7 días gratis</b>, sin tarjeta.</p></div>
+          <form className="owner reg-form" onSubmit={(e) => { e.preventDefault(); registrar(); }}>
+            <label>Nombre de tu bodega o negocio
+              <input id="reg-negocio" className="inp" value={negocio} autoFocus onChange={(e) => setNegocio(e.target.value)} placeholder="Ej: Bodega La Esquina" autoComplete="organization" />
+            </label>
+            <div className="reg-two">
+              <label>Tu nombre
+                <input id="reg-nombre" className="inp" value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Ej: María Pérez" autoComplete="name" />
+              </label>
+              <label>WhatsApp <span className="opt">(opcional)</span>
+                <input id="reg-tel" className="inp" inputMode="tel" value={telefono} onChange={(e) => setTelefono(e.target.value)} placeholder="0412-0000000" autoComplete="tel" />
+              </label>
+            </div>
+            <label>Correo (con él vas a entrar)
+              <input id="reg-email" className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" />
+            </label>
+            <div className="reg-two">
+              <label>Contraseña
+                <input id="reg-pass" className="inp" type="password" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="new-password" />
+              </label>
+              <label>Repítela
+                <input id="reg-pass2" className="inp" type="password" value={pass2} onChange={(e) => setPass2(e.target.value)} autoComplete="new-password" />
+              </label>
+            </div>
+            {pass.length > 0 && pass.length < 8 && <p className="hint">Mínimo 8 caracteres (faltan {8 - pass.length})</p>}
+            {pass2.length > 0 && pass !== pass2 && <p className="hint" style={{ color: "var(--bad)" }}>Las dos contraseñas no coinciden</p>}
+            {email.trim() && !correoOk && <p className="hint">Revisa el correo</p>}
+            {err && <p className="pinmsg err" role="alert">{err}</p>}
+            <button type="submit" className="btn primary" disabled={!registroListo}>{enviando ? "Creando tu cuenta…" : "Crear mi cuenta gratis"}</button>
+            <p className="hint reg-legal">Después podrás crear tus cajas y cajeros desde tu cuenta, sin tokens ni enredos.</p>
+            <button type="button" className="link" onClick={() => { setErr(""); setPass(""); setPass2(""); setVista("dueno"); }}>Ya tengo cuenta, quiero entrar</button>
+          </form>
         </main>
       </div></div>
     );

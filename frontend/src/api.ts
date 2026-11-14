@@ -59,6 +59,14 @@ export async function loginCajero(usuarioId: number, pin: string): Promise<Sesio
   return s;
 }
 
+/** Registro por cuenta propia: crea el negocio + la cuenta del dueño y deja la sesión iniciada. */
+export async function registrarNegocio(d: { negocio: string; nombre: string; telefono?: string; email: string; password: string }): Promise<Sesion> {
+  const r = await parse(await fetch("/api/auth/registro", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(d) }));
+  const s: Sesion = { token: r.token, rol: r.rol as Rol, usuarioId: r.usuarioId, negocioId: r.negocioId, cajaId: r.cajaId, nombre: r.nombreCompleto };
+  setSesion(s);
+  return s;
+}
+
 export async function loginDueno(email: string, password: string): Promise<Sesion> {
   const resp = await fetch("/api/auth/login-dueno", {
     method: "POST",

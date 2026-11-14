@@ -27,7 +27,7 @@ export function PrimerosPasos({ onIr }: { onIr: (tab: string) => void }) {
 
   if (!e) return null;
   const pasos = [
-    { ok: e.cajas > 0, n: "Crea tu primera caja", d: "El equipo donde se cobra. Al crearla te da un enlace para configurarlo.", cta: "Ir a Equipo y cajas", tab: "mas" },
+    { ok: e.cajas > 0, n: "Crea tu primera caja", d: "El equipo donde se cobra. Puedes usar este mismo equipo con un toque.", cta: "Ir a Equipo y cajas", tab: "mas" },
     { ok: e.cajeros > 0, n: "Agrega un cajero", d: "Con su PIN de 4 dígitos para cobrar rápido.", cta: "Ir a Equipo y cajas", tab: "mas" },
     { ok: e.productos > 0, n: "Carga tu inventario", d: "Producto por producto o importando un CSV.", cta: "Ir a Productos", tab: "inventario" }
   ];

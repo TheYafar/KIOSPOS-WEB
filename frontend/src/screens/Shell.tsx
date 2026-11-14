@@ -22,6 +22,8 @@ import { TemaBtn } from "../TemaBtn";
 import { Atajos } from "../Atajos";
 import { ColaModal, ColaPill, useCola } from "./ColaVentas";
 import { Campana } from "./Campana";
+import { Bienvenida } from "./Bienvenida";
+import { pideBienvenida } from "../esteEquipo";
 
 interface Tab { id: string; n: string; icon: string; }
 
@@ -58,6 +60,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
   }, []);
   const [online, setOnline] = useState(navigator.onLine);
   const [ayuda, setAyuda] = useState(false);
+  const [bienv, setBienv] = useState(() => !esCaja && pideBienvenida());
   // Ventas cobradas que aún no llegan al servidor (sin internet o rechazadas).
   const cola = useCola();
   const [verCola, setVerCola] = useState(false);
@@ -152,6 +155,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
             </div>
           </header>
 
+          {bienv && <Bienvenida onIr={setTab} onCerrar={() => setBienv(false)} />}
           {plan && <AvisoPlan plan={plan} esCaja={esCaja} onPagar={irAPagar} />}
           {tab === "caja" && esCaja && <Caja />}
           {tab === "cuadre" && esCaja && <Cuadre />}

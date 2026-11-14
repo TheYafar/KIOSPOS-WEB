@@ -4,6 +4,7 @@ import { getSesion, type Rol } from "../session";
 import { UIcono } from "../icons";
 import { MiPlan } from "./MiPlan";
 import { AjustesNegocio } from "./negocio";
+import { adoptarCaja, cajaLocalId, esteEquipoEsCaja } from "../esteEquipo";
 
 const ROL_N: Record<string, string> = { DUENO: "Dueño", ENCARGADO: "Encargado", CAJERO: "Cajero", SOPORTE: "Soporte Técnico", SUPER_ADMIN: "Super admin" };
 
@@ -13,7 +14,8 @@ export function Usuarios({ onSalir }: { onSalir: () => void }) {
   const [modal, setModal] = useState<null | "usuario" | "caja">(null);
   const [editUsuario, setEditUsuario] = useState<Usuario | null>(null);
   const [editCaja, setEditCaja] = useState<CajaInfo | null>(null);
-  const [tokenNuevo, setTokenNuevo] = useState<string | null>(null);
+  const [tokenNuevo, setTokenNuevo] = useState<{ token: string; id: number } | null>(null);
+  const [localId, setLocalId] = useState(cajaLocalId());
   const [err, setErr] = useState("");
   const [msg, setMsg] = useState("");
   const miId = getSesion()?.usuarioId;
@@ -60,24 +62,27 @@ export function Usuarios({ onSalir }: { onSalir: () => void }) {
         <span className="k" style={{ color: "var(--text-2)", fontWeight: 500, marginTop: 8 }}>Cajas</span>
         {cajas.map((c) => (
           <div className="irow eq-row" key={c.id}>
-            <div><div className="nm">{c.nombre}</div><div className="mt">{c.autorizada ? "Autorizada" : "Sin autorizar"} · {c.activa ? "activa" : "inactiva"}</div></div>
+            <div><div className="nm">{c.nombre}{c.id === localId && esteEquipoEsCaja() && <span className="pill ok eq-aqui">Este equipo</span>}</div><div className="mt">{c.autorizada ? "Autorizada" : "Sin autorizar"} · {c.activa ? "activa" : "inactiva"}</div></div>
             <div className="eq-acc">
               <button className="btn2 sm press" onClick={() => setEditCaja(c)}>Editar</button>
               <button className="btn2 sm press eq-del" aria-label={"Eliminar " + c.nombre} onClick={() => eliminarCaja(c)}><UIcono k="del" sw={2} /></button>
             </div>
           </div>
         ))}
-        {cajas.length === 0 && <p className="noresult">Sin cajas. Crea una para registrar un equipo.</p>}
+        {cajas.length === 0 && <p className="noresult">Sin cajas. Toca <b>+ Caja</b> y usa este mismo equipo para cobrar.</p>}
         <button className="btn ghost" style={{ marginTop: 16 }} onClick={onSalir}>Cerrar sesión</button>
         </div>
         </div>
       </div>
 
       {modal === "usuario" && <FormUsuario onClose={() => setModal(null)} onSaved={() => { setModal(null); avisar("Usuario creado"); cargar(); }} onErr={setErr} />}
-      {modal === "caja" && <FormCaja onClose={() => setModal(null)} onToken={(t) => { setModal(null); setTokenNuevo(t); avisar("Caja creada"); cargar(); }} onErr={setErr} />}
+      {modal === "caja" && <FormCaja numero={cajas.length + 1} onClose={() => setModal(null)}
+        onAqui={() => { setModal(null); setLocalId(cajaLocalId()); avisar("Listo: este equipo ya es tu caja"); cargar(); }}
+        onToken={(t, id) => { setModal(null); setTokenNuevo({ token: t, id }); avisar("Caja creada"); cargar(); }} onErr={setErr} />}
       {editUsuario && <EditarUsuario usuario={editUsuario} onClose={() => setEditUsuario(null)} onSaved={() => { setEditUsuario(null); avisar("Usuario actualizado"); cargar(); }} onErr={setErr} />}
       {editCaja && <EditarCaja caja={editCaja} onClose={() => setEditCaja(null)} onSaved={() => { setEditCaja(null); avisar("Caja actualizada"); cargar(); }} onErr={setErr} />}
-      {tokenNuevo && <TokenCaja token={tokenNuevo} onClose={() => setTokenNuevo(null)} />}
+      {tokenNuevo && <TokenCaja token={tokenNuevo.token} onClose={() => setTokenNuevo(null)}
+        onAqui={() => { adoptarCaja(tokenNuevo.token, tokenNuevo.id); setLocalId(tokenNuevo.id); setTokenNuevo(null); avisar("Listo: este equipo ya es tu caja"); }} />}
     </div>
   );
 }
@@ -160,16 +165,35 @@ function EditarCaja({ caja, onClose, onSaved, onErr }: { caja: CajaInfo; onClose
   );
 }
 
-function FormCaja({ onClose, onToken, onErr }: { onClose: () => void; onToken: (t: string) => void; onErr: (s: string) => void }) {
-  const [nombre, setNombre] = useState("Caja 1");
-  const guardar = async () => { try { const c = await crearCaja(nombre.trim()); onToken(c.cajaToken); } catch (e) { onErr((e as Error).message); onClose(); } };
+function FormCaja({ numero, onClose, onAqui, onToken, onErr }: { numero: number; onClose: () => void; onAqui: () => void; onToken: (t: string, id: number) => void; onErr: (s: string) => void }) {
+  const yaEsCaja = esteEquipoEsCaja();
+  const [nombre, setNombre] = useState("Caja " + numero);
+  const [donde, setDonde] = useState<"aqui" | "otro">(yaEsCaja ? "otro" : "aqui");
+  const [yendo, setYendo] = useState(false);
+  const guardar = async () => {
+    setYendo(true);
+    try {
+      const c = await crearCaja(nombre.trim());
+      if (donde === "aqui") { adoptarCaja(c.cajaToken, c.id); onAqui(); } else onToken(c.cajaToken, c.id);
+    } catch (e) { onErr((e as Error).message); onClose(); }
+  };
   return (
     <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card">
         <div className="modal-head"><h2>Nueva caja</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
-        <div className="modal-body"><label className="lbl">Nombre de la caja<input className="inp" value={nombre} onChange={(e) => setNombre(e.target.value)} /></label>
-          <span className="hint">Al crearla se genera un token que se configura UNA vez en el equipo (navegador) de esa caja.</span></div>
-        <div className="modal-foot"><button className="cta center press" disabled={!nombre.trim()} onClick={guardar}>Crear caja</button></div>
+        <div className="modal-body">
+          <label className="lbl">Nombre de la caja<input className="inp" value={nombre} onChange={(e) => setNombre(e.target.value)} /></label>
+          <span className="k" style={{ color: "var(--text-2)", fontWeight: 500 }}>¿Dónde se va a cobrar?</span>
+          <div className="caja-donde" role="radiogroup" aria-label="Dónde se va a cobrar">
+            <button type="button" role="radio" aria-checked={donde === "aqui"} className={"caja-op press" + (donde === "aqui" ? " on" : "")} onClick={() => setDonde("aqui")}>
+              <b>En este equipo</b><small>{yaEsCaja ? "Reemplaza la caja que tenía este equipo." : "Queda listo ya mismo, sin copiar nada."}</small>
+            </button>
+            <button type="button" role="radio" aria-checked={donde === "otro"} className={"caja-op press" + (donde === "otro" ? " on" : "")} onClick={() => setDonde("otro")}>
+              <b>En otro equipo</b><small>Te damos un enlace para abrirlo en ese equipo.</small>
+            </button>
+          </div>
+        </div>
+        <div className="modal-foot"><button className="cta center press" disabled={!nombre.trim() || yendo} onClick={guardar}>{donde === "aqui" ? "Crear y usar este equipo" : "Crear caja"}</button></div>
       </div>
     </div>
   );
@@ -190,7 +214,7 @@ async function copiarTexto(texto: string): Promise<boolean> {
   } catch { return false; }
 }
 
-function TokenCaja({ token, onClose }: { token: string; onClose: () => void }) {
+function TokenCaja({ token, onClose, onAqui }: { token: string; onClose: () => void; onAqui: () => void }) {
   const [copiado, setCopiado] = useState<"" | "enlace" | "token">("");
   const [falló, setFalló] = useState(false);
   const enlace = window.location.origin + "/#caja=" + encodeURIComponent(token);
@@ -213,7 +237,10 @@ function TokenCaja({ token, onClose }: { token: string; onClose: () => void }) {
           {copiado && <span className="pill ok" style={{ alignSelf: "flex-start" }}>{copiado === "enlace" ? "Enlace copiado" : "Token copiado"} — pégalo en el equipo de la caja</span>}
           {falló && <span className="pinmsg err">No se pudo copiar automáticamente. Selecciona el token de arriba y cópialo a mano (Ctrl+C).</span>}
         </div>
-        <div className="modal-foot"><button className="cta center press" onClick={onClose}>Listo</button></div>
+        <div className="modal-foot two-btn">
+          <button className="btn2 big press" onClick={onAqui}>Mejor uso este equipo</button>
+          <button className="cta center press" onClick={onClose}>Listo</button>
+        </div>
       </div>
     </div>
   );
