@@ -73,7 +73,8 @@ export function Clientes() {
           {vis.map((c, i) => {
             const pasado = c.limiteUsd > 0 && c.saldoUsd >= c.limiteUsd;
             return (
-              <button key={c.id} className={"card cli-row press" + (c.activo ? "" : " off")} onClick={() => setAbierto(c.id)}>
+              <div key={c.id} className="cli-row-w">
+              <button className={"card cli-row press" + (c.activo ? "" : " off")} onClick={() => setAbierto(c.id)}>
                 <span className="neg-av" style={{ ["--av" as string]: AV[i % AV.length] }}>{c.nombre.charAt(0).toUpperCase()}</span>
                 <span className="cli-nm"><b>{c.nombre}</b><small>{[c.cedula, c.telefono].filter(Boolean).join(" · ") || "Sin datos"} · {hace(c.ultimoMovimiento)}</small></span>
                 <span className="cli-sal">
@@ -82,6 +83,8 @@ export function Clientes() {
                   {c.tipo === "TRABAJADOR" && (c.sueldoUsd || 0) > 0 && <small>sueldo {usd(c.sueldoUsd || 0)}</small>}
                 </span>
               </button>
+              {c.saldoUsd > 0 && <button className="btn primary press cli-abonar" onClick={() => setAbierto(c.id)} aria-label={"Abonar a la cuenta de " + c.nombre}><UIcono k="cash" sw={2} />Abonar</button>}
+              </div>
             );
           })}
         </div>
@@ -187,7 +190,8 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
     setEnviando(true); setErr(""); setOk("");
     try {
       await abonarCliente(c.id, { metodo, monto: m, ...(mon === "VES" ? { tasa } : {}), ...(refe.trim() ? { referencia: refe.trim() } : {}) });
-      setOk("Abono de " + (mon === "USD" ? usd(m) : bs(m)) + " registrado ✓"); setMonto(""); setRefe(""); await cargar();
+      const queda = Math.max(0, Math.round((c.saldoUsd - mUsd) * 100) / 100);
+      setOk("Abono de " + (mon === "USD" ? usd(m) : bs(m)) + " registrado ✓ · " + (queda > 0.004 ? "ahora debe " + usd(queda) : "quedó al día")); setMonto(""); setRefe(""); await cargar();
       window.dispatchEvent(new Event("kp-turno"));
     } catch (e) { setErr((e as Error).message); }
     finally { setEnviando(false); }
@@ -229,20 +233,11 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
             <button className="btn2 press" onClick={() => setEditar(true)}><UIcono k="user" />Editar datos</button>
           </div>
 
-          {trab && c.saldoUsd > 0 && esJefe() && (
-            <div className="cli-abono">
-              <h3 className="h3">Descontar del sueldo</h3>
-              <div className="cli-abono-in">
-                <div className="inpw"><i>$</i><input className="inp t" style={{ paddingLeft: 30 }} inputMode="decimal" placeholder={money(c.saldoUsd)}
-                  value={desc} onChange={(e) => setDesc(e.target.value.replace(/[^\d.,]/g, ""))} aria-label="Monto a descontar del sueldo" /></div>
-                <button className="btn primary press" disabled={enviando} onClick={descontar}>Descontar {usd(leerMonto(desc) ?? c.saldoUsd)}</button>
-              </div>
-              <span className="hint">No toca la caja: queda anotado como descuento de nómina. Vacío = todo lo que debe. Para pagarle el sueldo completo (con bonos y recibo) usa la pestaña <b>Nómina</b>.</span>
-            </div>
-          )}
+          {c.saldoUsd <= 0.004 && <p className="hint cli-aldia">Está al día: no hay nada que abonar.</p>}
           {c.saldoUsd > 0 && (
             <div className="cli-abono">
-              <h3 className="h3">{trab ? "O recibir un pago" : "Recibir abono"}</h3>
+              <h3 className="h3">Abonar a la cuenta</h3>
+              <span className="hint">Lo que pague se le resta de lo que debe. ¿Cómo pagó?</span>
               <div className="seg cli-met">
                 {METODOS_ABONO.map((x) => <button key={x.id} className={metodo === x.id ? "on" : ""} onClick={() => { setMetodo(x.id); setMonto(""); }}>{x.n}</button>)}
               </div>
@@ -252,11 +247,22 @@ function DetalleCliente({ id, onClose }: { id: number; onClose: () => void }) {
                   onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); abonar(); } }} /></div>
                 <button className="btn2 press" onClick={() => setMonto(money(saldoEn))}>Todo · {mon === "USD" ? usd(saldoEn) : bs(saldoEn)}</button>
               </div>
-              {(metodo === "PAGO_MOVIL" || metodo === "PUNTO") && <input className="inp" inputMode="numeric" placeholder="Referencia (opcional)" value={refe} onChange={(e) => setRefe(e.target.value.replace(/\D/g, "").slice(0, 12))} aria-label="Referencia del abono" />}
+              {(metodo === "PAGO_MOVIL" || metodo === "PUNTO" || metodo === "BIOPAGO") && <input className="inp" inputMode="numeric" placeholder="Referencia (opcional)" value={refe} onChange={(e) => setRefe(e.target.value.replace(/\D/g, "").slice(0, 12))} aria-label="Referencia del abono" />}
               {m > 0 && mon === "VES" && <span className="hint t">= {usd(Math.round(mUsd * 100) / 100)} · le quedaría {usd(Math.max(0, Math.round((c.saldoUsd - mUsd) * 100) / 100))}</span>}
               {m > 0 && mon === "USD" && <span className="hint t">Le quedaría {usd(Math.max(0, Math.round((c.saldoUsd - m) * 100) / 100))}</span>}
               {err && <p className="pinmsg err">{err}</p>}
               <button className="btn primary big press" disabled={m <= 0 || enviando} onClick={abonar}>{enviando ? "Guardando…" : "Registrar abono"}</button>
+            </div>
+          )}
+          {trab && c.saldoUsd > 0 && esJefe() && (
+            <div className="cli-abono">
+              <h3 className="h3">O descontarlo del sueldo</h3>
+              <div className="cli-abono-in">
+                <div className="inpw"><i>$</i><input className="inp t" style={{ paddingLeft: 30 }} inputMode="decimal" placeholder={money(c.saldoUsd)}
+                  value={desc} onChange={(e) => setDesc(e.target.value.replace(/[^\d.,]/g, ""))} aria-label="Monto a descontar del sueldo" /></div>
+                <button className="btn primary press" disabled={enviando} onClick={descontar}>Descontar {usd(leerMonto(desc) ?? c.saldoUsd)}</button>
+              </div>
+              <span className="hint">No toca la caja: queda anotado como descuento de nómina. Vacío = todo lo que debe. Para pagarle el sueldo completo (con bonos y recibo) usa la pestaña <b>Nómina</b>.</span>
             </div>
           )}
           {ok && <p className="pinmsg ok">{ok}</p>}

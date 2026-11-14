@@ -26,6 +26,7 @@ import { Bienvenida } from "./Bienvenida";
 import { pideBienvenida } from "../esteEquipo";
 import { DemoBanner } from "./DemoBanner";
 import { AyudaWhatsApp } from "./Ayuda";
+import { GuiaBoton, GuiaPanel } from "./Guia";
 import { esSesionDemo } from "../demo";
 
 interface Tab { id: string; n: string; icon: string; }
@@ -63,6 +64,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
   }, []);
   const [online, setOnline] = useState(navigator.onLine);
   const [ayuda, setAyuda] = useState(false);
+  const [guia, setGuia] = useState(false);
   const [bienv, setBienv] = useState(() => !esCaja && pideBienvenida());
   const enDemo = esSesionDemo(sesion);
   // Ventas cobradas que aún no llegan al servidor (sin internet o rechazadas).
@@ -152,6 +154,7 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
                 <span className="dot" style={{ background: online ? "var(--ok)" : "var(--bad)" }} />
                 <b>{online ? "En línea" : "Sin conexión"}</b>
               </span>
+              <GuiaBoton onClick={() => setGuia(true)} />
               <button className="tema-btn press atajos-btn" title="Atajos de teclado (F1)" aria-label="Atajos de teclado" onClick={() => setAyuda(true)}><UIcono k="teclado" sw={1.9} /></button>
               <TamBtn />
               <TemaBtn />
@@ -160,6 +163,8 @@ export function Shell({ sesion, onSalir }: { sesion: Sesion; onSalir: () => void
           </header>
 
           {bienv && !enDemo && <Bienvenida onIr={setTab} onCerrar={() => setBienv(false)} />}
+          <GuiaBoton lado onClick={() => setGuia(true)} />
+          {guia && <GuiaPanel tabs={tabs} actual={tab} esCaja={esCaja} onIr={setTab} onCerrar={() => setGuia(false)} />}
           {enDemo && <DemoBanner sesion={sesion} onSalir={onSalir} />}
           {plan && !enDemo && <AvisoPlan plan={plan} esCaja={esCaja} onPagar={irAPagar} />}
           {tab === "caja" && esCaja && <Caja />}

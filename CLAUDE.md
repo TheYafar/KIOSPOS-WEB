@@ -774,3 +774,17 @@ el alta/venta/login (try/catch + log).
   en vivo); ahora trae lo contado y la diferencia guardados al cerrar (abierto sigue en null).
 - Pruebas: `CierrePuntoTest.elDuenoVeLosCierresDeCajaConCajaCajeroYCuadre` (CI), `e2e/puntos.spec.ts` (nueva + ajustada).
   Verificado contra Postgres real.
+
+## 39. Guía de módulos, "Abonar" a la vista y cierre del Biopago propio
+
+- **Guía** (`screens/Guia.tsx`): pestaña "? Guía" pegada al borde derecho (PC/tablet, `.guia-lado`) y botón "?" en el
+  encabezado en el teléfono (`.guia-hdr`). Abre un panel con **qué hace cada módulo** en palabras simples (textos en
+  `QUE_HACE`, distintos para cajero), marca **"Estás en"** y trae **"Ir aquí"** por módulo + WhatsApp de soporte.
+- **Crédito:** botón **Abonar** al lado de cada persona que debe (clientes y trabajadores) en la lista; en la cuenta, la
+  sección **"Abonar a la cuenta"** va primero (efectivo $, efectivo Bs, pago móvil, punto o Biopago; referencia opcional
+  para pago móvil/punto/Biopago) y "O descontarlo del sueldo" después (trabajadores). Al registrar: "ahora debe $X".
+  (El backend ya aceptaba las 5 formas: `ClienteService.METODOS_ABONO`.)
+- **Cierre del Biopago** con formato propio: se elige con dos tarjetas (Punto de venta / Biopago). Biopago = terminal,
+  lote, **transacciones** y **anulaciones** (cantidad y monto) y total; se guarda en la sección de débito
+  (`loteDebito`, terminal en `afiliado`); el servidor ignora crédito/Master-Visa para BIOPAGO. Ticket "CIERRE BIOPAGO".
+- Pruebas: `e2e/guia.spec.ts` (4). Verificado contra Postgres real (Biopago total y abono por Biopago).

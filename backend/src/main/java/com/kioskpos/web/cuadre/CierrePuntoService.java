@@ -80,7 +80,17 @@ public class CierrePuntoService {
         c.setLoteMasterVisa(texto(in.loteMasterVisa(), 20));
         c.setFechaHora(in.fechaHora() == null ? Instant.now() : in.fechaHora());
         c.setNota(texto(in.nota(), 300));
-        Seccion cr = seccion(in.credito(), "Tarjeta crédito"), de = seccion(in.debito(), "Tarjeta débito"), mv = seccion(in.masterVisa(), "Debit Master/Visa");
+        // Biopago: su ticket no se divide por tipo de tarjeta; es una sola sección (transacciones y anulaciones),
+        // guardada en la de débito, con su lote en loteDebito y el terminal en afiliado.
+        boolean bio = tipo.equals("BIOPAGO");
+        Seccion vacia = new Seccion(0, BigDecimal.ZERO, 0, BigDecimal.ZERO);
+        Seccion cr = bio ? vacia : seccion(in.credito(), "Tarjeta crédito");
+        Seccion de = seccion(in.debito(), bio ? "Biopago" : "Tarjeta débito");
+        Seccion mv = bio ? vacia : seccion(in.masterVisa(), "Debit Master/Visa");
+        if (bio) {
+            c.setLoteCredito(null);
+            c.setLoteMasterVisa(null);
+        }
         c.setCredComprasN(cr.comprasN()); c.setCredCompras(cr.compras()); c.setCredAnulN(cr.anulN()); c.setCredAnul(cr.anul());
         c.setDebComprasN(de.comprasN()); c.setDebCompras(de.compras()); c.setDebAnulN(de.anulN()); c.setDebAnul(de.anul());
         c.setMvComprasN(mv.comprasN()); c.setMvCompras(mv.compras()); c.setMvAnulN(mv.anulN()); c.setMvAnul(mv.anul());

@@ -29,6 +29,17 @@ export const horaCorta = (iso: string) => new Date(iso).toLocaleTimeString("es-V
 
 /** El ticket como lo imprime el banco (40 columnas), para verlo igual que el papel. */
 export function textoTicketPunto(c: CierrePunto): string {
+  if (c.tipo === "BIOPAGO") {
+    const d = new Date(c.fechaHora);
+    const B = [centrar("CIERRE BIOPAGO"), ...(c.titular ? [c.titular.toUpperCase().slice(0, W)] : [])];
+    B.push(fila("TERMINAL:", c.afiliado || "—"), fila("LOTE:", c.loteDebito || "—"),
+      fila("FECHA/HORA:", `${d.getFullYear()}/${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`),
+      "-".repeat(W), fila("TIPO           CANT", "MONTO"),
+      fila("TRANSACCIONES " + String(c.debComprasN).padStart(4), numBanco(c.debCompras)),
+      fila("ANULACIONES   " + String(c.debAnulN).padStart(4), numBanco(c.debAnul)),
+      "-".repeat(W), fila("TOTAL DEL CIERRE", numBanco(c.totalBs)));
+    return B.join("\n");
+  }
   const L = [centrar("CIERRE"), ...(c.titular ? [c.titular.toUpperCase().slice(0, W)] : [])];
   L.push(fila("AFIL:", c.afiliado || "—"), fila("LOTE CREDITO:", c.loteCredito || "—"), fila("LOTE DEBITO:", c.loteDebito || "—"),
     fila("LOTE MASTER/VISA:", c.loteMasterVisa || "—"));
@@ -61,11 +72,29 @@ export function FormCierrePunto({ onClose, onGuardado }: { onClose: () => void; 
   // Casi siempre los tres lotes son el mismo número: el primero se copia a los otros mientras sean iguales.
   const loteCredito = (v: string) => setLotes((l) => ({ credito: v, debito: l.debito === l.credito ? v : l.debito, mv: l.mv === l.credito ? v : l.mv }));
   const setSec = (k: SecK, campo: keyof SecForm, v: string) => setSecs((s) => ({ ...s, [k]: { ...s[k], [campo]: v } }));
+  const bio = tipo === "BIOPAGO";
+  const [bioSec, setBioSec] = useState<SecForm>(vacia());
+  const [loteBio, setLoteBio] = useState("");
   const leidas = SECCIONES.map((s) => leerSec(secs[s.k]));
-  const total = Math.round(leidas.reduce((a, s) => a + totalSec(s), 0) * 100) / 100;
+  const leidaBio = leerSec(bioSec);
+  const total = bio ? totalSec(leidaBio) : Math.round(leidas.reduce((a, s) => a + totalSec(s), 0) * 100) / 100;
 
   const guardar = async () => {
     if (enviando) return;
+    if (bio) {
+      if (leidaBio.comprasN === 0 && leidaBio.compras === 0) { setErr("Escribe las transacciones del Biopago (cantidad y monto)"); return; }
+      if (leidaBio.anul > leidaBio.compras) { setErr("Las anulaciones no pueden pasar de las transacciones"); return; }
+      setEnviando(true); setErr("");
+      try {
+        const c = await registrarCierrePunto({ tipo, titular: titular.trim() || undefined, afiliado: afiliado.trim() || undefined,
+          loteDebito: loteBio.trim() || undefined, fechaHora: new Date(fecha).toISOString(), debito: leidaBio,
+          credito: leerSec(vacia()), masterVisa: leerSec(vacia()), nota: nota.trim() || undefined });
+        try { localStorage.setItem("kp_punto_" + tipo, JSON.stringify({ titular: titular.trim(), afiliado: afiliado.trim() })); } catch { /* sin espacio */ }
+        onGuardado(c);
+      } catch (e) { setErr((e as Error).message); }
+      finally { setEnviando(false); }
+      return;
+    }
     if (leidas.every((s) => s.comprasN === 0 && s.compras === 0)) { setErr("Escribe las compras de al menos una sección del ticket"); return; }
     const malo = SECCIONES.find((_, i) => leidas[i].anul > leidas[i].compras);
     if (malo) { setErr(malo.n + ": las anulaciones no pueden pasar de las compras"); return; }
@@ -85,19 +114,42 @@ export function FormCierrePunto({ onClose, onGuardado }: { onClose: () => void; 
   return (
     <div className="modal" onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="modal-card cp-form" onKeyDown={(e) => { e.stopPropagation(); if (e.key === "Escape") onClose(); }}>
-        <div className="modal-head"><h2>Ticket de cierre del punto</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
+        <div className="modal-head"><h2>{bio ? "Cierre del Biopago" : "Cierre del punto de venta"}</h2><button className="ghost" onClick={onClose}>Cerrar</button></div>
         <div className="modal-body">
-          <span className="hint">Copia el ticket que imprime el punto al cerrar el lote, tal como sale en el papel.</span>
-          <div className="seg" role="tablist" aria-label="Tipo de equipo">
-            {(["PUNTO", "BIOPAGO"] as const).map((t) => <button key={t} role="tab" aria-selected={tipo === t} className={tipo === t ? "on" : ""} onClick={() => cambiarTipo(t)}>{t === "PUNTO" ? "Punto" : "Biopago"}</button>)}
+          <span className="k cp-q">¿Qué ticket vas a copiar?</span>
+          <div className="cp-tipo" role="radiogroup" aria-label="Tipo de equipo">
+            <button type="button" role="radio" aria-checked={!bio} className={"cp-tipo-op press" + (!bio ? " on" : "")} onClick={() => cambiarTipo("PUNTO")}>
+              <span className="co2-ic"><UIcono k="card" sw={1.8} /></span><span><b>Punto de venta</b><small>Tarjetas: crédito, débito y Master/Visa</small></span>
+            </button>
+            <button type="button" role="radio" aria-checked={bio} className={"cp-tipo-op press" + (bio ? " on" : "")} onClick={() => cambiarTipo("BIOPAGO")}>
+              <span className="co2-ic"><UIcono k="finger" sw={1.8} /></span><span><b>Biopago</b><small>Pago con huella: transacciones y total</small></span>
+            </button>
           </div>
+          <span className="hint">{bio ? "Copia el reporte de cierre que imprime el equipo Biopago." : "Copia el ticket que imprime el punto al cerrar el lote, tal como sale en el papel."}</span>
           <label className="lbl">Comercio <span className="opt">(la línea de arriba del ticket)</span>
             <input className="inp" value={titular} maxLength={80} onChange={(e) => setTitular(e.target.value.toUpperCase())} placeholder="Ej.: EPN DIEGO HERNANDEZ CRE" aria-label="Comercio" />
           </label>
           <div className="two cp-two">
-            <label className="lbl">Afiliado<input className="inp t" inputMode="numeric" value={afiliado} maxLength={30} onChange={(e) => setAfiliado(e.target.value)} placeholder="0078847603" aria-label="Afiliado" /></label>
+            <label className="lbl">{bio ? "Terminal / afiliado" : "Afiliado"}<input className="inp t" inputMode="numeric" value={afiliado} maxLength={30} onChange={(e) => setAfiliado(e.target.value)} placeholder={bio ? "N° del equipo" : "0078847603"} aria-label={bio ? "Terminal del Biopago" : "Afiliado"} /></label>
             <label className="lbl">Fecha y hora del ticket<input className="inp t" type="datetime-local" value={fecha} onChange={(e) => setFecha(e.target.value)} aria-label="Fecha y hora del ticket" /></label>
           </div>
+{bio ? (<>
+          <label className="lbl">Lote<input className="inp t" inputMode="numeric" value={loteBio} maxLength={20} onChange={(e) => setLoteBio(e.target.value)} placeholder="000123" aria-label="Lote del Biopago" /></label>
+          <div className="cp-sec">
+            <div className="cp-sec-h"><b>Biopago</b><span className="t">Total {bs(totalSec(leidaBio))}</span></div>
+            <div className="cp-grid">
+              <span />
+              <span className="cp-th">Cantidad</span>
+              <span className="cp-th">Monto (Bs)</span>
+              <span className="cp-rl">Transacciones</span>
+              <input className="inp t" inputMode="numeric" value={bioSec.comprasN} placeholder="0" onChange={(e) => setBioSec({ ...bioSec, comprasN: e.target.value.replace(/\D/g, "") })} aria-label="Biopago: cantidad de transacciones" />
+              <input className="inp t" inputMode="decimal" value={bioSec.compras} placeholder="0,00" onChange={(e) => setBioSec({ ...bioSec, compras: e.target.value.replace(/[^\d.,]/g, "") })} aria-label="Biopago: monto de transacciones" />
+              <span className="cp-rl">Anulaciones</span>
+              <input className="inp t" inputMode="numeric" value={bioSec.anulN} placeholder="0" onChange={(e) => setBioSec({ ...bioSec, anulN: e.target.value.replace(/\D/g, "") })} aria-label="Biopago: cantidad de anulaciones" />
+              <input className="inp t" inputMode="decimal" value={bioSec.anul} placeholder="0,00" onChange={(e) => setBioSec({ ...bioSec, anul: e.target.value.replace(/[^\d.,]/g, "") })} aria-label="Biopago: monto de anulaciones" />
+            </div>
+          </div>
+          </>) : (<>
           <div className="cp-lotes">
             <label className="lbl">Lote crédito<input className="inp t" inputMode="numeric" value={lotes.credito} maxLength={20} onChange={(e) => loteCredito(e.target.value)} placeholder="000407" aria-label="Lote crédito" /></label>
             <label className="lbl">Lote débito<input className="inp t" inputMode="numeric" value={lotes.debito} maxLength={20} onChange={(e) => setLotes({ ...lotes, debito: e.target.value })} placeholder="000407" aria-label="Lote débito" /></label>
@@ -119,6 +171,7 @@ export function FormCierrePunto({ onClose, onGuardado }: { onClose: () => void; 
               </div>
             </div>
           ))}
+          </>)}
           <label className="lbl">Nota <span className="opt">(opcional)</span><input className="inp" value={nota} maxLength={300} onChange={(e) => setNota(e.target.value)} placeholder="Ej.: el punto se quedó sin papel" aria-label="Nota del cierre de punto" /></label>
           {err && <p className="pinmsg err">{err}</p>}
         </div>
