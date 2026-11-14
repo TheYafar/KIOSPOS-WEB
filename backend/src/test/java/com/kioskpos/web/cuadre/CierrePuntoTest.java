@@ -89,6 +89,24 @@ class CierrePuntoTest extends PostgresRlsTestBase {
     }
 
     @Test
+    void elDuenoVeLosCierresDeCajaConCajaCajeroYCuadre() {
+        M m = montar("cierrecaja@ejemplo.com");
+        en(m.negocioId(), () -> cuadreService.cerrarSimple(m.turnoId(), new BigDecimal("5"), BigDecimal.ZERO, null, null));
+        var hoy = java.time.LocalDate.now(CierrePuntoService.ZONA);
+        var l = en(m.negocioId(), () -> cierrePuntoService.cierresDeCaja(hoy, hoy));
+        assertThat(l).hasSize(1);
+        var c = l.get(0);
+        assertThat(c.turnoId()).isEqualTo(m.turnoId());
+        assertThat(c.caja()).isNotBlank();
+        assertThat(c.cajero()).isNotBlank();
+        assertThat(c.fechaCierre()).isNotNull();
+        assertThat(c.cuadre().diferenciaUsd()).isEqualByComparingTo("5"); // contó $5 de más (fondo 0, sin ventas)
+        // Otro negocio no lo ve.
+        M otro = montar("cierrecaja2@ejemplo.com");
+        assertThat(en(otro.negocioId(), () -> cierrePuntoService.cierresDeCaja(hoy, hoy))).isEmpty();
+    }
+
+    @Test
     void validaElTicketYSoloBorraElDuenoTrasCerrar() {
         M m = montar("punto3@ejemplo.com");
         assertThatThrownBy(() -> en(m.negocioId(), () -> cierrePuntoService.registrar(m.caja(), new CierrePuntoService.Nuevo(

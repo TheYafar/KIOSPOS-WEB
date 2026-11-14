@@ -54,14 +54,53 @@ test("el dueño ve los tickets del punto por día, con hora, caja y comparación
   await preparar(page, st, { "kioskpos.sesion": sesionDueno });
   await ir(page);
   await page.getByRole("button", { name: /^Puntos/ }).first().click();
-  await expect(page.getByRole("heading", { name: "Cierres de punto" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Cierres", exact: true })).toBeVisible();
   await page.getByRole("tab", { name: "Hoy" }).click();
   const card = page.locator(".cp-card", { hasText: "EPN DIEGO HERNANDEZ CRE" });
   await expect(card).toContainText("Bs 29.606,00");
-  await expect(card).toContainText("Caja 1 · Ana Pérez");
+  await expect(card).toContainText("Punto de venta · Caja 1");
+  await expect(card).toContainText("Ana Pérez");
   await expect(card).toContainText("Ticket +Bs 16.106,00 vs sistema");
   await card.locator(".cp-card-h").click();
   await expect(card.getByLabel("Ticket del punto", { exact: true })).toContainText("13,199.00");
   await expect(card).toContainText("Hora del ticket");
   await expect(page).toHaveURL(/#\/puntos$/);
+});
+
+test("en Puntos también salen los cierres de caja, con caja, cajero, horas y cuadre", async ({ page }) => {
+  const abre = new Date(); abre.setHours(8, 5, 0, 0);
+  const cierra = new Date(); cierra.setHours(18, 40, 0, 0);
+  const tk = new Date(); tk.setHours(18, 33, 0, 0);
+  const st: Estado = { turnoAbierto: false,
+    puntos: [{ id: 1, turnoId: 7, cajaId: 1, usuarioId: 2, tipo: "PUNTO", titular: "EPN DIEGO", afiliado: null, loteCredito: null, loteDebito: null, loteMasterVisa: null,
+      fechaHora: tk.toISOString(), credComprasN: 0, credCompras: 0, credAnulN: 0, credAnul: 0, debComprasN: 2, debCompras: 4500, debAnulN: 0, debAnul: 0,
+      mvComprasN: 0, mvCompras: 0, mvAnulN: 0, mvAnul: 0, totalBs: 4500, nota: null, createdAt: tk.toISOString() }],
+    cierresCaja: [{ turnoId: 7, cajaId: 1, caja: "Caja 1", cajero: "Ana Pérez", fechaApertura: abre.toISOString(), fechaCierre: cierra.toISOString(),
+      cantidadVentas: 23, vendidoUsd: 142.5, vendidoBs: 129960, observaciones: "Faltó sencillo",
+      cuadre: { turnoId: 7, estado: "CERRADO", fondoUsd: 20, fondoBs: 2000, efectivoUsd: 60, efectivoBs: 9000, vueltoUsd: 3, vueltoBs: 456,
+        esperadoUsd: 77, esperadoBs: 10544, declaradoUsd: 75, declaradoBs: 10544, diferenciaUsd: -2, diferenciaBs: 0,
+        metodos: [{ metodo: "PUNTO", moneda: "VES", esperado: 4500, digital: true }, { metodo: "PAGO_MOVIL", moneda: "VES", esperado: 3100, digital: true }],
+        movimientos: [{ tipo: "GASTO", moneda: "USD", total: 5, cantidad: 1 }] } }] };
+  await preparar(page, st, { "kioskpos.sesion": sesionDueno });
+  await ir(page);
+  await page.getByRole("button", { name: /^Puntos/ }).first().click();
+  await page.getByRole("tab", { name: "Hoy" }).click();
+  const caja = page.locator(".cp-card", { hasText: "Cierre de caja · Caja 1" });
+  await expect(caja).toContainText("Ana Pérez");
+  await expect(caja).toContainText("$ 142,50");
+  await expect(caja).toContainText("Faltan $ 2,00");
+  // Ordenados por hora: el cierre de caja (6:40 p. m.) va antes que el ticket de punto (6:33 p. m.).
+  await expect(page.locator(".cp-card").first()).toContainText("Cierre de caja");
+  await caja.locator(".cp-card-h").click();
+  await expect(caja.getByRole("table", { name: "Cuadre de la gaveta" })).toContainText("Efectivo $");
+  await expect(caja).toContainText("Pago móvil");
+  await expect(caja).toContainText("Tickets de punto de este turno");
+  await expect(caja).toContainText("Nota del cierre: Faltó sencillo");
+  // Filtros: solo caja / solo punto.
+  await page.getByRole("tab", { name: "Tickets de punto" }).click();
+  await expect(page.locator(".cp-card", { hasText: "Cierre de caja" })).toHaveCount(0);
+  await expect(page.locator(".cp-card", { hasText: "EPN DIEGO" })).toBeVisible();
+  await page.getByRole("tab", { name: "Cierres de caja" }).click();
+  await expect(page.locator(".cp-card", { hasText: "EPN DIEGO" })).toHaveCount(0);
+  if (process.env.SHOT_DIR) await page.screenshot({ path: process.env.SHOT_DIR + "/cierres.png" });
 });

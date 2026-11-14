@@ -58,7 +58,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/nomina", "/api/nomina/**").hasAnyRole("DUENO", "ENCARGADO")
                         .requestMatchers("/api/contabilidad/**").hasAnyRole("DUENO", "ENCARGADO")
                         // Panel de cierres de punto por fecha: solo dueño o encargado (la caja anota y ve los de su turno).
-                        .requestMatchers(HttpMethod.GET, "/api/cierres-punto").hasAnyRole("DUENO", "ENCARGADO")
+                        .requestMatchers(HttpMethod.GET, "/api/cierres-punto", "/api/cierres-punto/cajas").hasAnyRole("DUENO", "ENCARGADO")
                         // Compras y proveedores: solo dueño o encargado.
                         .requestMatchers("/api/compras/**", "/api/proveedores/**").hasAnyRole("DUENO", "ENCARGADO")
                         // Código de recuperación de la cuenta: solo quien entra con correo.

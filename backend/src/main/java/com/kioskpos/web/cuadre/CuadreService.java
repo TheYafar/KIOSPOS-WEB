@@ -273,7 +273,9 @@ public class CuadreService {
         return new Resumen(turno.getId(), turno.getEstado(), fondoUsd, fondoBs,
                 efectivoUsd.setScale(2, RoundingMode.HALF_UP), efectivoBs.setScale(2, RoundingMode.HALF_UP),
                 vueltoUsd.setScale(2, RoundingMode.HALF_UP), vueltoBs.setScale(2, RoundingMode.HALF_UP),
-                esperadoUsd, esperadoBs, null, null, null, null, metodos, mov.lineas(),
+                // Abierto: aún no hay conteo (null). Cerrado: lo contado y la diferencia que quedaron al cerrar.
+                esperadoUsd, esperadoBs, turno.getDeclaradoUsd(), turno.getDeclaradoBs(),
+                turno.getDiferenciaUsd(), turno.getDiferenciaBs(), metodos, mov.lineas(),
                 fiadoUsd.setScale(2, RoundingMode.HALF_UP), comisionAvancesBs.setScale(2, RoundingMode.HALF_UP),
                 turno.getFechaApertura(), recargasBs.setScale(2, RoundingMode.HALF_UP),
                 comisionRecargasBs.setScale(2, RoundingMode.HALF_UP));

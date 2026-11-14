@@ -617,6 +617,15 @@ export async function registrarCierrePunto(body: NuevoCierrePunto): Promise<Cier
 export async function cierresPuntoDelTurno(turnoId: number): Promise<CierrePunto[]> {
   return parse(await fetch(`/api/cierres-punto/turno/${turnoId}`, { headers: auth() }));
 }
+/** Cierre de CAJA (turno cerrado) para el panel del dueño. */
+export interface CierreCajaVista {
+  turnoId: number; cajaId: number | null; caja: string | null; cajero: string | null;
+  fechaApertura: string; fechaCierre: string; cantidadVentas: number; vendidoUsd: number; vendidoBs: number;
+  observaciones: string | null; cuadre: TurnoResumen;
+}
+export async function cierresCajaEntre(desde: string, hasta: string): Promise<CierreCajaVista[]> {
+  return parse(await fetch(`/api/cierres-punto/cajas?desde=${desde}&hasta=${hasta}`, { headers: auth() }));
+}
 export async function cierresPuntoEntre(desde: string, hasta: string): Promise<CierrePuntoVista[]> {
   return parse(await fetch(`/api/cierres-punto?desde=${desde}&hasta=${hasta}`, { headers: auth() }));
 }

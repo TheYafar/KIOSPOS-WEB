@@ -30,7 +30,7 @@ export interface Estado { turnoAbierto: boolean; abrirFalla?: boolean; venta?: a
   csvImport?: string; productoBorrado?: number; inventarioVaciado?: boolean;
   compraAbonos?: any[]; compraFotos?: any[]; compraVence?: any; compraPagada?: boolean; avisos?: any;
   registro?: any; registroFalla?: string; cajaCreada?: any;
-  opciones?: any; demoCreada?: boolean; recuperacion?: any; recuperacionFalla?: string; codigoGenerado?: boolean; }
+  cierresCaja?: any[]; opciones?: any; demoCreada?: boolean; recuperacion?: any; recuperacionFalla?: string; codigoGenerado?: boolean; }
 
 /** Factura de compra base para los endpoints de detalle/abono. */
 const compraDemo = (st: Estado) => ({ id: 8, proveedorId: 3, numeroFactura: "A-77", fecha: "2026-11-09", totalUsd: 40,
@@ -135,6 +135,7 @@ export async function preparar(page: Page, st: Estado, local: Record<string, unk
       if (m !== "GET") { st.categoria = { metodo: m, ...JSON.parse(r.request().postData() || "{}") }; return r.fulfill({ json: { nombre: "x", productos: 0 } }); }
       return r.fulfill({ json: [{ nombre: "Bebidas", productos: 1 }, { nombre: "Charcutería", productos: 1 }, { nombre: "General", productos: 0 }, { nombre: "Víveres", productos: 2 }] });
     }
+    if (u.includes("/api/cierres-punto/cajas")) return r.fulfill({ json: st.cierresCaja ?? [] });
     if (u.includes("/api/cierres-punto")) {
       const lista = (st.puntos ??= []);
       if (m === "POST") {

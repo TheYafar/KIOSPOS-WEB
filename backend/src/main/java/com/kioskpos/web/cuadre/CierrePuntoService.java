@@ -30,8 +30,13 @@ public class CierrePuntoService {
     private final CuadreService cuadreService;
     private final CajaRepository cajas;
     private final UsuarioRepository usuarios;
+    private final TurnoRepository turnos;
+    private final com.kioskpos.web.venta.VentaRepository ventas;
 
-    public CierrePuntoService(CierrePuntoRepository cierres, CuadreService cuadreService, CajaRepository cajas, UsuarioRepository usuarios) {
+    public CierrePuntoService(CierrePuntoRepository cierres, CuadreService cuadreService, CajaRepository cajas, UsuarioRepository usuarios,
+                              TurnoRepository turnos, com.kioskpos.web.venta.VentaRepository ventas) {
+        this.turnos = turnos;
+        this.ventas = ventas;
         this.cierres = cierres;
         this.cuadreService = cuadreService;
         this.cajas = cajas;
@@ -111,6 +116,51 @@ public class CierrePuntoService {
                 c.getUsuarioId() == null ? null : nUsu.computeIfAbsent(c.getUsuarioId(), id -> usuarios.findById(id).map(x -> x.getNombreCompleto()).orElse(null)),
                 c.getTurnoId() == null ? null : sistema.computeIfAbsent(c.getTurnoId() + ":" + c.getTipo(), k -> sistemaDelTurno(c.getTurnoId(), c.getTipo()))))
                 .toList();
+    }
+
+    /**
+     * Un cierre de CAJA (turno cerrado) para el panel del dueño: qué caja, quién, de qué hora a qué hora,
+     * cuánto vendió y cómo cuadró (lo esperado vs lo contado, en $ y en Bs), con el detalle del cuadre.
+     */
+    public record CierreCajaVista(Long turnoId, Long cajaId, String caja, String cajero,
+                                  Instant fechaApertura, Instant fechaCierre,
+                                  int cantidadVentas, BigDecimal vendidoUsd, BigDecimal vendidoBs,
+                                  String observaciones, CuadreService.Resumen cuadre) {
+    }
+
+    /** Panel del dueño: los cierres de caja entre dos días (incluidos), los más nuevos primero. */
+    @Transactional(readOnly = true)
+    public List<CierreCajaVista> cierresDeCaja(LocalDate desde, LocalDate hasta) {
+        if (hasta.isBefore(desde)) {
+            throw new IllegalArgumentException("La fecha final es antes que la inicial");
+        }
+        if (desde.plusDays(370).isBefore(hasta)) {
+            throw new IllegalArgumentException("Elige un rango de hasta un año");
+        }
+        List<Turno> l = turnos.findByEstadoAndFechaCierreGreaterThanEqualAndFechaCierreLessThanOrderByFechaCierreAsc(
+                Turno.Estado.CERRADO.name(), desde.atStartOfDay(ZONA).toInstant(), hasta.plusDays(1).atStartOfDay(ZONA).toInstant());
+        Map<Long, String> nCaja = new HashMap<>();
+        Map<Long, String> nUsu = new HashMap<>();
+        java.util.ArrayList<CierreCajaVista> out = new java.util.ArrayList<>();
+        for (int i = l.size() - 1; i >= 0; i--) {
+            Turno t = l.get(i);
+            int n = 0;
+            BigDecimal usd = BigDecimal.ZERO;
+            BigDecimal bs = BigDecimal.ZERO;
+            for (var v : ventas.findByTurnoId(t.getId())) {
+                if ("COMPLETADA".equals(v.getEstado())) {
+                    n++;
+                    usd = usd.add(v.getTotalUsd());
+                    bs = bs.add(v.getTotalBs());
+                }
+            }
+            out.add(new CierreCajaVista(t.getId(), t.getCajaId(),
+                    t.getCajaId() == null ? null : nCaja.computeIfAbsent(t.getCajaId(), id -> cajas.findById(id).map(x -> x.getNombre()).orElse("Caja " + id)),
+                    t.getUsuarioId() == null ? null : nUsu.computeIfAbsent(t.getUsuarioId(), id -> usuarios.findById(id).map(x -> x.getNombreCompleto()).orElse(null)),
+                    t.getFechaApertura(), t.getFechaCierre(), n, usd.setScale(2, RoundingMode.HALF_UP), bs.setScale(2, RoundingMode.HALF_UP),
+                    t.getObservaciones(), cuadreService.resumen(t.getId())));
+        }
+        return out;
     }
 
     /** Lo que el sistema registró por ese medio (punto o biopago) en el turno. */

@@ -756,3 +756,21 @@ el alta/venta/login (try/catch + log).
   refleja), nunca **más** (tolerancia Bs 1; la caja bloquea y el servidor responde 400). `EstadoCobro.difBs`.
 - Pruebas: `CobroCalculadoraTest` (Java, sin BD), `cobroCalc.test.ts`, `e2e/cobro.spec.ts` (4 nuevas). Verificado contra
   Postgres real (mixto corto → 400, pago móvil sin referencia, vuelto $2 + Bs, vuelto a mano menor y de más → 400, cuadre y ticket).
+
+## 38. Panel "Puntos" = cierres de caja + tickets de punto
+
+- La pestaña **Puntos** del dueño (`screens/CierresPunto.tsx` `PanelCierresPunto`, título "Cierres") junta, por día y en
+  orden de hora, los **cierres de caja** y los **tickets de cierre del punto/Biopago**, cada uno con etiqueta (CAJA /
+  PUNTO / BIOPAGO), caja y cajero. Filtros: rango (Hoy/Ayer/7 días/Este mes/un día), **Todo / Cierres de caja / Tickets
+  de punto** y, si hay más de una, **por caja**. Cifras arriba: # cierres de caja + vendido + cuántos con descuadre, y
+  # tickets de punto + total.
+- Cierre de caja (`TarjetaCaja`): "Cierre de caja · Caja X", cajero, hora de apertura → cierre (con día si cruzó la
+  medianoche), vendido y **Cuadró / Faltan / Sobran** ($ y Bs). Al abrir: caja, cajero, abrió/cerró, ventas, tabla de la
+  gaveta (fondo, esperado, contó, diferencia en $ y Bs), cobros digitales, vuelto entregado, movimientos, los tickets de
+  punto de ESE turno y la nota del cierre.
+- Backend: `GET /api/cierres-punto/cajas?desde&hasta` (solo dueño/encargado) → `CierrePuntoService.cierresDeCaja`
+  (`CierreCajaVista`: caja, cajero, fechas, # ventas y vendido $/Bs, observaciones y el `Resumen` del cuadre).
+- **Bug corregido:** `CuadreService.resumen` de un turno CERRADO devolvía `declarado*`/`diferencia*` en null (se calculaba
+  en vivo); ahora trae lo contado y la diferencia guardados al cerrar (abierto sigue en null).
+- Pruebas: `CierrePuntoTest.elDuenoVeLosCierresDeCajaConCajaCajeroYCuadre` (CI), `e2e/puntos.spec.ts` (nueva + ajustada).
+  Verificado contra Postgres real.

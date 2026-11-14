@@ -33,6 +33,14 @@ public class CierrePuntoController {
         return service.registrar(p, req);
     }
 
+    /** Panel del dueño: los cierres de CAJA (turnos cerrados) en el rango, con su cuadre. */
+    @GetMapping("/cajas")
+    public List<CierrePuntoService.CierreCajaVista> cierresDeCaja(
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate desde,
+            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate hasta) {
+        return service.cierresDeCaja(desde, hasta);
+    }
+
     @GetMapping("/turno/{turnoId}")
     public List<CierrePunto> delTurno(@PathVariable Long turnoId) {
         return service.delTurno(turnoId);
