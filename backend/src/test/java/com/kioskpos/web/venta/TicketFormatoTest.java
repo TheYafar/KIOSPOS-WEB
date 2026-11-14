@@ -40,8 +40,9 @@ class TicketFormatoTest {
                 "             BODEGAS COCOA",
                 "           DIOS TODO PODEROSO",
                 "========================================",
-                "FECHA : 08/10/2026 09:15 a. m.",
-                "FACTURA #: 000012",
+                "          DOCUMENTO NO FISCAL",
+                "FECHA : 08/10/2026 09:15:00 a. m.",
+                "NRO. CONTROL INTERNO: 000012",
                 "----------------------------------------",
                 "CLIENTE: Consumidor Final",
                 "----------------------------------------",
@@ -56,8 +57,13 @@ class TicketFormatoTest {
                 "----------------------------------------",
                 "PUNTO                         VES 315,00",
                 "========================================",
+                "    ESTE DOCUMENTO NO ES UNA FACTURA",
+                "      SIN DERECHO A CREDITO FISCAL",
+                "    SI REQUIERE FACTURA, SOLICITELA",
                 "");
         assertThat(t).isEqualTo(esperado);
+        String conDoc = TicketService.armar(n, n.getNombre(), v, "Pedro Perez", "V-12345678");
+        assertThat(conDoc).contains("CLIENTE: Pedro Perez\nC.I./RIF: V-12345678\n").doesNotContain("FACTURA #");
         for (String linea : t.split("\n")) {
             assertThat(linea.length()).isLessThanOrEqualTo(40);
         }

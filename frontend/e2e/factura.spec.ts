@@ -18,10 +18,10 @@ test("vender a crédito a un empleado: se elige en 'Trabajadores' y sale el N° 
   await page.locator(".cli-pick-row", { hasText: "Luis" }).click();
   await page.keyboard.press("Enter");
 
-  await expect(page.getByLabel("Número de factura")).toContainText("0001");
+  await expect(page.getByLabel("Número de control")).toContainText("0001");
   await expect(page.locator(".fac-cred")).toContainText("del empleado");
   await expect(page.locator(".fac-cred")).toContainText("Luis (empleado)");
-  await expect(page.locator(".receipt")).toContainText("FACTURA #: 000001");
+  await expect(page.locator(".receipt")).toContainText("NRO. CONTROL INTERNO: 000001");
   expect(st.venta.clienteId).toBe(3);
 });
 

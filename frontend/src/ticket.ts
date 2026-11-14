@@ -7,7 +7,7 @@ export interface NegocioTicket { nombre: string; frase?: string | null; rif?: st
 export interface LineaTicket { cantidad: number; nombre: string; precioUsd: number; subtotalUsd: number; montoBs?: number; }
 export interface PagoTicket { nombre: string; moneda: "USD" | "VES"; monto: number; ref?: string; }
 export interface DatosTicket {
-  negocio: NegocioTicket; fecha: Date; numero?: number | null; cliente?: string | null;
+  negocio: NegocioTicket; fecha: Date; numero?: number | null; cliente?: string | null; doc?: string | null;
   tasa: number; lineas: LineaTicket[]; totalBs: number; pagos: PagoTicket[]; vueltoBs?: number; vueltoUsd?: number;
 }
 
@@ -33,11 +33,11 @@ export function envolver(t: string): string[] {
   if (a || !out.length) out.push(a);
   return out;
 }
-/** "08/10/2026 09:15 a. m." */
+/** "08/10/2026 09:15:30 a. m." (con segundos, como pide SNAT/2026/00093) */
 export function fechaVE(d: Date): string {
   const p = (n: number) => String(n).padStart(2, "0");
   const h = d.getHours() % 12 || 12;
-  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(h)}:${p(d.getMinutes())} ${d.getHours() < 12 ? "a. m." : "p. m."}`;
+  return `${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()} ${p(h)}:${p(d.getMinutes())}:${p(d.getSeconds())} ${d.getHours() < 12 ? "a. m." : "p. m."}`;
 }
 
 export function encabezado(n: NegocioTicket): string[] {
@@ -51,9 +51,11 @@ export function encabezado(n: NegocioTicket): string[] {
 
 export function armarTicket(t: DatosTicket): string {
   const doble = "=".repeat(W), linea = "-".repeat(W);
-  const L: string[] = [doble, ...encabezado(t.negocio), doble, "FECHA : " + fechaVE(t.fecha)];
-  if (t.numero != null) L.push("FACTURA #: " + String(t.numero).padStart(6, "0"));
-  L.push(linea, ("CLIENTE: " + (t.cliente || "Consumidor Final")).slice(0, W), linea, fila("CANT  DESCRIPCION", "PRECIO (Bs)"), linea);
+  const L: string[] = [doble, ...encabezado(t.negocio), doble, centrar("DOCUMENTO NO FISCAL"), "FECHA : " + fechaVE(t.fecha)];
+  if (t.numero != null) L.push("NRO. CONTROL INTERNO: " + String(t.numero).padStart(6, "0"));
+  L.push(linea, ("CLIENTE: " + (t.cliente || "Consumidor Final")).slice(0, W));
+  if (t.doc?.trim()) L.push(("C.I./RIF: " + t.doc.trim()).slice(0, W));
+  L.push(linea, fila("CANT  DESCRIPCION", "PRECIO (Bs)"), linea);
   for (const l of t.lineas) {
     const c = cantVE(l.cantidad);
     L.push(...envolver(c + " x " + l.nombre.toUpperCase()));
@@ -72,5 +74,7 @@ export function armarTicket(t: DatosTicket): string {
     if ((t.vueltoUsd || 0) > 0) L.push(fila("VUELTO", "USD " + numVE(t.vueltoUsd!)));
     L.push(doble);
   }
+  // Ticket NO FISCAL: no es factura (Providencia SNAT/2026/00093).
+  L.push(centrar("ESTE DOCUMENTO NO ES UNA FACTURA"), centrar("SIN DERECHO A CREDITO FISCAL"), centrar("SI REQUIERE FACTURA, SOLICITELA"));
   return L.join("\n");
 }

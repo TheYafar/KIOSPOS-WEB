@@ -215,7 +215,7 @@ export function Caja() {
       const its = [...carrito.values()].filter((i) => !i.servicio).map((i) => i.bloque && i.base
         ? { productoId: i.base.id, presentacionId: i.bloque.id, cantidad: i.qty, precioUsd: i.producto.precioUsd }
         : { productoId: i.producto.id, cantidad: i.qty, precioUsd: i.producto.precioUsd });
-      const codigo = await cobrar(its, pagos, clienteId, { totalUsd: total, productos: [...carrito.values()].map((i) => i.producto.nombre).join(", ").slice(0, 120) }, servicios, resumen.vueltoUsd, resumen.vueltoManual ? resumen.vueltoBs : undefined);
+      const codigo = await cobrar(its, pagos, clienteId, { totalUsd: total, productos: [...carrito.values()].map((i) => i.producto.nombre).join(", ").slice(0, 120) }, servicios, resumen.vueltoUsd, resumen.vueltoManual ? resumen.vueltoBs : undefined, resumen.comprador);
       window.dispatchEvent(new Event("kp-turno"));
       setDone({ total, totalBs, payLine: resumen.payLine, change: resumen.change, changeNote: resumen.changeNote, receipt: recibo(pagos, resumen, facturaDe(codigo)), factura: facturaDe(codigo), credito: resumen.credito });
       setView("done");
@@ -224,7 +224,7 @@ export function Caja() {
 
   const NOMBRE_PAGO: Record<string, string> = { FIADO: "CREDITO" };
   const recibo = (pagos: PagoCobro[], resumen: ResumenPago, factura?: number) => armarTicket({
-    negocio, fecha: new Date(), numero: factura ?? null, cliente: resumen.credito?.nombre ?? null, tasa,
+    negocio, fecha: new Date(), numero: factura ?? null, cliente: resumen.credito?.nombre ?? (resumen.comprador?.nombre || null), doc: resumen.comprador?.doc || null, tasa,
     lineas: [...carrito.values()].map((i) => ({ cantidad: i.qty, nombre: i.producto.nombre, precioUsd: i.producto.precioUsd, subtotalUsd: r2(i.producto.precioUsd * i.qty),
       montoBs: i.servicio ? i.servicio.servicio.cobradoBs : undefined })),
     totalBs, vueltoUsd: resumen.vueltoUsd, vueltoBs: resumen.vueltoBs,
@@ -262,9 +262,9 @@ export function Caja() {
             <h2>Venta cobrada</h2>
             <p className="t">{usd(done.total)} · {done.payLine}</p>
             {done.factura != null
-              ? <div className="fac-num" aria-label="Número de factura"><small>Factura N°</small><b className="t">{numFactura(done.factura)}</b></div>
-              : <div className="fac-num pend"><small>Factura</small><b>Se numera al enviarse (sin internet)</b></div>}
-            {done.credito && <p className="fac-cred">Anotado a crédito {done.credito.trabajador ? "del empleado" : "de"} <b>{done.credito.nombre}</b>: {usd(done.credito.montoUsd)}. Con el N° de factura el dueño ve todo lo que se llevó.</p>}
+              ? <div className="fac-num" aria-label="Número de control"><small>N° control interno</small><b className="t">{numFactura(done.factura)}</b></div>
+              : <div className="fac-num pend"><small>Control interno</small><b>Se numera al enviarse (sin internet)</b></div>}
+            {done.credito && <p className="fac-cred">Anotado a crédito {done.credito.trabajador ? "del empleado" : "de"} <b>{done.credito.nombre}</b>: {usd(done.credito.montoUsd)}. Con el N° de control el dueño ve todo lo que se llevó.</p>}
             {done.change && <div className="change">Vuelto: {done.change}{done.changeNote && <small>{done.changeNote}</small>}</div>}
           </div>
           <div className="receipt-lbl">Así sale el ticket (40 columnas)</div>

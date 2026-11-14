@@ -46,6 +46,13 @@ public class Venta {
     @Column(name = "cliente_id")
     private Long clienteId;
 
+    /** A quién se le vendió, para el ticket (opcional; nombre y cédula/RIF). */
+    @Column(name = "cliente_nombre", length = 80)
+    private String clienteNombre;
+
+    @Column(name = "cliente_doc", length = 20)
+    private String clienteDoc;
+
     @Column(name = "codigo_unico", length = 64)
     private String codigoUnico;
 

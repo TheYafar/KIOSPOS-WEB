@@ -25,9 +25,15 @@ public class TicketService {
     private static final int ANCHO = 40;
     private static final ZoneId ZONA = ZoneId.of("America/Caracas");
     private static final DateTimeFormatter FECHA =
-            DateTimeFormatter.ofPattern("dd/MM/yyyy hh:mm a", Locale.US).withZone(ZONA);
+            DateTimeFormatter.ofPattern("dd/MM/yyyy hh:mm:ss a", Locale.US).withZone(ZONA);
 
     private final NegocioRepository negocioRepository;
+    private com.kioskpos.web.cliente.ClienteRepository clienteRepository;
+
+    @org.springframework.beans.factory.annotation.Autowired(required = false)
+    void setClienteRepository(com.kioskpos.web.cliente.ClienteRepository clienteRepository) {
+        this.clienteRepository = clienteRepository;
+    }
 
     public TicketService(NegocioRepository negocioRepository) {
         this.negocioRepository = negocioRepository;
@@ -68,10 +74,26 @@ public class TicketService {
                 cliente = p.getReferencia().trim();
             }
         }
-        return armar(negocio, nombreNegocio, venta, cliente);
+        if (cliente == null && venta.getClienteNombre() != null) {
+            cliente = venta.getClienteNombre();
+        }
+        String doc = venta.getClienteDoc();
+        if (doc == null && venta.getClienteId() != null && clienteRepository != null) {
+            doc = clienteRepository.findById(venta.getClienteId()).map(c -> c.getCedula()).orElse(null);
+        }
+        return armar(negocio, nombreNegocio, venta, cliente, doc);
     }
 
     static String armar(Negocio negocio, String nombreNegocio, Venta venta, String cliente) {
+        return armar(negocio, nombreNegocio, venta, cliente, null);
+    }
+
+    /**
+     * Ticket NO FISCAL (Providencia SNAT/2026/00093): mientras el negocio no emita facturas por imprenta
+     * digital o máquina fiscal, el ticket no se llama "factura", lleva un número de control interno y
+     * avisa al pie que no es factura ni da derecho a crédito fiscal.
+     */
+    static String armar(Negocio negocio, String nombreNegocio, Venta venta, String cliente, String doc) {
         String doble = "=".repeat(ANCHO) + "\n";
         String linea = "-".repeat(ANCHO) + "\n";
         StringBuilder sb = new StringBuilder();
@@ -79,12 +101,16 @@ public class TicketService {
         sb.append(doble);
         sb.append(encabezado(negocio, nombreNegocio));
         sb.append(doble);
+        sb.append(centrar("DOCUMENTO NO FISCAL")).append("\n");
         sb.append("FECHA : ").append(fechaVE(venta.getFechaHora())).append("\n");
         if (venta.getNumeroFactura() != null) {
-            sb.append("FACTURA #: ").append(String.format("%06d", venta.getNumeroFactura())).append("\n");
+            sb.append("NRO. CONTROL INTERNO: ").append(String.format("%06d", venta.getNumeroFactura())).append("\n");
         }
         sb.append(linea);
         sb.append(recortar("CLIENTE: " + (cliente == null ? "Consumidor Final" : cliente))).append("\n");
+        if (doc != null && !doc.isBlank()) {
+            sb.append(recortar("C.I./RIF: " + doc.trim())).append("\n");
+        }
         sb.append(linea);
         sb.append(fila("CANT  DESCRIPCION", "PRECIO (Bs)"));
         sb.append(linea);
@@ -132,10 +158,13 @@ public class TicketService {
             }
             sb.append(doble);
         }
+        sb.append(centrar("ESTE DOCUMENTO NO ES UNA FACTURA")).append("\n");
+        sb.append(centrar("SIN DERECHO A CREDITO FISCAL")).append("\n");
+        sb.append(centrar("SI REQUIERE FACTURA, SOLICITELA")).append("\n");
         return sb.toString();
     }
 
-    /** "08/10/2026 09:15 a. m." (como lo imprime el escritorio en español). */
+    /** "08/10/2026 09:15:30 a. m." (como lo imprime el escritorio en español). */
     static String fechaVE(java.time.Instant i) {
         String f = FECHA.format(i);
         return f.endsWith("AM") ? f.substring(0, f.length() - 2) + "a. m." : f.substring(0, f.length() - 2) + "p. m.";

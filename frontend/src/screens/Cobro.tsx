@@ -40,7 +40,7 @@ const aTexto = (n: number) => (n <= 0 ? "" : n.toFixed(2).replace(".", ","));
 /** Límite de fiado: el propio, o el sueldo si es un trabajador sin límite (igual que el servidor). */
 const limiteDe = (c: ClienteFiado) => (c.limiteUsd > 0 ? c.limiteUsd : c.tipo === "TRABAJADOR" ? c.sueldoUsd || 0 : 0);
 
-export interface ResumenPago { payLine: string; change: string; changeNote: string; vueltoUsd?: number; vueltoBs?: number; vueltoManual?: boolean; credito?: { nombre: string; trabajador: boolean; montoUsd: number }; }
+export interface ResumenPago { payLine: string; change: string; changeNote: string; vueltoUsd?: number; vueltoBs?: number; vueltoManual?: boolean; comprador?: { nombre: string; doc: string }; credito?: { nombre: string; trabajador: boolean; montoUsd: number }; }
 
 export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
   total: number; totalBs?: number; tasa: number; isDesktop: boolean; err: string;
@@ -49,6 +49,10 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
 }) {
   const [txt, setTxt] = useState<Record<string, string>>({});
   const [ref, setRef] = useState("");
+  // Datos del cliente para el ticket (opcional, ticket NO fiscal).
+  const [conDatos, setConDatos] = useState(false);
+  const [compNombre, setCompNombre] = useState("");
+  const [compDoc, setCompDoc] = useState("");
   // Vuelto: "auto" decide solo (Bs si pagó en Bs o es menos de $1; si no, dólares enteros + resto en Bs).
   const [vModo, setVModo] = useState<"auto" | "USD" | "VES" | "MIXTO">("auto");
   const [vUsdTxt, setVUsdTxt] = useState("");
@@ -166,6 +170,7 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
     onConfirm(pagos, {
       payLine, change, changeNote: change ? "El vuelto sale del efectivo" : "", vueltoUsd: e.vueltoUsd, vueltoBs: e.vueltoBs,
       vueltoManual: hayVuelto && bsManual,
+      ...(conDatos && (compNombre.trim() || compDoc.trim()) ? { comprador: { nombre: compNombre.trim().slice(0, 80), doc: compDoc.trim().toUpperCase().slice(0, 20) } } : {}),
       ...(fiadoUsd > 0 && cliente ? { credito: { nombre: cliente.nombre, trabajador: cliente.tipo === "TRABAJADOR", montoUsd: fiadoUsd } } : {}),
     }, fiadoUsd > 0 ? cliente?.id : null);
   };
@@ -301,6 +306,18 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
               <div className="vz-ent"><span>Entrega</span><b className="t">{entregaTxt}</b></div>
               <small className="vz-nota">Sale del efectivo de la gaveta{e.vueltoUsd > 0 && e.vueltoBs > 0 ? ": dólares en billetes y el resto en bolívares." : "."}</small>
             </div>
+          )}
+          {conDatos ? (
+            <div className="comp-datos" aria-label="Datos del cliente para el ticket">
+              <div className="comp-hd"><b>Datos del cliente para el ticket</b>
+                <button className="vz-auto" onClick={() => { setConDatos(false); setCompNombre(""); setCompDoc(""); }}>Quitar</button></div>
+              <div className="comp-in">
+                <label><span>Nombre</span><input className="inp" value={compNombre} maxLength={80} placeholder="Ej. Pedro Pérez" onChange={(ev) => setCompNombre(ev.target.value)} /></label>
+                <label><span>Cédula o RIF</span><input className="inp t" value={compDoc} maxLength={20} placeholder="V-12345678" onChange={(ev) => setCompDoc(ev.target.value)} /></label>
+              </div>
+            </div>
+          ) : (
+            <button className="comp-add press" onClick={() => setConDatos(true)}>+ Datos del cliente en el ticket (opcional)</button>
           )}
           {err && <p className="pinmsg err">{err}</p>}
           <button className="btn primary big press cb3-go" disabled={!valido} onClick={confirmar}>

@@ -85,21 +85,31 @@ public class VentaService {
      * creadoAt: cuándo se cobró en la caja (epoch ms). Viene en las ventas de la cola sin internet.
      * clienteId: a quién se le fía (obligatorio si algún pago es FIADO).
      */
+    /** Datos del comprador para el ticket (opcionales): nombre y cédula o RIF. */
+    public record Comprador(String nombre, String doc) {
+    }
+
     /**
      * vueltoUsd: cuántos dólares del vuelto se entregan en $ (el resto, en Bs); null = automático.
      * vueltoBs: bolívares del vuelto escritos a mano (lo que de verdad se entregó); null = el resto automático.
+     * comprador: nombre y cédula/RIF para el ticket (opcional).
      */
     public record VentaInput(String codigoUnico, BigDecimal tasaBcv,
                              List<ItemInput> items, List<PagoInput> pagos, Long creadoAt, Long clienteId,
-                             List<ServicioInput> servicios, BigDecimal vueltoUsd, BigDecimal vueltoBs) {
+                             List<ServicioInput> servicios, BigDecimal vueltoUsd, BigDecimal vueltoBs, Comprador comprador) {
+        public VentaInput(String codigoUnico, BigDecimal tasaBcv, List<ItemInput> items, List<PagoInput> pagos,
+                          Long creadoAt, Long clienteId, List<ServicioInput> servicios, BigDecimal vueltoUsd, BigDecimal vueltoBs) {
+            this(codigoUnico, tasaBcv, items, pagos, creadoAt, clienteId, servicios, vueltoUsd, vueltoBs, null);
+        }
+
         public VentaInput(String codigoUnico, BigDecimal tasaBcv, List<ItemInput> items, List<PagoInput> pagos,
                           Long creadoAt, Long clienteId, List<ServicioInput> servicios, BigDecimal vueltoUsd) {
-            this(codigoUnico, tasaBcv, items, pagos, creadoAt, clienteId, servicios, vueltoUsd, null);
+            this(codigoUnico, tasaBcv, items, pagos, creadoAt, clienteId, servicios, vueltoUsd, null, null);
         }
 
         public VentaInput(String codigoUnico, BigDecimal tasaBcv, List<ItemInput> items, List<PagoInput> pagos,
                           Long creadoAt, Long clienteId, List<ServicioInput> servicios) {
-            this(codigoUnico, tasaBcv, items, pagos, creadoAt, clienteId, servicios, null, null);
+            this(codigoUnico, tasaBcv, items, pagos, creadoAt, clienteId, servicios, null, null, null);
         }
 
         public VentaInput(String codigoUnico, BigDecimal tasaBcv, List<ItemInput> items, List<PagoInput> pagos) {
@@ -272,6 +282,12 @@ public class VentaService {
         }
         venta.setCodigoUnico(input.codigoUnico());
         venta.setTasaBcv(tasa);
+        if (input.comprador() != null) {
+            venta.setClienteNombre(limpioTicket(input.comprador().nombre(), 80));
+            String doc = input.comprador().doc() == null ? null
+                    : input.comprador().doc().toUpperCase(java.util.Locale.ROOT).replaceAll("[^VEJPG0-9-]", "");
+            venta.setClienteDoc(limpioTicket(doc, 20));
+        }
 
         // 3. Líneas: el servidor pone el precio (autoridad), salvo el cobro rápido (por monto).
         BigDecimal totalUsd = BigDecimal.ZERO;
@@ -478,5 +494,17 @@ public class VentaService {
     @Transactional(readOnly = true)
     public List<Venta> ventasDeCaja(Long cajaId) {
         return ventaRepository.findByCajaIdOrderByFechaHoraDesc(cajaId);
+    }
+
+    /** Texto corto para el ticket: sin saltos de línea, recortado; null si queda vacío. */
+    private static String limpioTicket(String t, int max) {
+        if (t == null) {
+            return null;
+        }
+        String x = t.replaceAll("\\s+", " ").trim();
+        if (x.isEmpty()) {
+            return null;
+        }
+        return x.length() > max ? x.substring(0, max) : x;
     }
 }

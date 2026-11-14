@@ -788,3 +788,19 @@ el alta/venta/login (try/catch + log).
   lote, **transacciones** y **anulaciones** (cantidad y monto) y total; se guarda en la sección de débito
   (`loteDebito`, terminal en `afiliado`); el servidor ignora crédito/Master-Visa para BIOPAGO. Ticket "CIERRE BIOPAGO".
 - Pruebas: `e2e/guia.spec.ts` (4). Verificado contra Postgres real (Biopago total y abono por Biopago).
+
+## 40. Ticket NO FISCAL (mientras no hay factura fiscal)
+
+- Base: **Providencia SNAT/2026/00093** (Gaceta 43.484, 21/10/2026), arts. 4–8: una factura válida solo sale del
+  portal/app del SENIAT, de una **imprenta digital autorizada** (que da el número de control) o de una **máquina
+  fiscal** autorizada. KioskPOS todavía no es ninguna de esas → su ticket NO puede llamarse factura.
+- **Ticket** (`TicketService.armar` y `frontend/src/ticket.ts`, idénticos): bajo el encabezado `DOCUMENTO NO FISCAL`;
+  `FECHA` con **segundos** (`dd/MM/yyyy hh:mm:ss a. m.`); `NRO. CONTROL INTERNO: 000001` en vez de `FACTURA #`;
+  `CLIENTE` + `C.I./RIF` opcional; al pie `ESTE DOCUMENTO NO ES UNA FACTURA / SIN DERECHO A CREDITO FISCAL /
+  SI REQUIERE FACTURA, SOLICITELA`.
+- **Datos del cliente opcionales** (V30 `ventas.cliente_nombre`, `cliente_doc`): en el cobro, "+ Datos del cliente en
+  el ticket (opcional)" → `POST /api/ventas {comprador: {nombre, doc}}` (`VentaService.Comprador`; el doc se guarda en
+  mayúsculas solo con `VEJPG`, dígitos y `-`). Si la venta es a crédito sin doc, el ticket toma la cédula del cliente.
+- La pantalla final de la caja dice "N° control interno" (el número interno sigue siendo `numero_factura`).
+- **Pendiente (P3):** factura fiscal real = integrarse con una imprenta digital autorizada o con máquina fiscal.
+- Pruebas: `TicketFormatoTest`, `ticket.test.ts`, `e2e/nofiscal.spec.ts`; verificado contra Postgres real.
