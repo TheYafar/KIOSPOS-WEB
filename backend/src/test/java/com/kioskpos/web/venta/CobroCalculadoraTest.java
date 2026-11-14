@@ -47,6 +47,19 @@ class CobroCalculadoraTest {
     }
 
     @Test
+    void vueltoEscritoAManoPuedeSerMenosPeroNoMas() {
+        // Sobran $2,10 = Bs 1.915,20. Da $2 + Bs 90 (no tenía Bs 91,20): se guarda lo entregado.
+        var menos = CobroCalculadora.calcular(new BigDecimal("2.90"), null, TASA, List.of(usd("5")), new BigDecimal("2"), new BigDecimal("90"));
+        assertThat(menos.vueltoUsd()).isEqualByComparingTo("2");
+        assertThat(menos.vueltoBs()).isEqualByComparingTo("90");
+        // Bs 91,90 = 70 céntimos de más: tolerado. Bs 95 de más: no.
+        assertThat(CobroCalculadora.calcular(new BigDecimal("2.90"), null, TASA, List.of(usd("5")), new BigDecimal("2"), new BigDecimal("91.90")).vueltoBs())
+                .isEqualByComparingTo("91.90");
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> CobroCalculadora.calcular(new BigDecimal("2.90"), null, TASA,
+                List.of(usd("5")), new BigDecimal("2"), new BigDecimal("186.20"))).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
     void soloBolivaresDaVueltoEnBsPorDefecto() {
         var r = CobroCalculadora.calcular(new BigDecimal("2"), new BigDecimal("900"), List.of(bs("2000")));
         assertThat(r.cubre()).isTrue();

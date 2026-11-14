@@ -750,5 +750,9 @@ el alta/venta/login (try/catch + log).
   enteros → $; si no → los dólares enteros en $ y el resto en Bs. Se manda `vueltoUsd` (dólares que se entregan) en
   `POST /api/ventas` (`VentaInput.vueltoUsd`); el servidor calcula el resto en Bs (`vueltoBs`), el cuadre descuenta cada
   parte de su gaveta y el ticket imprime ambas líneas. Sin el campo (cola vieja) sigue el comportamiento anterior.
-- Pruebas: `CobroCalculadoraTest` (Java, sin BD), `cobroCalc.test.ts`, `e2e/cobro.spec.ts` (3 nuevas). Verificado contra
-  Postgres real (mixto corto → 400, pago móvil sin referencia, vuelto $2 + Bs en venta, cuadre y ticket).
+- **Vuelto a mano:** el panel muestra lo sugerido en dos casillas editables (**$** con −/+ y **Bs**); "Calcular solo"
+  vuelve al automático. Si se escriben los Bs, se manda también `vueltoBs` y el servidor guarda lo que de verdad se
+  entregó: puede ser **menos** (no había sencillo: aviso "el cliente recibe Bs X menos, queda en la caja"; el cuadre lo
+  refleja), nunca **más** (tolerancia Bs 1; la caja bloquea y el servidor responde 400). `EstadoCobro.difBs`.
+- Pruebas: `CobroCalculadoraTest` (Java, sin BD), `cobroCalc.test.ts`, `e2e/cobro.spec.ts` (4 nuevas). Verificado contra
+  Postgres real (mixto corto → 400, pago móvil sin referencia, vuelto $2 + Bs, vuelto a mano menor y de más → 400, cuadre y ticket).

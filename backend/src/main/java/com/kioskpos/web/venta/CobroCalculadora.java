@@ -17,6 +17,9 @@ import java.util.List;
  *
  * Vuelto: el cajero elige cuántos DÓLARES entrega ({@code vueltoUsdPedido}); el resto sale en
  * bolívares. Sin elección: solo-Bs → todo en Bs; si no → todo en $ (como antes).
+ * Vuelto A MANO ({@code vueltoBsPedido} además de los dólares): se guarda lo que de verdad se entregó.
+ * Puede ser MENOS de lo que se debe (no hay sencillo: la diferencia queda en la gaveta y el cuadre
+ * lo refleja), pero nunca más (tolerancia Bs 1), para no perder dinero.
  */
 public final class CobroCalculadora {
 
@@ -51,6 +54,12 @@ public final class CobroCalculadora {
      */
     public static Resultado calcular(BigDecimal totalUsd, BigDecimal totalBsExacto, BigDecimal tasa, List<Pago> pagos,
                                      BigDecimal vueltoUsdPedido) {
+        return calcular(totalUsd, totalBsExacto, tasa, pagos, vueltoUsdPedido, null);
+    }
+
+    /** @param vueltoBsPedido bolívares del vuelto escritos a mano (con {@code vueltoUsdPedido} = dólares entregados). */
+    public static Resultado calcular(BigDecimal totalUsd, BigDecimal totalBsExacto, BigDecimal tasa, List<Pago> pagos,
+                                     BigDecimal vueltoUsdPedido, BigDecimal vueltoBsPedido) {
         if (tasa == null || tasa.signum() <= 0) {
             throw new IllegalArgumentException("La tasa del día debe ser mayor a 0");
         }
@@ -94,7 +103,17 @@ public final class CobroCalculadora {
 
         BigDecimal vueltoUsd = BigDecimal.ZERO;
         BigDecimal vueltoBs = BigDecimal.ZERO;
-        if (cubre && sobraBs.signum() > 0) {
+        if (cubre && sobraBs.signum() > 0 && vueltoBsPedido != null) {
+            BigDecimal pu = vueltoUsdPedido == null ? BigDecimal.ZERO : vueltoUsdPedido.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal pb = vueltoBsPedido.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
+            BigDecimal entregadoBs = pu.multiply(tasa).add(pb).setScale(2, RoundingMode.HALF_UP);
+            if (entregadoBs.compareTo(sobraBs.add(TOLERANCIA_BS)) > 0) {
+                throw new IllegalArgumentException("El vuelto (Bs " + entregadoBs.toPlainString()
+                        + ") pasa de lo que se le debe al cliente (Bs " + sobraBs.toPlainString() + ")");
+            }
+            vueltoUsd = pu;
+            vueltoBs = pb;
+        } else if (cubre && sobraBs.signum() > 0) {
             BigDecimal pedido = vueltoUsdPedido == null ? (soloBs ? BigDecimal.ZERO : sobraUsd)
                     : vueltoUsdPedido.max(BigDecimal.ZERO).setScale(2, RoundingMode.HALF_UP);
             if (pedido.compareTo(sobraUsd) >= 0) {

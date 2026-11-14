@@ -116,3 +116,22 @@ test("la caja cobra con la tasa del negocio y el cajero no puede cambiarla", asy
   // El cajero solo ve Vender, Cierre y Ventas (Configuración y lo demás es del dueño).
   await expect(page.locator(".rail .rail-item[title]")).toHaveText(["Vender", "Cierre", "Ventas"]);
 });
+
+test("vuelto a mano: se puede dar menos Bs (queda en la caja) pero no de más", async ({ page }) => {
+  const st: Estado = { turnoAbierto: true };
+  await preparar(page, st, { "kioskpos.sesion": sesionCajero });
+  await ir(page); await abrirCobro(page); // $2,75 = Bs 2.475
+  await page.getByLabel("Monto en Efectivo $").fill("5");   // sobran $2,25 → sugiere $2 + Bs 225
+  const vz = page.locator(".vz");
+  await expect(page.getByLabel("Bolívares del vuelto")).toHaveValue("225,00");
+  await page.getByLabel("Bolívares del vuelto").fill("300");
+  await expect(vz.locator(".vz-dif.mal")).toContainText("Bs 75,00 de más");
+  await expect(page.locator(".cb3-go")).toBeDisabled();
+  await page.getByLabel("Bolívares del vuelto").fill("200");
+  await expect(vz.locator(".vz-dif")).toContainText("recibe Bs 25,00 menos");
+  await expect(vz.locator(".vz-ent")).toContainText("$ 2,00 + Bs 200,00");
+  if (process.env.SHOT_DIR) await page.screenshot({ path: process.env.SHOT_DIR + "/vuelto-mano.png" });
+  await page.locator(".cb3-go").click();
+  await expect.poll(() => st.venta?.vueltoBs).toBe(200);
+  expect(st.venta.vueltoUsd).toBe(2);
+});

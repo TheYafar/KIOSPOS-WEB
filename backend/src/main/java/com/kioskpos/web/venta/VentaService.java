@@ -85,13 +85,21 @@ public class VentaService {
      * creadoAt: cuándo se cobró en la caja (epoch ms). Viene en las ventas de la cola sin internet.
      * clienteId: a quién se le fía (obligatorio si algún pago es FIADO).
      */
-    /** vueltoUsd: cuántos dólares del vuelto se entregan en $ (el resto, en Bs); null = automático. */
+    /**
+     * vueltoUsd: cuántos dólares del vuelto se entregan en $ (el resto, en Bs); null = automático.
+     * vueltoBs: bolívares del vuelto escritos a mano (lo que de verdad se entregó); null = el resto automático.
+     */
     public record VentaInput(String codigoUnico, BigDecimal tasaBcv,
                              List<ItemInput> items, List<PagoInput> pagos, Long creadoAt, Long clienteId,
-                             List<ServicioInput> servicios, BigDecimal vueltoUsd) {
+                             List<ServicioInput> servicios, BigDecimal vueltoUsd, BigDecimal vueltoBs) {
+        public VentaInput(String codigoUnico, BigDecimal tasaBcv, List<ItemInput> items, List<PagoInput> pagos,
+                          Long creadoAt, Long clienteId, List<ServicioInput> servicios, BigDecimal vueltoUsd) {
+            this(codigoUnico, tasaBcv, items, pagos, creadoAt, clienteId, servicios, vueltoUsd, null);
+        }
+
         public VentaInput(String codigoUnico, BigDecimal tasaBcv, List<ItemInput> items, List<PagoInput> pagos,
                           Long creadoAt, Long clienteId, List<ServicioInput> servicios) {
-            this(codigoUnico, tasaBcv, items, pagos, creadoAt, clienteId, servicios, null);
+            this(codigoUnico, tasaBcv, items, pagos, creadoAt, clienteId, servicios, null, null);
         }
 
         public VentaInput(String codigoUnico, BigDecimal tasaBcv, List<ItemInput> items, List<PagoInput> pagos) {
@@ -383,7 +391,7 @@ public class VentaService {
             venta.setClienteId(clienteFiado.getId());
         }
         CobroCalculadora.Resultado cobro = CobroCalculadora.calcular(totalUsd.subtract(fiadoUsd),
-                totalBsExacto == null || fiadoUsd.signum() > 0 ? null : totalBsExacto, tasa, pagosCobro, input.vueltoUsd());
+                totalBsExacto == null || fiadoUsd.signum() > 0 ? null : totalBsExacto, tasa, pagosCobro, input.vueltoUsd(), input.vueltoBs());
         if (!cobro.cubre()) {
             throw new IllegalArgumentException(String.format(
                     "Pago insuficiente. Falta cubrir el total de $%.2f (Bs. %.2f)", totalUsd, totalBs));

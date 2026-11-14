@@ -40,7 +40,7 @@ const aTexto = (n: number) => (n <= 0 ? "" : n.toFixed(2).replace(".", ","));
 /** Límite de fiado: el propio, o el sueldo si es un trabajador sin límite (igual que el servidor). */
 const limiteDe = (c: ClienteFiado) => (c.limiteUsd > 0 ? c.limiteUsd : c.tipo === "TRABAJADOR" ? c.sueldoUsd || 0 : 0);
 
-export interface ResumenPago { payLine: string; change: string; changeNote: string; vueltoUsd?: number; vueltoBs?: number; credito?: { nombre: string; trabajador: boolean; montoUsd: number }; }
+export interface ResumenPago { payLine: string; change: string; changeNote: string; vueltoUsd?: number; vueltoBs?: number; vueltoManual?: boolean; credito?: { nombre: string; trabajador: boolean; montoUsd: number }; }
 
 export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
   total: number; totalBs?: number; tasa: number; isDesktop: boolean; err: string;
@@ -52,6 +52,7 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
   // Vuelto: "auto" decide solo (Bs si pagó en Bs o es menos de $1; si no, dólares enteros + resto en Bs).
   const [vModo, setVModo] = useState<"auto" | "USD" | "VES" | "MIXTO">("auto");
   const [vUsdTxt, setVUsdTxt] = useState("");
+  const [vBsTxt, setVBsTxt] = useState<string | null>(null); // null = los Bs se calculan solos
   const [enviando, setEnviando] = useState(false);
   const [foco, setFoco] = useState<string>("EFECTIVO_USD"); // casilla activa (para F8)
   const primero = useRef<HTMLInputElement>(null);
@@ -89,17 +90,24 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
     : e0.soloBs || e0.sobraUsd < 1 ? "VES" : Number.isInteger(Math.round(e0.sobraUsd * 100) / 100) ? "USD" : "MIXTO";
   const dolaresVuelto = modo === "USD" ? e0.sobraUsd : modo === "VES" ? 0
     : Math.min(e0.sobraUsd, vModo === "MIXTO" ? numOf(vUsdTxt) : Math.floor(e0.sobraUsd));
-  const e = calcularCobro(neto, tasa, sinFiado, monedaDe, bsFijo, dolaresVuelto);
+  const bsManual = vBsTxt != null;
+  const e = calcularCobro(neto, tasa, sinFiado, monedaDe, bsFijo, dolaresVuelto, bsManual ? numOf(vBsTxt) : undefined);
   const hayVuelto = e.cubre && e.sobraBs > 0;
   const entregaTxt = e.vueltoUsd > 0 && e.vueltoBs > 0 ? usd(e.vueltoUsd) + " + " + bs(e.vueltoBs)
     : e.vueltoUsd > 0 ? usd(e.vueltoUsd) : bs(e.vueltoBs);
+  const vueltoDeMas = hayVuelto && e.difBs < -1;
   const elegirVuelto = (m: "USD" | "VES" | "MIXTO") => {
-    setVModo(m);
+    setVModo(m); setVBsTxt(null);
     if (m === "MIXTO") setVUsdTxt(String(Math.floor(e0.sobraUsd) || 0));
   };
   const pasoDolar = (d: number) => {
     const n = Math.min(Math.floor(e0.sobraUsd), Math.max(0, Math.floor(numOf(vModo === "MIXTO" ? vUsdTxt : String(dolaresVuelto))) + d));
-    setVModo("MIXTO"); setVUsdTxt(String(n));
+    setVModo("MIXTO"); setVUsdTxt(String(n)); setVBsTxt(null);
+  };
+  // Escribir los Bs a mano: los dólares quedan como están y se guarda lo que de verdad se entrega.
+  const escribirBs = (v: string) => {
+    if (vModo !== "MIXTO") { setVModo("MIXTO"); setVUsdTxt(String(dolaresVuelto).replace(".", ",")); }
+    setVBsTxt(v.replace(/[^\d.,]/g, ""));
   };
   const pmUsado = (montos.PAGO_MOVIL || 0) > 0;
   // La referencia del pago móvil es OPCIONAL; si se escribe, que sea completa (4 a 6 dígitos).
@@ -114,13 +122,14 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
   const bloqueo = !(e.hayPago || fiadoUsd > 0) ? "Escribe cuánto pagó el cliente"
     : !e.cubre ? "Faltan " + usd(e.faltaUsd) + " · " + bs(e.faltaBs)
     : refMala ? "La referencia lleva 4 a 6 dígitos (o déjala vacía)"
+    : vueltoDeMas ? "El vuelto pasa por " + bs(-e.difBs) + " lo que se le debe"
     : fiadoMal ? fiadoMal
     : "";
   const valido = !bloqueo && !enviando;
 
   const set = (id: string, v: string) => setTxt((t) => ({ ...t, [id]: v }));
   const billete = (id: string, b: number) => set(id, aTexto((montos[id] || 0) + b)); // suma, como el escritorio
-  const limpiar = () => { setTxt({}); setRef(""); setVModo("auto"); setVUsdTxt(""); };
+  const limpiar = () => { setTxt({}); setRef(""); setVModo("auto"); setVUsdTxt(""); setVBsTxt(null); };
 
   // "Resto aquí": SIEMPRE hace algo visible.
   //  - Si falta dinero con las demás formas: pone en esta lo que falta (y lo dice en el botón).
@@ -156,6 +165,7 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
     const change = hayVuelto ? entregaTxt : "";
     onConfirm(pagos, {
       payLine, change, changeNote: change ? "El vuelto sale del efectivo" : "", vueltoUsd: e.vueltoUsd, vueltoBs: e.vueltoBs,
+      vueltoManual: hayVuelto && bsManual,
       ...(fiadoUsd > 0 && cliente ? { credito: { nombre: cliente.nombre, trabajador: cliente.tipo === "TRABAJADOR", montoUsd: fiadoUsd } } : {}),
     }, fiadoUsd > 0 ? cliente?.id : null);
   };
@@ -233,7 +243,7 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
                   {f.ref && (
                     <label className={"cb3-ref" + (refMala ? " bad" : "")}>
                       <span>Referencia <small className="opt">(opcional)</small></span>
-                      <input className="t" inputMode="numeric" placeholder="Opcional · 4 a 6 dígitos" value={ref} onChange={(ev) => setRef(ev.target.value.replace(/\D/g, "").slice(0, 6))} aria-label="Referencia del pago móvil" />
+                      <input className="t" inputMode="numeric" placeholder="4 a 6 dígitos" value={ref} onChange={(ev) => setRef(ev.target.value.replace(/\D/g, "").slice(0, 6))} aria-label="Referencia del pago móvil" />
                       {!refMala && ref.length >= 4 && <span className="okc"><UIcono k="check" sw={2.4} /></span>}
                     </label>
                   )}
@@ -271,17 +281,23 @@ export function Cobro({ total, totalBs, tasa, err, onBack, onConfirm }: {
                 <button role="radio" aria-checked={modo === "VES"} className={modo === "VES" ? "on" : ""} onClick={() => elegirVuelto("VES")}>Todo en Bs</button>
                 <button role="radio" aria-checked={modo === "MIXTO"} className={modo === "MIXTO" ? "on" : ""} disabled={e0.sobraUsd < 1} onClick={() => elegirVuelto("MIXTO")}>$ y Bs</button>
               </div>
-              {modo === "MIXTO" && (
-                <div className="vz-mix">
-                  <span>Dólares en billetes</span>
-                  <div className="vz-step">
-                    <button className="press" aria-label="Un dólar menos" onClick={() => pasoDolar(-1)}>−</button>
-                    <label className="vz-in"><i>$</i><input className="t" inputMode="decimal" aria-label="Dólares del vuelto"
-                      value={vModo === "MIXTO" ? vUsdTxt : String(dolaresVuelto)} onChange={(ev) => { setVModo("MIXTO"); setVUsdTxt(ev.target.value.replace(/[^\d.,]/g, "")); }} /></label>
-                    <button className="press" aria-label="Un dólar más" onClick={() => pasoDolar(1)}>+</button>
-                  </div>
+              <div className="vz-mix">
+                <span>Entregas</span>
+                <div className="vz-step">
+                  <button className="press" aria-label="Un dólar menos" onClick={() => pasoDolar(-1)}>−</button>
+                  <label className="vz-in"><i>$</i><input className="t" inputMode="decimal" aria-label="Dólares del vuelto"
+                    value={vModo === "MIXTO" ? vUsdTxt : String(dolaresVuelto).replace(".", ",")}
+                    onFocus={(ev) => ev.target.select()}
+                    onChange={(ev) => { setVModo("MIXTO"); setVBsTxt(null); setVUsdTxt(ev.target.value.replace(/[^\d.,]/g, "")); }} /></label>
+                  <button className="press" aria-label="Un dólar más" onClick={() => pasoDolar(1)}>+</button>
                 </div>
-              )}
+                <label className={"vz-in vz-bs" + (bsManual ? " man" : "")}><i>Bs</i><input className="t" inputMode="decimal" aria-label="Bolívares del vuelto"
+                  value={bsManual ? vBsTxt! : e.vueltoBs > 0 ? money(e.vueltoBs) : "0"}
+                  onFocus={(ev) => ev.target.select()} onChange={(ev) => escribirBs(ev.target.value)} /></label>
+                {bsManual && <button className="vz-auto" onClick={() => setVBsTxt(null)}>Calcular solo</button>}
+              </div>
+              {bsManual && e.difBs > 0.004 && <span className="vz-dif">El cliente recibe {bs(e.difBs)} menos: queda en la caja.</span>}
+              {vueltoDeMas && <span className="vz-dif mal">Le estás dando {bs(-e.difBs)} de más.</span>}
               <div className="vz-ent"><span>Entrega</span><b className="t">{entregaTxt}</b></div>
               <small className="vz-nota">Sale del efectivo de la gaveta{e.vueltoUsd > 0 && e.vueltoBs > 0 ? ": dólares en billetes y el resto en bolívares." : "."}</small>
             </div>

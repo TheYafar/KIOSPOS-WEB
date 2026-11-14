@@ -1969,3 +1969,10 @@ html[data-tam="muy-grande"] body { zoom:1.3; }
 .vz-ent b { font-size:18px; font-weight:800; color:var(--primary); text-align:right; }
 .vz-nota { font-size:12px; color:var(--text-2); }
 .cb3-ref .opt { font-weight:400; color:var(--text-3); }
+.vz-mix { row-gap:8px; }
+.vz-bs { flex:1 1 140px; }
+.vz-bs input { width:100%; }
+.vz-bs.man { border-color:var(--primary); box-shadow:0 0 0 2px color-mix(in srgb, var(--primary) 20%, transparent); }
+.vz-auto { border:0; background:none; color:var(--primary); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer; padding:0; text-decoration:underline; }
+.vz-dif { font-size:12.5px; font-weight:600; color:var(--warn); }
+.vz-dif.mal { color:var(--bad); }

@@ -33,6 +33,11 @@ describe("calcularCobro", () => {
     expect(C(2.9, 912, { EFECTIVO_USD: 5 }, undefined, undefined, 2)).toMatchObject({ vueltoUsd: 2, vueltoBs: 91.2 });
     expect(C(2.9, 912, { EFECTIVO_USD: 5 }, undefined, undefined, 0)).toMatchObject({ vueltoUsd: 0, vueltoBs: 1915.2 });
   });
+  it("vuelto a mano: se respeta lo entregado y dice la diferencia", () => {
+    const menos = C(2.9, 912, { EFECTIVO_USD: 5 }, undefined, undefined, 2, 90);
+    expect(menos).toMatchObject({ vueltoUsd: 2, vueltoBs: 90, difBs: 1.2 });
+    expect(C(2.9, 912, { EFECTIVO_USD: 5 }, undefined, undefined, 2, 100).difBs).toBeCloseTo(-8.8, 2);
+  });
   it("venta toda a crédito (nada que cobrar) cubre", () => {
     expect(C(0, 912, {})).toMatchObject({ cubre: true });
   });
